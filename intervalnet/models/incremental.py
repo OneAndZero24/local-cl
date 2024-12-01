@@ -47,7 +47,7 @@ class IncrementalClassifier(DynamicModule):
             )
         )
 
-        self.classifier = get_classifier(in_features, initial_out_features)
+        self.classifier = self.get_classifier(in_features, initial_out_features)
         au_init = torch.zeros(initial_out_features, dtype=torch.int8)
         self.register_buffer("active_units", au_init)
 
