@@ -4,7 +4,30 @@ import warnings
 import torchvision.transforms as transforms
 from torchvision.datasets.cifar import CIFAR10, CIFAR100
 from torchvision.datasets.mnist import MNIST, FashionMNIST
+from avalanche.benchmarks.classic import SplitCIFAR10, SplitMNIST
 
+
+def split_mnist(n_experiences: int):
+    transform = transforms.Compose([
+        transforms.Resize(32),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    return SplitMNIST(
+        n_experiences=n_experiences,
+        train_transform=transform,
+        eval_transform=transform
+    )
+
+def split_cifar10(n_experiences: int):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+    ])
+    return SplitCIFAR10(
+        n_experiences=n_experiences,
+        train_transform=transform,
+        eval_transform=transform
+    )
 
 def mnist():
     """MNIST dataset."""
