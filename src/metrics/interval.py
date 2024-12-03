@@ -12,7 +12,7 @@ from avalanche.evaluation.metrics.loss import LossPluginMetric
 from avalanche.training.strategies.base_strategy import BaseStrategy
 from torch import Tensor
 
-from intervalnet.models.interval import IntervalMLP, IntervalModel
+from src.models.interval import IntervalMLP, IntervalModel
 from ..strategies.interval import IntervalTraining
 
 from .generic import MetricNamingMixin

@@ -7,7 +7,7 @@ import copy
 import torch
 from avalanche.training.plugins.strategy_plugin import StrategyPlugin
 
-from intervalnet.models.dynamic import MultiTaskModule
+from src.models.dynamic import MultiTaskModule
 
 from .utils import avalanche_forward
 

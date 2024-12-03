@@ -19,20 +19,21 @@ import torch
 from torch import Tensor
 from torch.optim import SGD, AdamW
 
-from intervalnet.cfg import (
+from src.cfg import (
     DatasetType,
     OptimizerType,
     ScenarioType,
     Settings,
     StrategyType,
 )
-from intervalnet.datasets import fashion_mnist, mnist, cifar10, cifar100
-from intervalnet.metrics.basic import EvalAccuracy, TotalLoss, TrainAccuracy
-from intervalnet.metrics.interval import interval_training_diagnostics
-from intervalnet.models.interval import (IntervalAlexNet, IntervalMLP,
+from src.datasets import fashion_mnist, mnist, cifar10, cifar100
+from src.metrics.basic import EvalAccuracy, TotalLoss, TrainAccuracy
+from src.metrics.interval import interval_training_diagnostics
+from src.models.interval import (IntervalAlexNet, IntervalMLP,
                                          IntervalModel)
-from intervalnet.models.standard import AlexNet, MLP, MobileNet
-from intervalnet.strategies import (
+from src.models.lenet import LeNet
+from src.models.standard import AlexNet, MLP, MobileNet
+from src.strategies import (
     EWCPlugin,
     L2Plugin,
     LwFPlugin,
@@ -245,6 +246,11 @@ class Experiment(AvalancheExperiment):
     # ------------------------------------------------------------------------------------------
     # Experiment variants
     # ------------------------------------------------------------------------------------------
+    def _get_lenet_model(self):
+        return LeNet(
+            # TODO Model type + params in config
+        )
+
     def _get_mlp_model(self):
         return MLP(
             input_size=self.input_size ** 2 * self.channels,
@@ -375,4 +381,4 @@ class Experiment(AvalancheExperiment):
 
 
 if __name__ == "__main__":
-    Experiment("intervalnet", Settings)
+    Experiment("src", Settings)

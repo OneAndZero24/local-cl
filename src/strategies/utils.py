@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch import Tensor
 
-from intervalnet.models.dynamic import MultiTaskModule
+from src.models.dynamic import MultiTaskModule
 
 
 def avalanche_forward(model: nn.Module, x: Tensor, task_labels: Tensor):

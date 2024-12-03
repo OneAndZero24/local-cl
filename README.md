@@ -21,8 +21,3 @@ Ensure the path to the singularity image file is correct.
 ## Training
 
 Scripts for running the experiments from the paper are in the `scripts` directory. 
-
-
-## Development
-
-Main interval training logic is in `intervalnet/strategy.py`. Model specifics are in `intervalnet/models/interval.py`.

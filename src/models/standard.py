@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from intervalnet.models.dynamic import MultiTaskModule
+from src.models.dynamic import MultiTaskModule
 from torch import Tensor
 
 

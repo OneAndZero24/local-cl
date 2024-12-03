@@ -17,9 +17,9 @@ from torch import Tensor
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.optim import Optimizer
 
-from intervalnet.cfg import Settings
-from intervalnet.models.dynamic import MultiTaskModule
-from intervalnet.models.interval import Mode
+from src.cfg import Settings
+from src.models.dynamic import MultiTaskModule
+from src.models.interval import Mode
 
 
 class VanillaTraining(BaseStrategy):

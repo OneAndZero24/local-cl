@@ -17,9 +17,9 @@ from torch import Tensor
 from torch.optim import Optimizer
 from torchmetrics.functional.classification.accuracy import accuracy
 
-from intervalnet.cfg import Settings
-from intervalnet.models.interval import IntervalConv2d, IntervalMLP, Mode, IntervalBatchNorm2d
-from intervalnet.strategies import VanillaTraining
+from src.cfg import Settings
+from src.models.interval import IntervalConv2d, IntervalMLP, Mode, IntervalBatchNorm2d
+from src.strategies import VanillaTraining
 
 
 class IntervalTraining(VanillaTraining):
