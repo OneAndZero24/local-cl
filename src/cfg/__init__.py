@@ -80,6 +80,7 @@ class Settings(pytorch_yard.Settings):
     weight_decay: float = 0.0
     milestones: Optional[Dict[int, float]] = field(default_factory=lambda: {})
     act_fn: str = "relu"
+    gamma: float = 0.0001
 
     # ----------------------------------------------------------------------------------------------
     # Dataset
@@ -90,6 +91,18 @@ class Settings(pytorch_yard.Settings):
     # ----------------------------------------------------------------------------------------------
     # Model
     # ----------------------------------------------------------------------------------------------
+    model: str = "LENET"
+    size: int = 5
+    stride: int = 1
+    sizes: list[int] = [1, 6, 16, 120]
+    head_size: int = 84,
+    conv_type: str = "Conv2d",
+    head_type: str = "Linear",
+    add_avg_pool: bool = True,
+    initial_out_features: int = 2,
+    train_domain: bool = True,
+    toggle_linear: bool = False
+
     batchnorm: bool = False
 
     # ----------------------------------------------------------------------------------------------

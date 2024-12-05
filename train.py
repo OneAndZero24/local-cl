@@ -29,6 +29,7 @@ from src.cfg import (
 from src.datasets import fashion_mnist, mnist, cifar10, cifar100
 from src.metrics.basic import EvalAccuracy, TotalLoss, TrainAccuracy
 from src.metrics.interval import interval_training_diagnostics
+from src.loss.activation import ActivationEntropyPlugin
 from src.models.interval import (IntervalAlexNet, IntervalMLP,
                                          IntervalModel)
 from src.models.lenet import LeNet
@@ -70,6 +71,12 @@ class Experiment(AvalancheExperiment):
 
         self.n_heads: int
         """Number of model heads."""
+
+        self.model_map = {
+            "MLP": self._get_mlp_model,
+            "CNN": self._get_cnn_model,
+            "LENET": self._get_lenet_model
+        }
 
     def entry(self, root_cfg: pytorch_yard.RootConfig) -> None:
         super().entry(root_cfg)
@@ -248,7 +255,16 @@ class Experiment(AvalancheExperiment):
     # ------------------------------------------------------------------------------------------
     def _get_lenet_model(self):
         return LeNet(
-            # TODO Model type + params in config
+            self.cfg.model.size,
+            self.cfg.model.stride,
+            self.cfg.model.sizes,
+            self.cfg.model.head_size,
+            self.cfg.model.conv_type,
+            self.cfg.model.head_type,
+            self.cfg.model.add_avg_pool,
+            self.cfg.model.initial_out_features,
+            train_domain=self.cfg.model.train_domain,
+            toggle_linear=self.cfg.model.toggle_linear
         )
 
     def _get_mlp_model(self):
@@ -273,67 +289,60 @@ class Experiment(AvalancheExperiment):
         # )
 
     def setup_naive(self):
-        if self.cfg.dataset is DatasetType.MNIST or self.cfg.dataset is DatasetType.FASHION_MNIST:
-            self.model = self._get_mlp_model()
-        else:
-            self.model = self._get_cnn_model()
+        self.model = self.model_map[self.cfg.model]
         self.strategy_ = functools.partial(
             VanillaTraining,
+            plugins=[ActivationEntropyPlugin(self.cfg.gamma)]
         )
 
     def setup_ewc(self):
-        if self.cfg.dataset is DatasetType.MNIST or self.cfg.dataset is DatasetType.FASHION_MNIST:
-            self.model = self._get_mlp_model()
-        else:
-            self.model = self._get_cnn_model()
+        self.model = self.model_map[self.cfg.model]
         assert self.cfg.ewc_lambda and self.cfg.ewc_mode
         self.strategy_ = functools.partial(
             VanillaTraining,
-            plugins=[EWCPlugin(self.cfg.ewc_lambda, self.cfg.ewc_mode, self.cfg.ewc_decay)],
+            plugins=[EWCPlugin(self.cfg.ewc_lambda, self.cfg.ewc_mode, self.cfg.ewc_decay),
+                     ActivationEntropyPlugin(self.cfg.gamma)
+                ],
         )
 
     def setup_l2(self):
-        if self.cfg.dataset is DatasetType.MNIST or self.cfg.dataset is DatasetType.FASHION_MNIST:
-            self.model = self._get_mlp_model()
-        else:
-            self.model = self._get_cnn_model()
+        self.model = self.model_map[self.cfg.model]
         assert self.cfg.ewc_lambda and self.cfg.ewc_mode
         self.strategy_ = functools.partial(
             VanillaTraining,
-            plugins=[L2Plugin(self.cfg.ewc_lambda, self.cfg.ewc_mode, self.cfg.ewc_decay)],
+            plugins=[L2Plugin(self.cfg.ewc_lambda, self.cfg.ewc_mode, self.cfg.ewc_decay),
+                     ActivationEntropyPlugin(self.cfg.gamma)
+                ],
         )
 
     def setup_si(self):
-        if self.cfg.dataset is DatasetType.MNIST or self.cfg.dataset is DatasetType.FASHION_MNIST:
-            self.model = self._get_mlp_model()
-        else:
-            self.model = self._get_cnn_model()
+        self.model = self.model_map[self.cfg.model]
         assert self.cfg.si_lambda
         self.strategy_ = functools.partial(
             VanillaTraining,
-            plugins=[SynapticIntelligencePlugin(self.cfg.si_lambda)],
+            plugins=[SynapticIntelligencePlugin(self.cfg.si_lambda),
+                     ActivationEntropyPlugin(self.cfg.gamma)
+                ],
         )
 
     def setup_lwf(self):
-        if self.cfg.dataset is DatasetType.MNIST or self.cfg.dataset is DatasetType.FASHION_MNIST:
-            self.model = self._get_mlp_model()
-        else:
-            self.model = self._get_cnn_model()
+        self.model = self.model_map[self.cfg.model]
         assert self.cfg.lwf_alpha and self.cfg.lwf_temperature
         self.strategy_ = functools.partial(
             VanillaTraining,
-            plugins=[LwFPlugin(self.cfg.lwf_alpha, self.cfg.lwf_temperature)],
+            plugins=[LwFPlugin(self.cfg.lwf_alpha, self.cfg.lwf_temperature),
+                     ActivationEntropyPlugin(self.cfg.gamma)
+                ],
         )
 
     def setup_mas(self):
-        if self.cfg.dataset is DatasetType.MNIST or self.cfg.dataset is DatasetType.FASHION_MNIST:
-            self.model = self._get_mlp_model()
-        else:
-            self.model = self._get_cnn_model()
+        self.model = self.model_map[self.cfg.model]
         assert self.cfg.ewc_lambda and self.cfg.ewc_mode
         self.strategy_ = functools.partial(
             VanillaTraining,
-            plugins=[MASPlugin(self.cfg.ewc_lambda, self.cfg.ewc_mode, self.cfg.ewc_decay)],
+            plugins=[MASPlugin(self.cfg.ewc_lambda, self.cfg.ewc_mode, self.cfg.ewc_decay),
+                     ActivationEntropyPlugin(self.cfg.gamma)
+                ],
         )
 
     def setup_interval(self):
