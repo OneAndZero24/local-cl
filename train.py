@@ -289,14 +289,14 @@ class Experiment(AvalancheExperiment):
         # )
 
     def setup_naive(self):
-        self.model = self.model_map[self.cfg.model]
+        self.model = self.model_map[self.cfg.model]()
         self.strategy_ = functools.partial(
             VanillaTraining,
             plugins=[ActivationEntropyPlugin(self.cfg.gamma)]
         )
 
     def setup_ewc(self):
-        self.model = self.model_map[self.cfg.model]
+        self.model = self.model_map[self.cfg.model]()
         assert self.cfg.ewc_lambda and self.cfg.ewc_mode
         self.strategy_ = functools.partial(
             VanillaTraining,
@@ -306,7 +306,7 @@ class Experiment(AvalancheExperiment):
         )
 
     def setup_l2(self):
-        self.model = self.model_map[self.cfg.model]
+        self.model = self.model_map[self.cfg.model]()
         assert self.cfg.ewc_lambda and self.cfg.ewc_mode
         self.strategy_ = functools.partial(
             VanillaTraining,
@@ -316,7 +316,7 @@ class Experiment(AvalancheExperiment):
         )
 
     def setup_si(self):
-        self.model = self.model_map[self.cfg.model]
+        self.model = self.model_map[self.cfg.model]()
         assert self.cfg.si_lambda
         self.strategy_ = functools.partial(
             VanillaTraining,
@@ -326,7 +326,7 @@ class Experiment(AvalancheExperiment):
         )
 
     def setup_lwf(self):
-        self.model = self.model_map[self.cfg.model]
+        self.model = self.model_map[self.cfg.model]()
         assert self.cfg.lwf_alpha and self.cfg.lwf_temperature
         self.strategy_ = functools.partial(
             VanillaTraining,
@@ -336,7 +336,7 @@ class Experiment(AvalancheExperiment):
         )
 
     def setup_mas(self):
-        self.model = self.model_map[self.cfg.model]
+        self.model = self.model_map[self.cfg.model]()
         assert self.cfg.ewc_lambda and self.cfg.ewc_mode
         self.strategy_ = functools.partial(
             VanillaTraining,
