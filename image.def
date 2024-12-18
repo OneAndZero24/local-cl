@@ -16,4 +16,3 @@ From: nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
     TMPDIR=/pip-build pip --no-input --no-cache-dir install coolname gdown ipywidgets opencv-python-headless python-dotenv rich torchmetrics tqdm typer
     TMPDIR=/pip-build pip --no-input --no-cache-dir install wandb seaborn visdom
     rm -rf /pip-build
-    apt autoclean -y
