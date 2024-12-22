@@ -1,7 +1,12 @@
 **/__pycache__
 **/outputs
 
+DS_Store
 venv
 cache
+data
+outputs
 
+.env
 *.log
+*.pyc
