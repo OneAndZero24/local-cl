@@ -6,3 +6,4 @@ torchvision==0.20.1
 lightning==2.5.0
 lightning-fabric==2.5.0
 wandb==0.19.1
+continuum==1.2.7
