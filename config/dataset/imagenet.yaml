@@ -1,4 +1,4 @@
 _partial_: True
 _target_: continuum.datasets.ImageNet100
-data_path: ${oc.env:DATASET_DIR}/mnist
+data_path: ${oc.env:DATASET_DIR}/imagenet
 download: True
