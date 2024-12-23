@@ -1,0 +1,4 @@
+_partial_: True
+_target_: continuum.datasets.CIFAR100
+data_path: ${oc.env:DATASET_DIR}/mnist
+download: True

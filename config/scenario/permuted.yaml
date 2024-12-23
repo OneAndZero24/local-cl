@@ -1,0 +1,5 @@
+_partial_: True
+_target_: continuum.Permutations
+nb_tasks: 5
+seed: 42
+shared_label_space: False
