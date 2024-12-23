@@ -8,6 +8,10 @@ from .local_conv2d import LocalConv2DLayer
 
 
 class LayerType(Enum):
+    """
+    enum = (LOCAL, NORMAL)
+    """
+
     LOCAL = "Local"
     NORMAL = "Normal"
 
