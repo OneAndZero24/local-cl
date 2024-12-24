@@ -65,7 +65,7 @@ def experiment(config: DictConfig):
                 train(train_loader)
                 test(test_loader)
 
-            # TODO what in method ?
+            # TODO proper grad flow in LwF
             # TODO increment classifier
             # TODO fabric increment classifier
 
