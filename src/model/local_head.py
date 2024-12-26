@@ -27,6 +27,7 @@ class LocalHead(nn.Module):
         self.left_bounds  = nn.Parameter(data=left_bounds, requires_grad=False)
         self.right_bounds = nn.Parameter(data=right_bounds, requires_grad=False)
 
+
     def forward(self, x):
         x = self.linear(x)
         if self.out_features > self.old_out_features:
@@ -49,6 +50,8 @@ class LocalHead(nn.Module):
 
         return x
     
+
+    @torch.no_grad()
     def increment(self, new_classes: list[int]):
         old_out_features = self.out_features
         self.out_features += len(new_classes)
