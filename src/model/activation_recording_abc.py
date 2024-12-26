@@ -2,7 +2,7 @@ from abc import ABCMeta
 
 from torch import nn
 
-from layer import LocalLayer, LocalConv2DLayer
+from model.layer import LocalLayer, LocalConv2DLayer
 
 
 LOCAL_LAYERS = (LocalLayer, LocalConv2DLayer)

@@ -5,7 +5,7 @@ DS_Store
 venv
 cache
 data
-output
+outputs
 
 .env
 *.log

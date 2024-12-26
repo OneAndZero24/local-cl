@@ -56,10 +56,10 @@ class LocalConv2DLayer(nn.Module):
         return res.view(res.shape[0], self.out_channels, h, -1)
 
     def extra_repr(self):
-        return f"in_features={self.in_features}, 
-            out_features={self.out_features},
-            size={self.size},
-            stride={self.stride}, 
-            x_min={self.x_min}, x_max={self.x_max}, 
-            train_domain={self.left_bounds.requires_grad}"
+        return (f"in_features={self.in_features}, "
+            f"out_features={self.out_features}, "
+            f"size={self.size}, "
+            f"stride={self.stride}, " 
+            f"x_min={self.x_min}, x_max={self.x_max}, " 
+            f"train_domain={self.left_bounds.requires_grad}")
     

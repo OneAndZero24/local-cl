@@ -1,9 +1,10 @@
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-import fabric
+
+from lightning.fabric import Fabric
 
 
-def setup_fabric(config: DictConfig) -> fabric.Fabric:
+def setup_fabric(config: DictConfig) -> Fabric:
     """
     Sets up Fabric run based on config.
     """

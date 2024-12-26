@@ -1,11 +1,13 @@
 defaults:
-  - dataset: split_mnist
+  - _self_
+  - dataset: mnist
   - scenario: class_inc
   - model: lenet
-  - mehod: lwf
+  - method: lwf
 
-_target_: experiment
 exp:
+  run_func:
+    _target_: experiment.experiment
   seed: 42
   log_dir: # set during runtime to automatically created dir
   batch_size: 64

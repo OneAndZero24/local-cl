@@ -5,8 +5,8 @@ import torch
 from torch import nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from metric import distillation_loss
-from method_abc import MethodABC
+from method.metric import distillation_loss
+from method.method_abc import MethodABC
 
 
 class LwF(MethodABC):

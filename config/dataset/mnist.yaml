@@ -1,4 +1,4 @@
 _partial_: True
 _target_: continuum.datasets.MNIST
-data_path: ${oc.env:DATASET_DIR}/mnist
+data_path: ${oc.env:DATA_DIR}/mnist
 download: True

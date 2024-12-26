@@ -3,7 +3,7 @@ from typing import Optional
 from torch import nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from method_abc import MethodABC
+from method.method_abc import MethodABC
 
 
 class Naive(MethodABC):

@@ -1,2 +1,2 @@
-from naive import Naive
-from lwf import LwF
+from .naive import Naive
+from .lwf import LwF

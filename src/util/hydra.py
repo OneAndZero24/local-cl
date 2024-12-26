@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from omegaconf import DictConfig
@@ -9,7 +10,7 @@ def extract_output_dir(config: DictConfig) -> Path:
     '''
     
     date = '/'.join(list(config._metadata.resolver_cache['now'].values()))
-    output_dir = Path.cwd() / 'outputs' / date
+    output_dir = Path.cwd() / os.environ['OUTPUT_DIR'] / date
     return output_dir
 
 def preprocess_config(config: DictConfig):

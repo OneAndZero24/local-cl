@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from activation_recording_abc import ActivationRecordingModuleABC
-from inc_classifier import IncrementalClassifier
-from layer import LayerType, LocalLayer
+from model.activation_recording_abc import ActivationRecordingModuleABC
+from model.inc_classifier import IncrementalClassifier
+from model.layer import LayerType, LocalLayer
 
 
 class MLP(ActivationRecordingModuleABC):
