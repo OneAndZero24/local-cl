@@ -45,7 +45,7 @@ def experiment(config: DictConfig):
     model = fabric.setup(instantiate(config.model))
 
     log.info(f'Setting up method')
-    method = fabric.setup(instantiate(config.method)(model))
+    method = instantiate(config.method)(model)
 
     for task_id, (train_task, test_task) in enumerate(zip(train_scenario, test_scenario)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
@@ -66,8 +66,7 @@ def experiment(config: DictConfig):
 
         if isinstance(method.module.head, IncrementalClassifier):
             log.info(f'Incrementing model head')
-            method.module.head.increment(train_task.classes)
-            method.module = fabric.setup(method.module)
+            method.module.head.increment(train_task.get_classes())
 
         log.info(f'Setting up task')
         method.setup_task(task_id)
@@ -89,8 +88,8 @@ def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
 
     method.module.train()
     avg_loss = 0.0
-    for batch_idx, (X, y) in enumerate(tqdm(dataloader)):
-        loss, preds = method(X, y)
+    for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
+        loss, preds = method.forward(X, y)
 
         method.backward(loss)
 
@@ -113,8 +112,8 @@ def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, cm
         avg_loss = 0.0
         y_total = []
         preds_total = []
-        for batch_idx, (X, y) in enumerate(tqdm(dataloader)):
-            loss, preds = method(X, y)
+        for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
+            loss, preds = method.forward(X, y)
             avg_loss += loss
 
             preds, _ = torch.max(preds.data, 1)

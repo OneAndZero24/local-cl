@@ -4,8 +4,8 @@ stride: 1
 initial_out_features: 2
 sizes: [1, 6, 16, 120]
 head_size: 84
-conv_type: model.LayerType.NORMAL
-head_type: model.LayerType.LOCAL
+conv_type: Local
+head_type: Normal
 add_avg_pool: True
 add_fc_local: False
 train_domain: False

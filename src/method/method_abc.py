@@ -55,7 +55,7 @@ class MethodABC(metaclass=ABCMeta):
 
 
     @abstractmethod
-    def forward(self, x):
+    def forward(self, x, y):
         """
         Forward pass.
         """

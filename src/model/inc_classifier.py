@@ -28,9 +28,9 @@ class IncrementalClassifier(nn.Module):
 
         self.get_classifier = (lambda in_features, out_features: 
             instantiate(
+                layer_type,
                 in_features, 
                 out_features,
-                layer_type,
                 **kwargs
             )
         )

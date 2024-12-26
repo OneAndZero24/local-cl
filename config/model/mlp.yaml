@@ -1,6 +1,6 @@
 _target_: model.MLP
 initial_out_features: 2
-sizes: [1024, 128]
-head_type: model.LayerType.LOCAL
+sizes: [784, 128]
+head_type: Local
 add_fc_local: False
 train_domain: False

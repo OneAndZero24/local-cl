@@ -26,7 +26,7 @@ class Naive(MethodABC):
         Task setup.
         """
 
-        pass
+        super().setup_optim(task_id)
     
 
     def forward(self, x, y):

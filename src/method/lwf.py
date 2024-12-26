@@ -41,6 +41,7 @@ class LwF(MethodABC):
             with torch.no_grad():   
                 self.old_module = deepcopy(self.module).freeze()
                 self.old_module.eval()
+        super().setup_optim(task_id)
 
 
     def forward(self, x, y):

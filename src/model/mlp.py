@@ -14,29 +14,27 @@ class MLP(ActivationRecordingModuleABC):
     def __init__(self,
         initial_out_features: int,
         sizes: list[int],
-        head_type: LayerType=LayerType.NORMAL,
+        head_type: str="Normal",
         add_fc_local: bool=True,
         **kwargs
     ):
-        masking = kwargs["masking"]
-        mask_value = kwargs["mask_value"]
-        del kwargs["masking"]
-        del kwargs["mask_value"]
+        head_type = LayerType(head_type)
         super().__init__(
             IncrementalClassifier(
                 sizes[-1], 
                 initial_out_features,
                 layer_type=head_type,
-                masking=masking,
-                mask_value=mask_value
                 **kwargs
             )
         )
 
+        kwargs.pop("masking", None)
+        kwargs.pop("mask_value", None)
+
         layers = []
         for i in range(len(sizes)-1):
             layers.append(nn.Linear(sizes[i], sizes[i+1]))
-            if add_local:
+            if add_fc_local:
                 layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
 
         self.layers = nn.ModuleList(layers)
