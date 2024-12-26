@@ -52,7 +52,7 @@ class LeNet(ActivationRecordingModuleABC):
             nn.Tanh()
         ]
         if add_fc_local:
-            layers.insert(2, LocalLayer(head_size, head_size, **kwargs))
+            layers.insert(2, LocalLayer(head_size, **kwargs))
         self.fc_layers = nn.Sequential(*layers)
 
 
