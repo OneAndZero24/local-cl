@@ -1,7 +1,11 @@
+from typing import Optional
 from abc import ABCMeta, abstractmethod
 
 from torch import nn
 from torch import optim
+
+from model.activation_recording_abc import ActivationRecordingModuleABC
+from method.metric import activation_entropy_loss
 
 
 class MethodABC(metaclass=ABCMeta):
@@ -10,27 +14,44 @@ class MethodABC(metaclass=ABCMeta):
     """
 
     def __init__(self, 
-        module: nn.Module,
+        module: ActivationRecordingModuleABC,
         criterion: nn.Module, 
         first_lr: float, 
-        lr: float
+        lr: float,
+        gamma: Optional[float]=None
     ):
         self.module = module
         self.criterion = criterion
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr
+        self.gamma = gamma
 
 
-    def setup(self, task_id: int):
+    def setup_optim(self, task_id: int):
         """
-        Task setup.
+        Optimizer setup.
         """
 
         params = list(self.module.parameters())
         params = filter(lambda p: p.requires_grad, params)
         lr = self.first_lr if task_id == 0 else self.lr
         self.optimizer = optim.Adam(params, lr=lr)
+
+
+    def add_ael(self, loss):
+        if self.gamma is not None:
+            loss += activation_entropy_loss(self.module.activations, self.gamma)
+        return loss
+
+
+    @abstractmethod
+    def setup_task(self, task_id: int):
+        """
+        Task setup.
+        """
+
+        pass
 
 
     @abstractmethod

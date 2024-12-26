@@ -5,7 +5,7 @@ initial_out_features: 2
 sizes: [1, 6, 16, 120]
 head_size: 84
 conv_type: model.LayerType.NORMAL
-fc_type: model.LayerType.NORMAL
-head_type: model.LayerType.NORMAL
+head_type: model.LayerType.LOCAL
 add_avg_pool: True
+add_fc_local: False
 train_domain: False

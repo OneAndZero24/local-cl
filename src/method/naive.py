@@ -1,28 +1,40 @@
+from typing import Optional
+
 from torch import nn
 
+from model.activation_recording_abc import ActivationRecordingModuleABC
 from method_abc import MethodABC
 
 
 class Naive(MethodABC):
     """
-    Naive method.
+    Naive joint training method.
     """
 
     def __init__(self, 
-        module: nn.Module,
+        module: ActivationRecordingModuleABC,
         criterion: nn.Module, 
         first_lr: float, 
-        lr: float
+        lr: float,
+        gamma: Optional[float]=None
     ):
-        super().__init__(module, criterion, first_lr, lr)
+        super().__init__(module, criterion, first_lr, lr, gamma)
 
+
+    def setup_task(self, task_id: int):
+        """
+        Task setup.
+        """
+
+        pass
+    
 
     def forward(self, x, y):
         """
         Forward pass.
         """
         preds = self.module(x)
-        return self.criterion(preds, y)
+        return self.add_ael(self.criterion(preds, y)), preds
     
 
     def backward(self, loss):

@@ -15,6 +15,7 @@ class MLP(ActivationRecordingModuleABC):
         initial_out_features: int,
         sizes: list[int],
         head_type: LayerType=LayerType.NORMAL,
+        add_fc_local: bool=True,
         **kwargs
     ):
         masking = kwargs["masking"]
@@ -35,7 +36,8 @@ class MLP(ActivationRecordingModuleABC):
         layers = []
         for i in range(len(sizes)-1):
             layers.append(nn.Linear(sizes[i], sizes[i+1]))
-            layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
+            if add_local:
+                layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
 
         self.layers = nn.ModuleList(layers)
     

@@ -2,7 +2,7 @@ import torch.nn as nn
 
 from activation_recording_abc import ActivationRecordingModuleABC
 from inc_classifier import IncrementalClassifier
-from layer import LayerType, instantiate2D, instantiate
+from layer import LayerType, LocalLayer, instantiate2D
 
 
 class LeNet(ActivationRecordingModuleABC):
@@ -17,9 +17,9 @@ class LeNet(ActivationRecordingModuleABC):
         sizes: list[int],
         head_size: int,
         conv_type: LayerType=LayerType.NORMAL,
-        fc_type: LayerType=LayerType.NORMAL,
         head_type: LayerType=LayerType.NORMAL,
         add_avg_pool: bool=True,
+        add_fc_local: bool=False,
         **kwargs
     ):
         masking = kwargs["masking"]
@@ -48,7 +48,8 @@ class LeNet(ActivationRecordingModuleABC):
         self.conv_layers = nn.Sequential(*layers)
         self.fc_layers = nn.Sequential(
             nn.Flatten(),
-            instantiate(fc_type, sizes[-1], head_size, head_type, **kwargs),
+            nn.Linear(sizes[-1], head_size),
+            LocalLayer(head_size, head_size, **kwargs) if add_fc_local else nn.Identity,
             nn.Tanh()
         )
 

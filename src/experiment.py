@@ -11,6 +11,8 @@ import wandb
 from tqdm import tqdm
 
 from util.fabric import setup_fabric
+from model import IncrementalClassifier
+from method.method_abc import MethodABC
  
 
 log = logging.getLogger(__name__)
@@ -40,7 +42,10 @@ def experiment(config: DictConfig):
     fabric = setup_fabric(config)
 
     log.info(f'Building model')
-    fabric.setup(instantiate(config.model))
+    model = fabric.setup(instantiate(config.model))
+
+    log.info(f'Setting up method')
+    method = fabric.setup(instantiate(config.method)(model))
 
     for task_id, (train_task, test_task) in enumerate(zip(train_scenario, test_scenario)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
@@ -59,28 +64,70 @@ def experiment(config: DictConfig):
             generator=torch.Generator(device=fabric.device)
         ))
 
+        if isinstance(method.module.head, IncrementalClassifier):
+            log.info(f'Incrementing model head')
+            method.module.head.increment(train_task.classes)
+            method.module = fabric.setup(method.module)
+
+        log.info(f'Setting up task')
+        method.setup_task(task_id)
+
         with fabric.init_tensor():
             for epoch in range(config.exp.epochs):
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
-                train(train_loader)
-                test(test_loader)
+                train(method, train_loader, task_id, epoch)
+                test(method, test_loader, task_id, epoch)
+                if task_id > 0:
+                    for j in range(task_id-1, -1, -1):
+                        test(method, test_loader, j, epoch, cm_suffix=f' after {task_id}')
 
-            # TODO proper grad flow in LwF
-            # TODO increment classifier
-            # TODO fabric increment classifier
 
-
-def train():
+def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
     """
     Train one epoch.
     """
-    
-    pass
+
+    method.module.train()
+    avg_loss = 0.0
+    for batch_idx, (X, y) in enumerate(tqdm(dataloader)):
+        loss, preds = method(X, y)
+
+        method.backward(loss)
+
+        avg_loss += loss
+        wandb.log({f'Loss/train/{task_id}/per_batch': loss}, (epoch+1)*len(dataloader) + batch_idx)
+
+    avg_loss /= len(dataloader)
+    wandb.log({f'Loss/{task_id}/train': avg_loss}, epoch+1)
 
 
-def test():
+def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, cm_suffix: str = ''):
     """
     Test one epoch.
     """
-    
-    pass
+
+    method.module.eval()
+    with torch.no_grad():
+        correct = 0
+        total = 0
+        avg_loss = 0.0
+        y_total = []
+        preds_total = []
+        for batch_idx, (X, y) in enumerate(tqdm(dataloader)):
+            loss, preds = method(X, y)
+            avg_loss += loss
+
+            preds, _ = torch.max(preds.data, 1)
+            total += y.size(0)
+            correct += (preds == y).sum().item()
+
+            y_total.extend(y.cpu().numpy())
+            preds_total.extend(preds.cpu().numpy())
+            wandb.log({f'Loss/test/{task_id}/per_batch': loss}, (epoch+1)*len(dataloader) + batch_idx)
+
+        avg_loss /= len(dataloader)
+        log.info(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
+        wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}' : 
+                   wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)})
+        wandb.log({f'Loss/{task_id}/test': avg_loss}, epoch+1)
+        wandb.log({f'Accuracy/{task_id}/test': 100 * correct / total}, epoch+1)

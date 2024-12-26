@@ -1,7 +1,7 @@
 defaults:
   - dataset: split_mnist
   - scenario: class_inc
-  - model: mlp
+  - model: lenet
   - mehod: naive
 
 _target_: experiment

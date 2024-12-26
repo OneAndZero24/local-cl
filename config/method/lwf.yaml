@@ -1,0 +1,8 @@
+_partial_: True
+_target_: method.LwF
+criterion: nn.CrossEntropyLoss
+first_lr: 0.001
+lr: 0.001
+T: 2
+alpha: 0.1
+gamma: 0.0001
