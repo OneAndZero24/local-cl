@@ -80,14 +80,14 @@ def experiment(config: DictConfig):
         with fabric.init_tensor():
             for epoch in range(config.exp.epochs):
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
-                train(method, train_task, task_id, epoch)
-                test(method, test_task, task_id, epoch, gen_cm)
+                train(method, train_task, task_id)
+                test(method, test_task, task_id, gen_cm)
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
-                        test(method, test_tasks[j], j, epoch, gen_cm, cm_suffix=f' after {task_id}')
+                        test(method, test_tasks[j], j, gen_cm, cm_suffix=f' after {task_id}')
 
 
-def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
+def train(method: MethodABC, dataloader: DataLoader, task_id: int):
     """
     Train one epoch.
     """
@@ -100,13 +100,13 @@ def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
         method.backward(loss)
 
         avg_loss += loss
-        wandb.log({f'Loss/train/{task_id}/per_batch': loss}, (epoch+1)*len(dataloader) + batch_idx)
+        wandb.log({f'Loss/train/{task_id}/per_batch': loss})
 
     avg_loss /= len(dataloader)
-    wandb.log({f'Loss/train/{task_id}': avg_loss}, epoch+1)
+    wandb.log({f'Loss/train/{task_id}': avg_loss})
 
 
-def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, gen_cm: bool, cm_suffix: str = ''):
+def test(method: MethodABC, dataloader: DataLoader, task_id: int, gen_cm: bool, cm_suffix: str = ''):
     """
     Test one epoch.
     """
@@ -126,16 +126,16 @@ def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, ge
             _, preds = torch.max(preds.data, 1)
             total += y.size(0)
             correct += (preds == y).sum().item()
-            wandb.log({f'Loss/test/{task_id}/per_batch': loss}, (epoch+1)*len(dataloader) + batch_idx)
+            wandb.log({f'Loss/test/{task_id}/per_batch': loss})
 
             if gen_cm:
                 y_total.extend(y.cpu().numpy())
                 preds_total.extend(preds.cpu().numpy())
 
         avg_loss /= len(dataloader)
-        log.info(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
-        wandb.log({f'Loss/test/{task_id}': avg_loss}, epoch+1)
-        wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total}, epoch+1)
+        log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')
+        wandb.log({f'Loss/test/{task_id}': avg_loss})
+        wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
         if gen_cm:
             wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}': 
                 wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)}

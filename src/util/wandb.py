@@ -24,7 +24,7 @@ def setup_wandb(config: omegaconf.DictConfig):
     wandb_config = omegaconf.OmegaConf.to_container(
         config, resolve = True, throw_on_missing = True
     )
-    tags = _parse(config.exp)
+    tags = _parse(config)
     wandb.init(
         entity = config.wandb.entity,
         project = config.wandb.project,
