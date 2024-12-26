@@ -12,6 +12,7 @@ exp:
   log_dir: # set during runtime to automatically created dir
   batch_size: 64
   epochs: 5
+  gen_cm: False
 
 fabric:
   _target_: lightning.Fabric

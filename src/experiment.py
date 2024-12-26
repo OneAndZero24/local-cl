@@ -16,6 +16,7 @@ from method.method_abc import MethodABC
  
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
 def get_scenarios(config: DictConfig):
@@ -47,6 +48,8 @@ def experiment(config: DictConfig):
     log.info(f'Setting up method')
     method = instantiate(config.method)(model)
 
+    gen_cm = config.exp.gen_cm
+
     for task_id, (train_task, test_task) in enumerate(zip(train_scenario, test_scenario)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
 
@@ -75,10 +78,10 @@ def experiment(config: DictConfig):
             for epoch in range(config.exp.epochs):
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
                 train(method, train_loader, task_id, epoch)
-                test(method, test_loader, task_id, epoch)
+                test(method, test_loader, task_id, epoch, gen_cm)
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
-                        test(method, test_loader, j, epoch, cm_suffix=f' after {task_id}')
+                        test(method, test_loader, j, epoch, gen_cm, cm_suffix=f' after {task_id}')
 
 
 def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
@@ -100,7 +103,7 @@ def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
     wandb.log({f'Loss/train/{task_id}': avg_loss}, epoch+1)
 
 
-def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, cm_suffix: str = ''):
+def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, gen_cm: bool, cm_suffix: str = ''):
     """
     Test one epoch.
     """
@@ -110,23 +113,27 @@ def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, cm
         correct = 0
         total = 0
         avg_loss = 0.0
-        y_total = []
-        preds_total = []
+        if gen_cm:
+            y_total = []
+            preds_total = []
         for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
             loss, preds = method.forward(X, y)
             avg_loss += loss
 
-            preds, _ = torch.max(preds.data, 1)
+            _, preds = torch.max(preds.data, 1)
             total += y.size(0)
             correct += (preds == y).sum().item()
-
-            y_total.extend(y.cpu().numpy())
-            preds_total.extend(preds.cpu().numpy())
             wandb.log({f'Loss/test/{task_id}/per_batch': loss}, (epoch+1)*len(dataloader) + batch_idx)
+
+            if gen_cm:
+                y_total.extend(y.cpu().numpy())
+                preds_total.extend(preds.cpu().numpy())
 
         avg_loss /= len(dataloader)
         log.info(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
-        wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}' : 
-                   wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)})
         wandb.log({f'Loss/test/{task_id}': avg_loss}, epoch+1)
         wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total}, epoch+1)
+        if gen_cm:
+            wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}': 
+                wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)}
+            )
