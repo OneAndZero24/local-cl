@@ -23,7 +23,9 @@ def _instantiate(
     **kwargs
 ):
     layer = map[layer_type]
-    return layer(*args, **kwargs)
+    if layer_type == LayerType.LOCAL:
+        return layer(*args, **kwargs)
+    return layer(*args)
 
 
 instantiate = partial(_instantiate, {

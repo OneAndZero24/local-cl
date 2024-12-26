@@ -97,7 +97,7 @@ def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):
         wandb.log({f'Loss/train/{task_id}/per_batch': loss}, (epoch+1)*len(dataloader) + batch_idx)
 
     avg_loss /= len(dataloader)
-    wandb.log({f'Loss/{task_id}/train': avg_loss}, epoch+1)
+    wandb.log({f'Loss/train/{task_id}': avg_loss}, epoch+1)
 
 
 def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, cm_suffix: str = ''):
@@ -128,5 +128,5 @@ def test(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int, cm
         log.info(f'Accuracy of the model on the test images: {100 * correct / total:.2f}%')
         wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}' : 
                    wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)})
-        wandb.log({f'Loss/{task_id}/test': avg_loss}, epoch+1)
-        wandb.log({f'Accuracy/{task_id}/test': 100 * correct / total}, epoch+1)
+        wandb.log({f'Loss/test/{task_id}': avg_loss}, epoch+1)
+        wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total}, epoch+1)

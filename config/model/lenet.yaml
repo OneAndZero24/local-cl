@@ -3,9 +3,9 @@ size: 5
 stride: 1
 initial_out_features: 2
 sizes: [1, 6, 16, 120]
-head_size: 84
-conv_type: Local
-head_type: Normal
+head_size: 120
+conv_type: Normal
+head_type: Local
 add_avg_pool: True
 add_fc_local: False
 train_domain: False

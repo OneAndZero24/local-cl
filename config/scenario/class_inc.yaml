@@ -1,3 +1,5 @@
 _partial_: True
 _target_: continuum.ClassIncremental
 increment: 2
+transformations: 
+  _target_: util.resize_transform

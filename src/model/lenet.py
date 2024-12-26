@@ -45,22 +45,25 @@ class LeNet(ActivationRecordingModuleABC):
                 layers.append(nn.Tanh())
 
         self.conv_layers = nn.Sequential(*layers)
-        self.fc_layers = nn.Sequential(
+
+        layers = [
             nn.Flatten(),
             nn.Linear(sizes[-1], head_size),
-            LocalLayer(head_size, head_size, **kwargs) if add_fc_local else nn.Identity,
             nn.Tanh()
-        )
+        ]
+        if add_fc_local:
+            layers.insert(2, LocalLayer(head_size, head_size, **kwargs))
+        self.fc_layers = nn.Sequential(*layers)
 
 
     def forward(self, x):
         self.reset_activations()
 
-        for layer in self.conv_seq:
+        for layer in self.conv_layers:
             x = layer(x)
             self.add_activation(layer, x)
         
-        for layer in self.fc_seq:
+        for layer in self.fc_layers:
             x = layer(x)
             self.add_activation(layer, x)
         return self.head(x)

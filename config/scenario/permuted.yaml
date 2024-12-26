@@ -3,3 +3,5 @@ _target_: continuum.Permutations
 nb_tasks: 5
 seed: 42
 shared_label_space: False
+transformations: 
+  _target_: util.resize_transform
