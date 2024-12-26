@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from model.inc_classifier import IncrementalClassifier
+from model.local_head import LocalHead
 from model.layer import LayerType, LocalLayer
 
 
@@ -20,11 +20,9 @@ class MLP(ActivationRecordingModuleABC):
     ):
         head_type = LayerType(head_type)
         super().__init__(
-            IncrementalClassifier(
+            LocalHead(
                 sizes[-1], 
                 initial_out_features,
-                layer_type=head_type,
-                **kwargs
             )
         )
 

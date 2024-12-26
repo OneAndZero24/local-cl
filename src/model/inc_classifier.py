@@ -27,11 +27,14 @@ class IncrementalClassifier(nn.Module):
         self.mask_value = mask_value
 
         self.get_classifier = (lambda in_features, out_features: 
-            instantiate(
-                layer_type,
-                in_features, 
-                out_features,
-                **kwargs
+            nn.Sequential(
+                nn.Linear(in_features, out_features),
+                instantiate(
+                    layer_type,
+                    in_features, 
+                    out_features,
+                    **kwargs
+                )
             )
         )
 
@@ -44,8 +47,8 @@ class IncrementalClassifier(nn.Module):
     def increment(self, new_classes: list[int]):
         device = next(self.classifier.parameters()).device
 
-        in_features = self.classifier.in_features
-        old_nclasses = self.classifier.out_features
+        in_features = self.in_features
+        old_nclasses = self.out_features
         new_nclasses = len(new_classes)
         new_nclasses = max(old_nclasses, new_nclasses)
 
@@ -65,7 +68,8 @@ class IncrementalClassifier(nn.Module):
             self.classifier = self.get_classifier(in_features, new_nclasses).to(device)
             for name, param in self.classifier.named_parameters():
                 param.data[:old_nclasses] = state_dict[name]
-
+        self.out_features = new_nclasses
+        
 
     def forward(self, x):
         out = self.classifier(x)
