@@ -37,11 +37,13 @@ class LwF(MethodABC):
         """
 
         self.task_id = task_id
+        super().setup_optim(task_id)
         if task_id > 0:         
             with torch.no_grad():   
-                self.old_module = deepcopy(self.module).freeze()
+                self.old_module = deepcopy(self.module)
+                for p in self.old_module.parameters():
+                    p.requires_grad = False
                 self.old_module.eval()
-        super().setup_optim(task_id)
 
 
     def forward(self, x, y):
@@ -53,7 +55,7 @@ class LwF(MethodABC):
 
         if self.task_id > 0:
             with torch.no_grad():
-                old_preds = self.old_module(y)
+                old_preds = self.old_module(x)
 
                 loss *= self.alpha
                 loss += distillation_loss(preds, old_preds, self.T)*(1-self.alpha)

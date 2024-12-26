@@ -11,7 +11,7 @@ import wandb
 from tqdm import tqdm
 
 from util.fabric import setup_fabric
-from model import IncrementalClassifier
+from model import IncrementalClassifier, LocalHead
 from method.method_abc import MethodABC
  
 
@@ -50,26 +50,29 @@ def experiment(config: DictConfig):
 
     gen_cm = config.exp.gen_cm
 
-    for task_id, (train_task, test_task) in enumerate(zip(train_scenario, test_scenario)):
-        log.info(f'Task {task_id + 1}/{len(train_scenario)}')
-
-        log.info(f'Setting up dataloaders')
-        train_loader = fabric.setup_dataloaders(DataLoader(
+    log.info(f'Setting up dataloaders')
+    train_tasks = []
+    test_tasks = []
+    for train_task, test_task in zip(train_scenario, test_scenario):
+        train_tasks.append(fabric.setup_dataloaders(DataLoader(
             train_task, 
             batch_size=config.exp.batch_size, 
             shuffle=True, 
             generator=torch.Generator(device=fabric.device)
-        ))
-        test_loader = fabric.setup_dataloaders(DataLoader(
+        )))
+        test_tasks.append(fabric.setup_dataloaders(DataLoader(
             test_task, 
             batch_size=1, 
             shuffle=False, 
             generator=torch.Generator(device=fabric.device)
-        ))
+        )))
 
-        if isinstance(method.module.head, IncrementalClassifier):
+    for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
+        log.info(f'Task {task_id + 1}/{len(train_scenario)}')
+
+        if isinstance(method.module.head, (IncrementalClassifier, LocalHead)):
             log.info(f'Incrementing model head')
-            method.module.head.increment(train_task.get_classes())
+            method.module.head.increment(train_task.dataset.get_classes())
 
         log.info(f'Setting up task')
         method.setup_task(task_id)
@@ -77,11 +80,11 @@ def experiment(config: DictConfig):
         with fabric.init_tensor():
             for epoch in range(config.exp.epochs):
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
-                train(method, train_loader, task_id, epoch)
-                test(method, test_loader, task_id, epoch, gen_cm)
+                train(method, train_task, task_id, epoch)
+                test(method, test_task, task_id, epoch, gen_cm)
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
-                        test(method, test_loader, j, epoch, gen_cm, cm_suffix=f' after {task_id}')
+                        test(method, test_tasks[j], j, epoch, gen_cm, cm_suffix=f' after {task_id}')
 
 
 def train(method: MethodABC, dataloader: DataLoader, task_id: int, epoch: int):

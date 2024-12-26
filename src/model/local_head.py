@@ -65,5 +65,5 @@ class LocalHead(nn.Module):
         new_domain = torch.linspace(self.x_min, self.x_max, self.out_features + 1)
         new_left_bounds = new_domain[:-1].unsqueeze(0).repeat(self.out_features, 1)
         new_right_bounds = new_domain[1:].unsqueeze(0).repeat(self.out_features, 1)
-        self.left_bounds.data = new_left_bounds.to(self.device)
-        self.right_bounds.data = new_right_bounds.to(self.device)
+        self.left_bounds.data = new_left_bounds
+        self.right_bounds.data = new_right_bounds
