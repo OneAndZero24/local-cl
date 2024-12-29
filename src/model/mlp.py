@@ -23,28 +23,25 @@ class MLP(ActivationRecordingModuleABC):
             LocalHead(
                 sizes[-1], 
                 initial_out_features,
-                **kwargs
             )
         )
-        print(f"initial_out_features: {initial_out_features}")
+
         kwargs.pop("masking", None)
         kwargs.pop("mask_value", None)
 
         layers = []
         for i in range(len(sizes)-1):
+            layers.append(nn.Linear(sizes[i], sizes[i+1]))
             if add_fc_local:
-                layers.append(LocalLayer(sizes[i], sizes[i+1], **kwargs))
-            else:
-                layers.append(nn.Linear(sizes[i], sizes[i+1]))
+                layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
         self.layers = nn.ModuleList(layers)
     
     
     def forward(self, x):
         self.reset_activations()
+
         x = torch.flatten(x, start_dim=1)
-        
         for layer in self.layers:
             x = layer(x)
             self.add_activation(layer, x)
-            
         return self.head(x)

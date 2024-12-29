@@ -70,6 +70,10 @@ def experiment(config: DictConfig):
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
 
+        if task_id > 0 and isinstance(method.module.head, (IncrementalClassifier, LocalHead)):
+            log.info(f'Incrementing model head')
+            method.module.head.increment(train_task.dataset.get_classes())
+
         log.info(f'Setting up task')
         method.setup_task(task_id)
 
@@ -81,10 +85,6 @@ def experiment(config: DictConfig):
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
                         test(method, test_tasks[j], j, gen_cm, cm_suffix=f' after {task_id}')
-
-        if task_id < len(train_tasks) and isinstance(method.module.head, (IncrementalClassifier, LocalHead)):
-            log.info(f'Incrementing model head')
-            method.module.head.increment(train_task.dataset.get_classes())
 
 
 def train(method: MethodABC, dataloader: DataLoader, task_id: int):
