@@ -7,5 +7,4 @@ head_size: 120
 conv_type: Normal
 head_type: Local
 add_avg_pool: True
-add_fc_local: False
 train_domain: False

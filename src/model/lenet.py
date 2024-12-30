@@ -19,7 +19,6 @@ class LeNet(ActivationRecordingModuleABC):
         conv_type: str="Normal",
         head_type: str="Normal",
         add_avg_pool: bool=True,
-        add_fc_local: bool=False,
         **kwargs
     ):
         conv_type = LayerType(conv_type)
@@ -51,8 +50,6 @@ class LeNet(ActivationRecordingModuleABC):
             nn.Linear(sizes[-1], head_size),
             nn.Tanh()
         ]
-        if add_fc_local:
-            layers.insert(2, LocalLayer(head_size, **kwargs))
         self.fc_layers = nn.ModuleList(layers)
 
 

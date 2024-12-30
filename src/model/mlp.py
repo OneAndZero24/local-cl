@@ -32,9 +32,10 @@ class MLP(ActivationRecordingModuleABC):
         kwargs.pop("mask_value", None)
 
         layers = []
-        for i in range(len(sizes)-1):
+        N = len(sizes)-1
+        for i in range(N):
             layers.append(nn.Linear(sizes[i], sizes[i+1]))
-            if add_fc_local:
+            if add_fc_local and (i < N-1): # dont add Local after last
                 layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
         self.layers = nn.ModuleList(layers)
     
