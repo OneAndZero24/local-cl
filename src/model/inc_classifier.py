@@ -79,7 +79,7 @@ class IncrementalClassifier(nn.Module):
     def forward(self, x):
         x = self.classifier[0](x)
         if isinstance(self.classifier[1], LocalLayer):
-            x[:, :self.old_nclasses] *= self.mul+(torch.min(self.classifier[1].left_bounds)*(1-self.mul))
+            x[:, :self.old_nclasses] = self.mul*x[:, :self.old_nclasses]+(torch.min(self.classifier[1].left_bounds)*(1-self.mul))
         out = self.classifier[1](x)
         if self.masking:
             mask = torch.logical_not(self.active_units)
