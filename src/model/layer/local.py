@@ -15,10 +15,13 @@ class LocalLayer(nn.Module):
         x_min: float = -1.0,
         x_max: float = 1.0,
         device = None, 
-        dtype = None
+        dtype = None,
+        eps: float = 1e-8
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
+
+        self.eps = eps if self.train_domain else 0.0
 
         self.in_features = in_features
         self.out_features = out_features
@@ -36,12 +39,9 @@ class LocalLayer(nn.Module):
         self.left_bounds.data = domain[:-1].clone().unsqueeze(0).repeat(self.in_features, 1)
         self.right_bounds.data = domain[1:].clone().unsqueeze(0).repeat(self.in_features, 1)
 
-    def forward(self, x, eps: float = 1e-8):
+    def forward(self, x):
 
         assert len(x.shape) == 2, "Please check dimensions!"
-        
-        if not self.train_domain:
-            eps = 0.0
 
         upper_bound = float(torch.max(self.right_bounds))
         lower_bound = float(torch.min(self.left_bounds))
@@ -50,7 +50,7 @@ class LocalLayer(nn.Module):
         x = F.hardtanh(x, min_val=lower_bound, max_val=upper_bound)
 
         x = x.unsqueeze(2).repeat(1,1,self.out_features)
-        norm_const = 4 / ((self.right_bounds - self.left_bounds)**2 + eps)
+        norm_const = 4 / ((self.right_bounds - self.left_bounds)**2 + self.eps)
         
         # Forward pass
         x = torch.relu(x - self.left_bounds) \
