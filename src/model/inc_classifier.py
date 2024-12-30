@@ -30,15 +30,12 @@ class IncrementalClassifier(nn.Module):
         self.old_nclasses = initial_out_features
 
         self.get_classifier = (lambda in_features, out_features: 
-            nn.ModuleList([
-                nn.Linear(in_features, out_features),
-                instantiate(
-                    layer_type,
-                    in_features, 
-                    out_features,
-                    **kwargs
-                )
-            ])
+            instantiate(
+                layer_type,
+                in_features, 
+                out_features,
+                **kwargs
+            )
         )
 
         self.classifier = self.get_classifier(in_features, initial_out_features)
@@ -77,10 +74,9 @@ class IncrementalClassifier(nn.Module):
         
 
     def forward(self, x):
-        x = self.classifier[0](x)
-        if isinstance(self.classifier[1], LocalLayer):
-            x[:, :self.old_nclasses] = self.mul*x[:, :self.old_nclasses]+(torch.min(self.classifier[1].left_bounds)*(1-self.mul))
-        out = self.classifier[1](x)
+        if isinstance(self.classifier, LocalLayer):
+            x[:, :self.old_nclasses] = self.mul*x[:, :self.old_nclasses]+(torch.min(self.classifier.left_bounds)*(1-self.mul))
+        out = self.classifier(x)
         if self.masking:
             mask = torch.logical_not(self.active_units)
             out = out.masked_fill(mask=mask, value=self.mask_value)
