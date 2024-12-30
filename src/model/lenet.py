@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from model.local_head import LocalHead
+from model.inc_classifier import IncrementalClassifier
 from model.layer import LayerType, LocalLayer, instantiate2D
 
 
@@ -25,9 +25,11 @@ class LeNet(ActivationRecordingModuleABC):
         conv_type = LayerType(conv_type)
         head_type = LayerType(head_type)
         super().__init__(
-            LocalHead(
+            IncrementalClassifier(
                 sizes[-1], 
                 initial_out_features,
+                head_type,
+                **kwargs
             )
         )
 
@@ -42,7 +44,7 @@ class LeNet(ActivationRecordingModuleABC):
                 layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
                 layers.append(nn.Tanh())
 
-        self.conv_layers = nn.Sequential(*layers)
+        self.conv_layers = nn.ModuleList(layers)
 
         layers = [
             nn.Flatten(),
@@ -51,7 +53,7 @@ class LeNet(ActivationRecordingModuleABC):
         ]
         if add_fc_local:
             layers.insert(2, LocalLayer(head_size, **kwargs))
-        self.fc_layers = nn.Sequential(*layers)
+        self.fc_layers = nn.ModuleList(layers)
 
 
     def forward(self, x):
