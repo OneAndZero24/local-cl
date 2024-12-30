@@ -70,7 +70,7 @@ def experiment(config: DictConfig):
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
 
-        if isinstance(method.module.head, (IncrementalClassifier, LocalHead)):
+        if task_id > 0 and isinstance(method.module.head, (IncrementalClassifier, LocalHead)):
             log.info(f'Incrementing model head')
             method.module.head.increment(train_task.dataset.get_classes())
 

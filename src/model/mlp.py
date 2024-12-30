@@ -35,8 +35,7 @@ class MLP(ActivationRecordingModuleABC):
         for i in range(len(sizes)-1):
             layers.append(nn.Linear(sizes[i], sizes[i+1]))
             if add_fc_local:
-                layers.append(LocalLayer(sizes[i+1], **kwargs))
-
+                layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
         self.layers = nn.ModuleList(layers)
     
     
