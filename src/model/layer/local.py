@@ -21,7 +21,7 @@ class LocalLayer(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
-        self.eps = eps if self.train_domain else 0.0
+        self.eps = eps if train_domain else 0.0
 
         self.in_features = in_features
         self.out_features = out_features
