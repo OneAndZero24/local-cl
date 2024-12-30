@@ -13,6 +13,7 @@ def distillation_loss(outputs_new, outputs_old, T=2):
 def activation_entropy_loss(activations, gamma=1e-4):
     loss = 0.0
     for activation in activations:
-        entropy = F.softmax(activation, dim=1) * F.log_softmax(activation, dim=1)
+        activation_sum = activation.sum(dim=0)
+        entropy = F.softmax(activation_sum) * F.log_softmax(activation_sum)
         loss += -1.0 * entropy.sum()
     return gamma * loss
