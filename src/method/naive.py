@@ -1,5 +1,6 @@
 from typing import Optional
 
+import torch
 from torch import nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
@@ -16,9 +17,11 @@ class Naive(MethodABC):
         criterion: nn.Module, 
         first_lr: float, 
         lr: float,
-        gamma: Optional[float]=None
+        gamma: Optional[float]=None,
+        clipgrad: Optional[float]=None
     ):
         super().__init__(module, criterion, first_lr, lr, gamma)
+        self.clipgrad = clipgrad
 
 
     def setup_task(self, task_id: int):
@@ -44,4 +47,6 @@ class Naive(MethodABC):
 
         self.optimizer.zero_grad()
         loss.backward()
+        if self.clipgrad is not None:
+            torch.nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()

@@ -68,7 +68,10 @@ class IncrementalClassifier(nn.Module):
             state_dict = self.classifier.state_dict()
             self.classifier = self.get_classifier(in_features, new_nclasses).to(device)
             for name, param in self.classifier.named_parameters():
-                param.data[:, :old_nclasses] = state_dict[name]
+                if isinstance(self.classifier, LocalLayer):
+                    param.data[:, :old_nclasses] = state_dict[name]
+                else:
+                    param.data[:old_nclasses] = state_dict[name]
         
 
     def forward(self, x):

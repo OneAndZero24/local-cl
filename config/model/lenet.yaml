@@ -7,4 +7,4 @@ head_size: 84
 conv_type: Normal
 head_type: Local
 add_avg_pool: True
-train_domain: False
+train_domain: True

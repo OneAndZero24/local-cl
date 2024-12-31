@@ -5,3 +5,4 @@ criterion:
 first_lr: 0.001
 lr: 0.001
 gamma: 0.0001
+clipgrad: 0.000001
