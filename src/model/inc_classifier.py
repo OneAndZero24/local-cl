@@ -59,8 +59,7 @@ class IncrementalClassifier(nn.Module):
                 )
                 self.active_units[:old_act_units.shape[0]] = old_act_units
 
-            if self.training:
-                self.active_units[new_classes] = 1
+            self.active_units[new_classes] = 1
 
         if old_nclasses != new_nclasses:
             self.mul *= old_nclasses/new_nclasses
@@ -83,7 +82,7 @@ class IncrementalClassifier(nn.Module):
             )
             x = new_x
         out = self.classifier(x)
-        if self.masking:
+        if self.masking and self.training:
             mask = torch.logical_not(self.active_units)
             out = out.masked_fill(mask=mask, value=self.mask_value)
         return out
