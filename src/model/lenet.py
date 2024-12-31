@@ -2,7 +2,7 @@ import torch.nn as nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
 from model.inc_classifier import IncrementalClassifier
-from model.layer import LayerType, LocalLayer, instantiate2D
+from model.layer import LayerType, instantiate2D
 
 
 class LeNet(ActivationRecordingModuleABC):
@@ -25,7 +25,7 @@ class LeNet(ActivationRecordingModuleABC):
         head_type = LayerType(head_type)
         super().__init__(
             IncrementalClassifier(
-                sizes[-1], 
+                head_size, 
                 initial_out_features,
                 head_type,
                 **kwargs

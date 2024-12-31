@@ -13,6 +13,7 @@ exp:
   batch_size: 64
   epochs: 5
   gen_cm: False
+  detect_anomaly: False
 
 fabric:
   _target_: lightning.Fabric

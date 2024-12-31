@@ -27,7 +27,7 @@ class IncrementalClassifier(nn.Module):
         self.mask_value = mask_value
 
         self.mul = 1.0
-        self.old_nclasses = initial_out_features
+        self.old_nclasses = None
 
         self.get_classifier = (lambda in_features, out_features: 
             instantiate(
@@ -47,10 +47,9 @@ class IncrementalClassifier(nn.Module):
     def increment(self, new_classes: list[int]):
         device = next(self.classifier.parameters()).device
 
-        in_features = self.in_features
-        old_nclasses = self.out_features
-        new_nclasses = len(new_classes)
-        new_nclasses = max(old_nclasses, new_nclasses)
+        in_features = self.classifier.in_features
+        old_nclasses = self.classifier.out_features
+        new_nclasses = max(old_nclasses, max(new_classes)+1)
 
         if self.masking:
             if old_nclasses != new_nclasses: 
@@ -68,14 +67,18 @@ class IncrementalClassifier(nn.Module):
             self.old_nclasses = old_nclasses
             state_dict = self.classifier.state_dict()
             self.classifier = self.get_classifier(in_features, new_nclasses).to(device)
-            for name, param in self.classifier.parameters():
-                param.data[:old_nclasses] = state_dict[name]
-        self.out_features = new_nclasses
+            for name, param in self.classifier.named_parameters():
+                param.data[:, :old_nclasses] = state_dict[name]
         
 
     def forward(self, x):
-        if isinstance(self.classifier, LocalLayer):
-            x[:, :self.old_nclasses] = self.mul*x[:, :self.old_nclasses]+(torch.min(self.classifier.left_bounds)*(1-self.mul))
+        if isinstance(self.classifier, LocalLayer) and (self.old_nclasses is not None):
+            new_x = x.clone()
+            new_x[:, :self.old_nclasses] = (
+                self.mul * x[:, :self.old_nclasses] 
+                + (torch.min(self.classifier.left_bounds) * (1 - self.mul))
+            )
+            x = new_x
         out = self.classifier(x)
         if self.masking:
             mask = torch.logical_not(self.active_units)

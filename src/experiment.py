@@ -36,6 +36,9 @@ def experiment(config: DictConfig):
     Full training and testing on given scenario.
     """
 
+    if config.exp.detect_anomaly:
+        torch.autograd.set_detect_anomaly(True)
+
     log.info(f'Initializing scenarios')
     train_scenario, test_scenario = get_scenarios(config)
 
@@ -70,7 +73,7 @@ def experiment(config: DictConfig):
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
 
-        if task_id > 0 and isinstance(method.module.head, IncrementalClassifier):
+        if isinstance(method.module.head, IncrementalClassifier):
             log.info(f'Incrementing model head')
             method.module.head.increment(train_task.dataset.get_classes())
 
