@@ -5,6 +5,6 @@ criterion:
 first_lr: 0.001
 lr: 0.001
 T: 2
-alpha: 0.1
-gamma: 0.0001
+alpha: 0.9
+gamma: 10
 clipgrad: 0.000001
