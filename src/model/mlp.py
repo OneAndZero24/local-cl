@@ -38,13 +38,19 @@ class MLP(ActivationRecordingModuleABC):
             if add_fc_local and (i < N-1): # dont add Local after last
                 layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
         self.layers = nn.ModuleList(layers)
-    
+
     
     def forward(self, x):
         self.reset_activations()
+        self.reset_active_hills()
 
         x = torch.flatten(x, start_dim=1)
-        for layer in self.layers:
+
+        for idx, layer in enumerate(self.layers):
             x = layer(x)
             self.add_activation(layer, x)
+            
+            next_layer = self.layers[idx + 1] if idx + 1 < len(self.layers) else self.head
+            self.find_active_hills(layer, next_layer, x)
+
         return self.head(x)
