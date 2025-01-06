@@ -39,6 +39,8 @@ class IncrementalClassifier(nn.Module):
         )
 
         self.classifier = self.get_classifier(in_features, initial_out_features)
+        if isinstance(self.classifier, LocalLayer):
+            self.classifier.train_domain = False
         au_init = torch.zeros(initial_out_features, dtype=torch.int8)
         self.register_buffer("active_units", au_init)
 
