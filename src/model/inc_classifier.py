@@ -62,7 +62,7 @@ class IncrementalClassifier(nn.Module):
             self.active_units[new_classes] = 1
 
         if old_nclasses != new_nclasses:
-            self.mul *= old_nclasses/new_nclasses
+            self.mul = old_nclasses/new_nclasses
             self.old_nclasses = old_nclasses
             state_dict = self.classifier.state_dict()
             self.classifier = self.get_classifier(in_features, new_nclasses).to(device)
