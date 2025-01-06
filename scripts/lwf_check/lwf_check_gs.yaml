@@ -1,0 +1,69 @@
+program: src/main.py
+method: bayes          # Use Bayesian optimization
+metric:               # Metric to optimize
+  name: val_accuracy      # Replace with your evaluation metric
+  goal: maximize      # Can be "minimize" or "maximize"
+
+parameters:
+  # Experiment defaults
+  dataset:
+    value: mnist
+  scenario:
+    value: class_inc
+  model:
+    value: mlp
+  method:
+    value: lwf
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    value: 128
+  exp.epochs: 
+    value: 30
+  exp.gen_cm: 
+    value: True
+  exp.detect_anomaly:
+    value: False       
+
+  # Model configuration
+  model._target_: 
+    value: model.MLP
+  model.initial_out_features:
+    value: 2          
+  model.sizes:
+    value: [1024, 400, 400]     
+  model.head_type: 
+    value: Normal
+  model.add_fc_local: 
+    value: False
+  model.train_domain: 
+    value: False        
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.LwF
+  method.criterion._target_: 
+    value: torch.nn.CrossEntropyLoss
+  method.first_lr: 
+    value: 0.001
+  method.T: 
+    value: 2
+  method.alpha: 
+    value: 0.5
+  method.lr: 
+    value: 0.001
+  method.gamma: 
+    value: 0.0
+  method.clipgrad: 
+    value: 0.000001
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - lwf_split_mnist_mlp.yaml
+  - ${args_no_hyphens}
