@@ -18,9 +18,10 @@ class Naive(MethodABC):
         first_lr: float, 
         lr: float,
         gamma: Optional[float]=None,
+        reg_type: Optional[str]=None,
         clipgrad: Optional[float]=None
     ):
-        super().__init__(module, criterion, first_lr, lr, gamma)
+        super().__init__(module, criterion, first_lr, lr, reg_type, gamma)
         self.clipgrad = clipgrad
 
 

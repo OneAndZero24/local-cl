@@ -5,7 +5,7 @@ from torch import nn
 from torch import optim
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from method.metric import activation_entropy_loss
+from method.metric import activation_loss
 
 
 class MethodABC(metaclass=ABCMeta):
@@ -18,6 +18,7 @@ class MethodABC(metaclass=ABCMeta):
         criterion: nn.Module, 
         first_lr: float, 
         lr: float,
+        reg_type: Optional[str]=None,
         gamma: Optional[float]=None
     ):
         self.module = module
@@ -25,6 +26,7 @@ class MethodABC(metaclass=ABCMeta):
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr
+        self.reg_type = reg_type
         self.gamma = gamma
 
 
@@ -40,8 +42,8 @@ class MethodABC(metaclass=ABCMeta):
 
 
     def add_ael(self, loss):
-        if self.gamma is not None:
-            loss += activation_entropy_loss(self.module.activations, self.gamma)
+        if self.gamma is not None and self.reg_type is not None:
+            loss += activation_loss(self.module.activations, self.reg_type, self.gamma)
         return loss
 
 
