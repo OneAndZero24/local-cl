@@ -38,7 +38,7 @@ class MLP(ActivationRecordingModuleABC):
             if add_fc_local and (i < N-1): # dont add Local after last
                 layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
         self.layers = nn.ModuleList(layers)
-    
+
     
     def forward(self, x):
         self.reset_activations()
