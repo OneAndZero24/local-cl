@@ -31,15 +31,21 @@ class MLP(ActivationRecordingModuleABC):
         kwargs.pop("masking", None)
         kwargs.pop("mask_value", None)
 
-        layers = []
-        N = len(sizes)-1
-        for i in range(N):
-            layers.append(nn.Linear(sizes[i], sizes[i+1]))
-            if add_fc_local and (i < N-1): # dont add Local after last
-                layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
-        self.layers = nn.ModuleList(layers)
+        # layers = []
+        # N = len(sizes)-1
+        # for i in range(N):
+        #     layers.append(nn.Linear(sizes[i], sizes[i+1]))
+        #     if add_fc_local and (i < N-1): # dont add Local after last
+        #         layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
+        #     else:
+        #         layers.append(nn.Tanh())
+        # self.layers = nn.ModuleList(layers)
 
-    
+        self.layers = nn.ModuleList([
+           LocalLayer(1024,100,False,use_w=True),
+        ])
+
+        print(self.layers)
     def forward(self, x):
         self.reset_activations()
 
