@@ -35,3 +35,4 @@ def setup_wandb(config: omegaconf.DictConfig):
         sync_tensorboard = False,
         tags=tags
     )
+    wandb.define_metric("avg_acc", summary="last")

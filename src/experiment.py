@@ -70,6 +70,7 @@ def experiment(config: DictConfig):
             generator=torch.Generator(device=fabric.device)
         )))
 
+    avg_acc = 0.0
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{len(train_scenario)}')
 
@@ -82,12 +83,20 @@ def experiment(config: DictConfig):
 
         with fabric.init_tensor():
             for epoch in range(config.exp.epochs):
+                lastepoch = (epoch == config.exp.epochs-1)
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
                 train(method, train_task, task_id)
-                test(method, test_task, task_id, gen_cm)
+                acc = test(method, test_task, task_id, gen_cm)
+                if lastepoch:
+                    avg_acc = 0.0
+                    avg_acc += acc
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
-                        test(method, test_tasks[j], j, gen_cm, cm_suffix=f' after {task_id}')
+                        acc = test(method, test_tasks[j], j, gen_cm, cm_suffix=f' after {task_id}')
+                        if lastepoch:
+                            avg_acc += acc
+        avg_acc /= task_id+1
+        wandb.log({f'avg_acc': avg_acc})
 
 
 def train(method: MethodABC, dataloader: DataLoader, task_id: int):
@@ -109,7 +118,7 @@ def train(method: MethodABC, dataloader: DataLoader, task_id: int):
     wandb.log({f'Loss/train/{task_id}': avg_loss})
 
 
-def test(method: MethodABC, dataloader: DataLoader, task_id: int, gen_cm: bool, cm_suffix: str = ''):
+def test(method: MethodABC, dataloader: DataLoader, task_id: int, gen_cm: bool, cm_suffix: str = '') -> float:
     """
     Test one epoch.
     """
@@ -143,3 +152,4 @@ def test(method: MethodABC, dataloader: DataLoader, task_id: int, gen_cm: bool, 
             wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}': 
                 wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)}
             )
+        return 100 * correct / total
