@@ -19,11 +19,11 @@ class LocalLayer(nn.Module):
         device = None, 
         dtype = None,
         eps: float = 1e-8,
-        use_w=False
+        use_importance_params: bool = True
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
-        self.use_w = use_w
+        self.use_importance_params = use_importance_params
 
         self.eps = eps if train_domain else 0.0
 
@@ -36,7 +36,7 @@ class LocalLayer(nn.Module):
 
         self.left_bounds = nn.Parameter(torch.empty(in_features, out_features, **factory_kwargs), requires_grad=train_domain)
         self.right_bounds = nn.Parameter(torch.empty(in_features, out_features, **factory_kwargs), requires_grad=train_domain)
-        if use_w:
+        if use_importance_params:
             self.w = nn.Parameter(torch.empty(in_features, out_features, **factory_kwargs), requires_grad=True)
         self.reset_parameters()
 
@@ -44,43 +44,44 @@ class LocalLayer(nn.Module):
         domain = torch.linspace(self.x_min, self.x_max, self.out_features+1)
         self.left_bounds.data = domain[:-1].clone().unsqueeze(0).repeat(self.in_features, 1)
         self.right_bounds.data = domain[1:].clone().unsqueeze(0).repeat(self.in_features, 1)
-        if self.use_w:
+        if self.use_importance_params:
             nn.init.kaiming_uniform_(self.w, a=math.sqrt(5))
 
     def forward(self, x):
 
         assert len(x.shape) == 2, "Please check dimensions!"
 
-        upper_bound = float(torch.max(self.right_bounds))
-        lower_bound = float(torch.min(self.left_bounds))
-        
-        x = F.hardtanh(x, min_val=lower_bound, max_val=upper_bound)
+        upper_bound = torch.max(self.right_bounds).item()
+        lower_bound = torch.min(self.left_bounds).item()
 
-        x = x.unsqueeze(2).repeat(1,1,self.out_features)
-        left_bounds = self.left_bounds.unsqueeze(0).repeat(x.shape[0], 1, 1)
-        right_bounds = self.right_bounds.unsqueeze(0).repeat(x.shape[0], 1, 1)
+        x = torch.tanh(x)
+        x = lower_bound + 0.5*(x+1)*(upper_bound-lower_bound)
 
-        active_hills = (x >= left_bounds) & (x < right_bounds)
-        active_hills = active_hills.int()
-        
-        x = active_hills * x
-        left_bounds = self.left_bounds * active_hills
-        right_bounds = self.right_bounds * active_hills
-       
+        assert (lower_bound <= x).all() and (x <= upper_bound).all()
+
+        x = x.unsqueeze(2)
+
+        left_bounds = self.left_bounds.unsqueeze(0)  
+        right_bounds = self.right_bounds.unsqueeze(0)  
+
+        active_hills = ((x >= left_bounds) & (x < right_bounds)).int()
+
+        left_bounds = left_bounds * active_hills
+        right_bounds = right_bounds * active_hills
+
         width = right_bounds - left_bounds
-        norm_const = torch.where(width == 0, 0.0, 4 / ((width)**2 + self.eps))
-        # TODO Zrobić najpierw sumowanie, potem aktywacja!!!!
-        # Forward pass
-        x = torch.relu(x - left_bounds) \
+        norm_const = torch.where(width == 0, 0.0, 4 / (width**2 + self.eps))
+
+        x = active_hills * torch.relu(x - left_bounds) \
             * torch.relu(right_bounds - x) \
             * norm_const
-        
-        x = x * x
-         
-        if self.use_w:
+        x = x * x  
+
+        if self.use_importance_params:
             x = x * self.w
-        x = x.sum(dim=1)    
-       
+
+        x = x.sum(dim=1)
+
         return x
 
     def extra_repr(self):
