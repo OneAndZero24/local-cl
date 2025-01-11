@@ -22,9 +22,10 @@ class LwF(MethodABC):
         T: float,
         alpha: float,
         gamma: Optional[float]=None,
+        reg_type: Optional[str]=None,
         clipgrad: Optional[float]=None
     ):
-        super().__init__(module, criterion, first_lr, lr, gamma)
+        super().__init__(module, criterion, first_lr, lr, reg_type, gamma)
         self.task_id = None
         self.T = T
         self.alpha = alpha
