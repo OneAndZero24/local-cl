@@ -87,5 +87,4 @@ class IncrementalClassifier(nn.Module):
         if self.masking and self.training:
             mask = torch.logical_not(self.active_units)
             out = out.masked_fill(mask=mask, value=self.mask_value)
-        # print(out)
         return out
