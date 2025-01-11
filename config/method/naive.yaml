@@ -4,6 +4,6 @@ criterion:
   _target_: torch.nn.CrossEntropyLoss
 first_lr: 0.001
 lr: 0.001
-reg_type: l1  # entropy, l1, l0
-gamma: 0.01
+reg_type: entropy  # entropy, l1, l0
+gamma: 0.0
 clipgrad: 0.000001

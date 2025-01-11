@@ -5,7 +5,7 @@ criterion:
 first_lr: 0.001
 lr: 0.001
 T: 2
-alpha: 0.9
+alpha: 0.4
 reg_type: entropy
-gamma: 10
+gamma: 0.0
 clipgrad: 0.000001

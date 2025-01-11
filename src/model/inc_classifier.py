@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from model.layer import instantiate, LayerType, LocalLayer
+import torch.nn.functional as F
 
 
 class IncrementalClassifier(nn.Module):
@@ -39,8 +40,6 @@ class IncrementalClassifier(nn.Module):
         )
 
         self.classifier = self.get_classifier(in_features, initial_out_features)
-        if isinstance(self.classifier, LocalLayer):
-            self.classifier.train_domain = False
         au_init = torch.zeros(initial_out_features, dtype=torch.int8)
         self.register_buffer("active_units", au_init)
 
@@ -78,6 +77,7 @@ class IncrementalClassifier(nn.Module):
     def forward(self, x):
         if isinstance(self.classifier, LocalLayer) and (self.old_nclasses is not None):
             new_x = x.clone()
+            new_x = F.hardtanh(new_x, -1.0, 1.0)
             new_x[:, :self.old_nclasses] = (
                 self.mul * x[:, :self.old_nclasses] 
                 + (torch.min(self.classifier.left_bounds) * (1 - self.mul))
