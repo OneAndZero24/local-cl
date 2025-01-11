@@ -19,12 +19,18 @@ class MLP(ActivationRecordingModuleABC):
         **kwargs
     ):
         head_type = LayerType(head_type)
+
+        head_kwargs = kwargs.copy()
+        head_kwargs["train_domain"] = kwargs.get("train_head_domain", False)
+        head_kwargs.pop("train_head_domain", None)
+        kwargs.pop("train_head_domain", None)
+
         super().__init__(
             IncrementalClassifier(
                 sizes[-1], 
                 initial_out_features,
                 head_type,
-                **kwargs
+                **head_kwargs
             )
         )
 
@@ -35,7 +41,7 @@ class MLP(ActivationRecordingModuleABC):
         N = len(sizes)-1
         for i in range(N):
             layers.append(nn.Linear(sizes[i], sizes[i+1]))
-            if add_fc_local and (i < N): # dont add Local after last
+            if add_fc_local and (i < N):
                 layers.append(LocalLayer(sizes[i+1], sizes[i+1], **kwargs))
             else:
                 layers.append(nn.Tanh())

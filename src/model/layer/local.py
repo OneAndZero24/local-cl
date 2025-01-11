@@ -88,5 +88,6 @@ class LocalLayer(nn.Module):
         return (f"in_features={self.in_features}, "
             f"out_features={self.out_features}, " 
             f"x_min={self.x_min}, x_max={self.x_max}, "
-            f"train_domain={self.left_bounds.requires_grad}")
+            f"train_domain={self.left_bounds.requires_grad}, "
+            f"use_importance_params={self.use_importance_params}")
     
