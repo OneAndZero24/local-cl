@@ -19,7 +19,7 @@ parameters:
   exp.batch_size:
     value: 32        
   exp.epochs: 
-    value: 50
+    values: [50, 10, 5, 1]
   exp.gen_cm: 
     value: True
   exp.detect_anomaly:
@@ -31,11 +31,11 @@ parameters:
   model.initial_out_features:
     value: 2          
   model.sizes:
-    value: [1024, 400, 400]     
+    value: [1024, 400]     
   model.head_type: 
-    values: [Local, Normal]
-  model.add_fc_local: 
-    values: [True, False] 
+    value: Normal
+  model.layer_types: 
+    values: [["Local"], ["Normal", "Local"]] 
   model.train_domain: 
     values: [True, False]            
 
@@ -60,7 +60,7 @@ parameters:
     max: 4
   method.alpha: 
     distribution: uniform      
-    min: 0.6
+    min: 0.7
     max: 0.95
   method.gamma: 
     distribution: uniform  
@@ -68,6 +68,8 @@ parameters:
     max: 1.0
   method.clipgrad: 
     value: 0.000001
+  method.reg_type:
+    values: ["entropy", "l1", "l0"]
 
 
 command:
