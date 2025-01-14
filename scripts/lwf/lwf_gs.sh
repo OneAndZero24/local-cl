@@ -15,15 +15,15 @@ fi
 echo "Activating the conda environment: lcl"
 source activate lcl
 
-cd $HOME/LocalCL || { echo "Error: Directory $HOME/LocalCL not found!"; exit 1; }
+cd $HOME/$MAIN_DIR || { echo "Error: Directory $HOME/$MAIN_DIR not found!"; exit 1; }
 
 run_sweep_and_agent () {
   SWEEP_NAME="$1"
   
-  YAML_PATH="$HOME/LocalCL/$SWEEP_NAME.yaml"
+  YAML_PATH="$HOME/$MAIN_DIR/$SWEEP_NAME.yaml"
   
   if [ ! -f "$YAML_PATH" ]; then
-    echo "Error: YAML file '$SWEEP_NAME.yaml' not found in $HOME/LocalCL"
+    echo "Error: YAML file '$SWEEP_NAME.yaml' not found in $HOME/$MAIN_DIR"
     exit 1
   fi
   
