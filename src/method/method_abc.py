@@ -43,7 +43,7 @@ class MethodABC(metaclass=ABCMeta):
 
     def add_ael(self, loss):
         if self.gamma is not None and self.reg_type is not None:
-            loss += activation_loss(self.module.activations, self.reg_type, self.gamma)
+            loss = (1-self.gamma)*loss+activation_loss(self.module.activations, self.reg_type, self.gamma)
         return loss
 
 
