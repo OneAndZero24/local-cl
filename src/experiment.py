@@ -149,7 +149,8 @@ def test(method: MethodABC, dataloader: DataLoader, task_id: int, gen_cm: bool, 
         wandb.log({f'Loss/test/{task_id}': avg_loss})
         wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
         if gen_cm:
-            wandb.log({f'Confusion matrix {str(task_id)+cm_suffix}': 
-                wandb.plot.confusion_matrix(probs=None,y_true=y_total, preds=preds_total)}
+            title = f'Confusion matrix {str(task_id)+cm_suffix}'
+            wandb.log({title: 
+                wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
             )
         return 100 * correct / total
