@@ -57,7 +57,10 @@ class LocalLayer(nn.Module):
         x = torch.tanh(x)
         x = lower_bound + 0.5*(x+1)*(upper_bound-lower_bound)
 
-        assert (lower_bound <= x).all() and (x <= upper_bound).all()
+        is_lower_close = torch.allclose(x, torch.clamp(x, min=lower_bound), atol=self.eps)
+        is_upper_close = torch.allclose(x, torch.clamp(x, max=upper_bound), atol=self.eps)
+
+        assert is_lower_close and is_upper_close
 
         x = x.unsqueeze(2)
 

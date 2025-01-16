@@ -1,6 +1,6 @@
 _target_: model.MLP
 initial_out_features: 2
-sizes: [1024, 100]
+sizes: [1024, 400]
 head_type: Local
 layer_types: ["Normal"] 
 train_domain: True

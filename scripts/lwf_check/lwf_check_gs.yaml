@@ -1,7 +1,7 @@
 program: src/main.py
 method: bayes          # Use Bayesian optimization
 metric:               # Metric to optimize
-  name: val_accuracy      # Replace with your evaluation metric
+  name: avg_acc      # Replace with your evaluation metric
   goal: maximize      # Can be "minimize" or "maximize"
 
 parameters:

@@ -1,6 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=local_cl_split_mnist_lwf
 #SBATCH --qos=normal
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --partition=dgx
 
@@ -12,6 +14,7 @@ else
   exit 1
 fi
 
+export HYDRA_FULL_ERROR=1
 echo "Activating the conda environment: lcl"
 source activate lcl
 
@@ -28,11 +31,11 @@ run_sweep_and_agent () {
   fi
   
   echo "Running wandb sweep for: $SWEEP_NAME"
-  wandb sweep --project "$PROJECT_NAME" --name "$SWEEP_NAME" "$YAML_PATH" > temp_output.txt 2>&1
+  wandb sweep --project "$PROJECT_NAME" --name "$SWEEP_NAME" "$YAML_PATH" > ${SWEEP_NAME}_temp_output.txt 2>&1
   
-  SWEEP_ID=$(awk '/wandb agent/{ match($0, /wandb agent (.+)/, arr); print arr[1]; }' temp_output.txt)
+  SWEEP_ID=$(awk '/wandb agent/{ match($0, /wandb agent (.+)/, arr); print arr[1]; }' ${SWEEP_NAME}_temp_output.txt)
   
-  rm temp_output.txt
+  rm ${SWEEP_NAME}_temp_output.txt
 
   echo "Starting WandB agent for sweep ID: $SWEEP_ID"
   wandb agent "$SWEEP_ID"
