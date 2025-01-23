@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
 from model.inc_classifier import IncrementalClassifier
-from model.layer import LayerType, LocalLayer
+from model.layer import instantiate, LayerType
 
 
 class MLP(ActivationRecordingModuleABC):
@@ -14,12 +14,12 @@ class MLP(ActivationRecordingModuleABC):
     def __init__(self,
         initial_out_features: int,
         sizes: list[int],
+        layers: list[str],
         head_type: str="Normal",
-        layer_types: list[str]=["Normal"],
         **kwargs
     ):
         head_type = LayerType(head_type)
-        layer_types = map(lambda x: LayerType(x), layer_types)
+        layer_types = list(map(lambda x: LayerType(x), layers))
 
         head_kwargs = kwargs.copy()
         head_kwargs["train_domain"] = kwargs.get("train_head_domain", False)
@@ -43,17 +43,11 @@ class MLP(ActivationRecordingModuleABC):
         for i in range(N):                    
             in_size = sizes[i]
             out_size = sizes[i+1]
-            for lt in layer_types:
-                if layers:
-                    in_size = sizes[i+1]
-                    out_size = sizes[i+1]
-
-                if lt == LayerType.NORMAL:
-                    if layers and (type(layers[-1]) == nn.Linear):
-                        layers.append(nn.Tanh())
-                    layers.append(nn.Linear(in_size, out_size))
-                else:
-                    layers.append(LocalLayer(in_size, out_size, **kwargs))
+            lt = layer_types[i]
+            if lt == LayerType.NORMAL:
+                if layers and (type(layers[-1]) == nn.Linear):
+                    layers.append(nn.Tanh())
+            layers.append(instantiate(lt, in_size, out_size, **kwargs))
                     
             if layers and (type(layers[-1]) == nn.Linear):
                 layers.append(nn.Tanh())
