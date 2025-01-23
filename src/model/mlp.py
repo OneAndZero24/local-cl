@@ -22,8 +22,9 @@ class MLP(ActivationRecordingModuleABC):
         layer_types = list(map(lambda x: LayerType(x), layers))
 
         head_kwargs = kwargs.copy()
-        head_kwargs["train_domain"] = kwargs.get("train_head_domain", False)
-        head_kwargs.pop("train_head_domain", None)
+        if head_type == LayerType.LOCAL:
+            head_kwargs["train_domain"] = kwargs.get("train_head_domain", False)
+            head_kwargs.pop("train_head_domain", None)
         kwargs.pop("train_head_domain", None)
 
         super().__init__(

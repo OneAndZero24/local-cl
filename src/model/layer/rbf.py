@@ -27,6 +27,10 @@ import torch.nn as nn
 from typing import Callable
 
 
+def l_norm(x, p=2):
+    return torch.norm(x, p=p, dim=-1)
+
+
 # Radial basis functions
 def rbf_gaussian(x):
     return (-x.pow(2)).exp()
@@ -49,9 +53,9 @@ def rbf_inverse_multiquadric(x):
 
 
 def rbf_bump(x):
-    if x.abs() <= 1:
+    if torch.all(x.abs() <= 1):
         return (-1/(1-x.pow(2))).exp()
-    return 0
+    return torch.zeros_like(x)
 
 
 class RBFLayer(nn.Module):
@@ -76,11 +80,11 @@ class RBFLayer(nn.Module):
 
     Parameters
     ----------
-        in_features_dim: int
+        in_features: int
             Dimensionality of the input features
         num_kernels: int
             Number of kernels to use
-        out_features_dim: int
+        out_features: int
             Dimensionality of the output features
         radial_function: Callable[[torch.Tensor], torch.Tensor]
             A radial basis function that returns a tensor of real values
@@ -110,9 +114,9 @@ class RBFLayer(nn.Module):
     """
 
     def __init__(self,
-                 in_features_dim: int,
+                 in_features: int,
+                 out_features: int,
                  num_kernels: int,
-                 out_features_dim: int,
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
@@ -124,9 +128,9 @@ class RBFLayer(nn.Module):
                  constant_weights_parameters: bool = False):
         super(RBFLayer, self).__init__()
 
-        self.in_features_dim = in_features_dim
+        self.in_features = in_features
         self.num_kernels = num_kernels
-        self.out_features_dim = out_features_dim
+        self.out_features = out_features
         self.radial_function = radial_function
         self.norm_function = norm_function
         self.normalization = normalization
@@ -154,7 +158,7 @@ class RBFLayer(nn.Module):
         else:
             self.weights = nn.Parameter(
                 torch.zeros(
-                    self.out_features_dim,
+                    self.out_features,
                     self.num_kernels,
                     dtype=torch.float32))
 
@@ -166,7 +170,7 @@ class RBFLayer(nn.Module):
             self.kernels_centers = nn.Parameter(
                 torch.zeros(
                     self.num_kernels,
-                    self.in_features_dim,
+                    self.in_features,
                     dtype=torch.float32))
 
         # Initialize shape parameter
@@ -235,9 +239,9 @@ class RBFLayer(nn.Module):
         # Compute difference from centers
         # c has size B x num_kernels x Fin
         c = self.kernels_centers.expand(batch_size, self.num_kernels,
-                                        self.in_features_dim)
+                                        self.in_features)
 
-        diff = input.view(batch_size, 1, self.in_features_dim) - c
+        diff = input.view(batch_size, 1, self.in_features) - c
 
         # Apply norm function; c has size B x num_kernels
         r = self.norm_function(diff)
@@ -255,7 +259,7 @@ class RBFLayer(nn.Module):
             rbfs = rbfs / (1e-9 + rbfs.sum(dim=-1)).unsqueeze(-1)
 
         # Take linear combination
-        out = self.weights.expand(batch_size, self.out_features_dim,
+        out = self.weights.expand(batch_size, self.out_features,
                                   self.num_kernels) * rbfs.view(
                                       batch_size, 1, self.num_kernels)
 
