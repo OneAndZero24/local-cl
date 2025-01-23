@@ -2,10 +2,10 @@ from abc import ABCMeta
 
 from torch import nn
 
-from model.layer import LocalLayer, LocalConv2DLayer
+from model.layer import LocalLayer, RBFLayer, LocalConv2DLayer
 
 
-LOCAL_LAYERS = (LocalLayer, LocalConv2DLayer)
+LOCAL_LAYERS = (LocalLayer, RBFLayer, LocalConv2DLayer)
 
 class ActivationRecordingModuleABC(nn.Module, metaclass=ABCMeta):
     def __init__(self, head: nn.Module, *args, **kwargs):
