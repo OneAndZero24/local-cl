@@ -51,6 +51,7 @@ class LwF(MethodABC):
         """
         Forward pass.
         """
+        
         preds = self.module(x)
         loss = self.add_ael(self.criterion(preds, y))
 
