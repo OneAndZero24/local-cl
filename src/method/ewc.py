@@ -2,8 +2,8 @@ from typing import Optional
 from copy import deepcopy
 
 import torch
-from torch import functional as F
 from torch import nn
+from torch.nn import functional as F
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
 from method.metric import ewc_loss
@@ -43,9 +43,10 @@ class EWC(MethodABC):
         super().setup_optim(task_id)
 
         if task_id > 0:
-            for name, p in deepcopy(self.module.named_parameters()):
+            for name, p in deepcopy(list(self.module.named_parameters())):
                 p.requires_grad = False
                 self.params_buffer[name] = p     
+            self.fisher_diag = self._get_fisher_diag()
         self.data_buffer = []
 
 
@@ -60,7 +61,7 @@ class EWC(MethodABC):
 
         if self.task_id > 0:
             loss *= self.alpha
-            loss += (1-self.alpha)*ewc_loss(self.module, self.get_fisher_diag(), self.params_buffer)
+            loss += (1-self.alpha)*ewc_loss(self.module, self.fisher_diag, self.params_buffer)
         return loss, preds
     
 
@@ -76,7 +77,7 @@ class EWC(MethodABC):
         self.optimizer.step()
 
 
-    def get_fisher_diag(self):
+    def _get_fisher_diag(self):
         """
         Calculates fisher matrix diagonal
         """
