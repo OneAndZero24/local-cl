@@ -1,6 +1,5 @@
 ## Methods
-
-- `method_abc.py` - `MethodABC` base class for continual learning methods.
-- `metric.py` - Implements needed losses/metrics.
-- `naive.py` - Naive joint training strategy implemented here.
-- `lwf.py` - Learning without Forgetting implemented here.
+- `method_abc.py` - `MethodABC` base class for continual learning methods
+- `metric.py` - Losses/metrics
+- `naive.py` - Naive joint training strategy
+- `lwf.py` - Learning without Forgetting
