@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from model.layer import instantiate, LayerType, LocalLayer
+from model.layer import instantiate, LayerType, LocalLayer, RBFLayer
 import torch.nn.functional as F
 
 
@@ -67,12 +67,16 @@ class IncrementalClassifier(nn.Module):
             self.old_nclasses = old_nclasses
             state_dict = self.classifier.state_dict()
             self.classifier = self.get_classifier(in_features, new_nclasses).to(device)
+            param_filter = []
+            if isinstance(self.classifier, RBFLayer):
+                param_filter = ["weights"]
             for name, param in self.classifier.named_parameters():
-                if isinstance(self.classifier, LocalLayer):
-                    param.data[:, :old_nclasses] = state_dict[name]
-                else:
-                    param.data[:old_nclasses] = state_dict[name]
-        
+                if (name in param_filter) or (len(param_filter) == 0):
+                    if isinstance(self.classifier, LocalLayer):
+                        param.data[:, :old_nclasses] = state_dict[name]
+                    else:
+                        param.data[:old_nclasses] = state_dict[name]
+    
 
     def forward(self, x):
         if isinstance(self.classifier, LocalLayer) and (self.old_nclasses is not None):

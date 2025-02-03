@@ -18,7 +18,6 @@ conda acitate lcl
 WANDB_MODE={offline/online} HYDRA_FULL_ERROR={0/1} python src/main.py --config-name config 
 ```
 
-## Project Structure
-Based on 
-[template](https://github.com/sobieskibj/templates/tree/master)
-by Bartłomiej Sobieski
+## acknowledgements
+- Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
+- PyTorchRBFLayer [repo](https://github.com/rssalessio/PytorchRBFLayer) by Alessio Russo
