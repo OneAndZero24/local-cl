@@ -32,3 +32,11 @@ def activation_loss(activations, loss_type='entropy', gamma=1e-4):
 
     loss = sum(loss_fn(activation.sum(dim=0)) for activation in activations)
     return gamma * loss
+
+
+def ewc_loss(model, fisher_diag, params_buffer):
+    loss = 0
+    for name, p in model.named_parameters():
+        _loss = fisher_diag[name] * (p - params_buffer[name]) ** 2
+        loss += _loss.sum()
+    return loss
