@@ -245,3 +245,6 @@ class RBFLayer(LocalModule):
         """ Returns the shape parameters """
         return self.log_shapes.detach().exp()
     
+    def incrementable_params(self):
+        """ Returns the incrementable parameters of the module. """
+        return ["weights"]

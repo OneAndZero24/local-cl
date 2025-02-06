@@ -46,6 +46,7 @@ class LocalLayer(LocalModule):
             Returns a string with the extra representation of the layer.
     """
 
+
     def __init__(self, 
         in_features: int,
         out_features: int,
@@ -93,6 +94,7 @@ class LocalLayer(LocalModule):
             self.w = nn.Parameter(torch.empty(in_features, out_features, **factory_kwargs), requires_grad=True)
         self.reset_parameters()
 
+
     def reset_parameters(self):
         """
         Resets the parameters of the layer.
@@ -109,6 +111,7 @@ class LocalLayer(LocalModule):
         self.right_bounds.data = domain[1:].clone().unsqueeze(0).repeat(self.in_features, 1)
         if self.use_importance_params:
             nn.init.kaiming_uniform_(self.w, a=math.sqrt(5))
+
 
     def forward(self, x):
         """
@@ -162,6 +165,7 @@ class LocalLayer(LocalModule):
 
         return x
 
+
     def extra_repr(self):
         """
         Returns a string representation of the layer's configuration.
@@ -179,3 +183,6 @@ class LocalLayer(LocalModule):
             f"train_domain={self.left_bounds.requires_grad}, "
             f"use_importance_params={self.use_importance_params}")
     
+
+    def get_slice(self, old_nclasses):
+        return (slice(None), slice(None, old_nclasses))
