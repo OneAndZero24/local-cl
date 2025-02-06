@@ -7,11 +7,11 @@ from .rbf import RBFLayer
 from .local import LocalLayer
 from .local_conv2d import LocalConv2DLayer
 from .local_module import LocalModule
-
+from .local_head import LocalHead
 
 class LayerType(Enum):
     """
-    enum = (LOCAL, NORMAL)
+    enum = (LOCAL, NORMAL, RBF)
     """
 
     LOCAL = "Local"

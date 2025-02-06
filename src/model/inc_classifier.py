@@ -144,25 +144,11 @@ class IncrementalClassifier(nn.Module):
         Returns:
             torch.Tensor: Output tensor after applying the classifier and optional masking.
         The forward pass includes the following steps:
-        1. If the classifier is an instance of LocalLayer and old_nclasses is not None:
-            - Clone the input tensor.
-            - Apply hardtanh activation to the cloned tensor.
-            - Modify the first old_nclasses elements of the cloned tensor using a linear combination of the original input and the minimum left bounds of the classifier.
-            - Replace the original input tensor with the modified tensor.
-        2. Pass the (possibly modified) input tensor through the classifier.
-        3. If masking is enabled and the model is in training mode:
+        1. Pass the (possibly modified) input tensor through the classifier.
+        2. If masking is enabled and the model is in training mode:
             - Create a mask from the active_units tensor.
             - Apply the mask to the output tensor, filling masked positions with mask_value.
         """
-
-        if isinstance(self.classifier, LocalLayer) and (self.old_nclasses is not None):
-            new_x = x.clone()
-            new_x = F.hardtanh(new_x, -1.0, 1.0)
-            new_x[:, :self.old_nclasses] = (
-                self.mul * x[:, :self.old_nclasses] 
-                + (torch.min(self.classifier.left_bounds) * (1 - self.mul))
-            )
-            x = new_x
         out = self.classifier(x)
         if self.masking and self.training:
             mask = torch.logical_not(self.active_units)
