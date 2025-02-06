@@ -5,7 +5,7 @@ from torch import nn
 from torch import optim
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from src.method.regularization import activation_loss
+from method.regularization import activation_loss
 
 
 class MethodABC(metaclass=ABCMeta):

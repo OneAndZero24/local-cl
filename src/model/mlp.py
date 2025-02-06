@@ -15,6 +15,7 @@ class MLP(ActivationRecordingModuleABC):
         sizes (list[int]): A list of integers representing the sizes of each layer.
         layers (list[str]): A list of strings representing the type of each layer.
         head_type (str, optional): The type of the head layer. Defaults to "Normal".
+        activation (nn.Module, optional): The activation function to use between layers. Defaults to nn.Tanh().
         **kwargs: Additional keyword arguments for layer instantiation.
 
     Attributes:
@@ -34,6 +35,7 @@ class MLP(ActivationRecordingModuleABC):
         sizes: list[int],
         layers: list[str],
         head_type: str="Normal",
+        activation: nn.Module=nn.Tanh(),
         **kwargs
     ):
         """
@@ -44,6 +46,7 @@ class MLP(ActivationRecordingModuleABC):
             sizes (list[int]): A list of integers representing the sizes of each layer.
             layers (list[str]): A list of strings representing the types of each layer.
             head_type (str, optional): The type of the head layer. Defaults to "Normal".
+            activation (nn.Module, optional): The activation function to use between layers. Defaults to nn.Tanh().
             **kwargs: Additional keyword arguments for layer instantiation.
 
         Keyword Args:
@@ -79,13 +82,9 @@ class MLP(ActivationRecordingModuleABC):
             in_size = sizes[i]
             out_size = sizes[i+1]
             lt = layer_types[i]
-            if lt == LayerType.NORMAL:
-                if layers and (type(layers[-1]) == nn.Linear):
-                    layers.append(nn.Tanh())
             layers.append(instantiate(lt, in_size, out_size, **kwargs))
-                    
-            if layers and (type(layers[-1]) == nn.Linear):
-                layers.append(nn.Tanh())
+            if lt == LayerType.NORMAL:
+                layers.append(activation)
         self.layers = nn.ModuleList(layers)
        
     def forward(self, x):

@@ -3,6 +3,8 @@ initial_out_features: 2
 sizes: [1024, 400]
 layers: ["Local", "Local"]
 head_type: Normal
+activation: 
+  _target_: torch.nn.Tanh
 train_domain: True
 train_head_domain: False
 use_importance_params: True
