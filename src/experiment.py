@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from util.fabric import setup_fabric
 from model import IncrementalClassifier
-from method.method_abc import MethodABC
+from src.method.method_plugin_abc import MethodPluginABC
  
 
 log = logging.getLogger(__name__)
@@ -99,7 +99,7 @@ def experiment(config: DictConfig):
         wandb.log({f'avg_acc': avg_acc})
 
 
-def train(method: MethodABC, dataloader: DataLoader, task_id: int):
+def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int):
     """
     Train one epoch.
     """
@@ -118,7 +118,7 @@ def train(method: MethodABC, dataloader: DataLoader, task_id: int):
     wandb.log({f'Loss/train/{task_id}': avg_loss})
 
 
-def test(method: MethodABC, dataloader: DataLoader, task_id: int, gen_cm: bool, cm_suffix: str = '') -> float:
+def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, cm_suffix: str = '') -> float:
     """
     Test one epoch.
     """
