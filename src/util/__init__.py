@@ -1,4 +1,5 @@
 import warnings
+import logging
 
 from torchvision import transforms
 
@@ -12,4 +13,7 @@ resize_transform = lambda : [
 ]
 
 def deprecation_warning(message: str):
+    log = logging.getLogger(__name__)
+    log.setLevel(logging.INFO)
+    log.warning(message)
     warnings.warn(message, DeprecationWarning)
