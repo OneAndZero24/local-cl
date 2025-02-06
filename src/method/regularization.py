@@ -9,18 +9,28 @@ def distillation_loss(outputs_new, outputs_old, T=2):
     return prob_old.mul(-1*torch.log(prob_new)).sum(1).mean()*T*T
 
 
-def activation_loss(activations, loss_type='entropy', gamma=1e-4):
-    def entropy_loss(activation_sum):
-        entropy = F.softmax(activation_sum, dim=0) * F.log_softmax(activation_sum, dim=0)
-        return -1*entropy.sum()
+def ewc_loss(model, fisher_diag, params_buffer):
+    loss = 0
+    for name, p in model.named_parameters():
+        _loss = fisher_diag[name] * (p - params_buffer[name]) ** 2
+        loss += _loss.sum()
+    return loss
 
-    def l1_loss(activation_sum):
-        return activation_sum.mean()
 
-    def l0_loss(activation_sum):
-        return (activation_sum > 0).float().mean()
+def entropy_loss(activation_sum):
+    entropy = F.softmax(activation_sum, dim=0) * F.log_softmax(activation_sum, dim=0)
+    return -1*entropy.sum()
 
-    # Loss function lookup
+
+def l1_loss(activation_sum):
+    return activation_sum.mean()
+
+
+def l0_loss(activation_sum):
+    return (activation_sum > 0).float().mean()
+
+
+def regularization(activations, loss_type='entropy'):
     loss_fn = {
         'entropy': entropy_loss,
         'l1': l1_loss,
@@ -30,13 +40,4 @@ def activation_loss(activations, loss_type='entropy', gamma=1e-4):
     if loss_fn is None:
         raise ValueError(f"Invalid loss_type '{loss_type}'. Choose from 'entropy', 'l1', or 'l0'.")
 
-    loss = sum(loss_fn(activation.sum(dim=0)) for activation in activations)
-    return gamma * loss
-
-
-def ewc_loss(model, fisher_diag, params_buffer):
-    loss = 0
-    for name, p in model.named_parameters():
-        _loss = fisher_diag[name] * (p - params_buffer[name]) ** 2
-        loss += _loss.sum()
-    return loss
+    return sum(loss_fn(activation.sum(dim=0)) for activation in activations)

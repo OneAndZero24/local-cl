@@ -5,7 +5,7 @@ from torch import nn
 from torch import optim
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
-from method.regularization import activation_loss
+from method.regularization import regularization
 
 
 class MethodABC(metaclass=ABCMeta):
@@ -24,7 +24,7 @@ class MethodABC(metaclass=ABCMeta):
     Methods:
         setup_optim(task_id: int):
             Sets up the optimizer for the given task.
-        add_ael(loss):
+        add_reg(loss):
             Adds activation entropy loss (AEL) to the given loss if regularization is specified.
         setup_task(task_id: int):
             Abstract method for setting up a task. Must be implemented by subclasses.
@@ -40,7 +40,8 @@ class MethodABC(metaclass=ABCMeta):
         first_lr: float, 
         lr: float,
         reg_type: Optional[str]=None,
-        gamma: Optional[float]=None
+        gamma: Optional[float]=None,
+        clipgrad: Optional[float]=None
     ):
         """
         Initializes the MethodABC class with the given parameters.
@@ -57,6 +58,7 @@ class MethodABC(metaclass=ABCMeta):
         self.lr = lr
         self.reg_type = reg_type
         self.gamma = gamma
+        self.clipgrad = clipgrad
 
 
     def setup_optim(self, task_id: int):
@@ -80,9 +82,9 @@ class MethodABC(metaclass=ABCMeta):
         self.optimizer = optim.Adam(params, lr=lr)
 
 
-    def add_ael(self, loss):
+    def add_reg(self, loss):
         """
-        Adjusts the given loss by adding an activation loss element (AEL) if certain conditions are met.
+        Adjusts the given loss by adding regularization.
 
         Args:
             loss (float): The original loss value to be adjusted.
@@ -92,7 +94,7 @@ class MethodABC(metaclass=ABCMeta):
         """
 
         if self.gamma is not None and self.reg_type is not None:
-            loss = (1-self.gamma)*loss+activation_loss(self.module.activations, self.reg_type, self.gamma)
+            loss = (1-self.gamma)*loss+self.gamma*regularization(self.module.activations, self.reg_type)
         return loss
 
 
@@ -109,18 +111,47 @@ class MethodABC(metaclass=ABCMeta):
 
 
     @abstractmethod
+    def _forward(self, x, y, loss, preds):
+        """
+        Internal forward pass.
+        """
+
+        pass
+
+
     def forward(self, x, y):
         """
-        Forward pass.
+        Perform a forward pass, compute the loss, and return predictions.
+
+        Args:
+            x (torch.Tensor): Input data.
+            y (torch.Tensor): Target labels.
+
+        Returns:
+            tuple: A tuple containing the computed loss and the predictions.
         """
 
-        pass
+        preds = self.module(x)
+        loss = self.criterion(preds, y)
+        loss = self.add_reg(loss)
 
+        return self._forward(x, y, loss, preds)
 
-    @abstractmethod
     def backward(self, loss):
         """
-        Backward pass.
-        """
+        Perform a backward pass and update the model parameters.
 
-        pass
+        Args:
+            loss (torch.Tensor): The loss tensor from which to compute gradients.
+        This method performs the following steps:
+        1. Resets the gradients of the optimizer.
+        2. Computes the gradients of the loss with respect to the model parameters.
+        3. Optionally clips the gradients to a maximum norm if `self.clipgrad` is set.
+        4. Updates the model parameters using the optimizer.
+        """     
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        if self.clipgrad is not None:
+            nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
+        self.optimizer.step()

@@ -1,6 +1,5 @@
 from typing import Optional
 
-import torch
 from torch import nn
 
 from model.activation_recording_abc import ActivationRecordingModuleABC
@@ -51,8 +50,7 @@ class Naive(MethodABC):
             clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.
         """
 
-        super().__init__(module, criterion, first_lr, lr, reg_type, gamma)
-        self.clipgrad = clipgrad
+        super().__init__(module, criterion, first_lr, lr, reg_type, gamma, clipgrad)
 
 
     def setup_task(self, task_id: int):
@@ -68,41 +66,19 @@ class Naive(MethodABC):
         super().setup_optim(task_id)
     
 
-    def forward(self, x, y):
+    def _forward(self, x, y, loss, preds):
         """
-        Perform a forward pass through the model.
+        Perform a forward pass.
 
         Args:
             x: Input data.
             y: Target data.
-            
+            loss: Loss value.
+            preds: Predictions.
+
         Returns:
-            A tuple containing:
-                - The result of applying the criterion to the predictions and targets, 
-                  with additional processing by add_ael.
-                - The raw predictions from the model.
+            Tuple containing the loss and predictions.
         """
 
-        preds = self.module(x)
-        return self.add_ael(self.criterion(preds, y)), preds
-    
 
-    def backward(self, loss):
-        """
-        Perform a backward pass and update model parameters.
-
-        Args:
-            loss (torch.Tensor): The loss tensor from which gradients will be computed.
-            
-        This method performs the following steps:
-        1. Resets the gradients of the optimizer.
-        2. Computes the gradients of the loss with respect to the model parameters.
-        3. Optionally clips the gradients to prevent exploding gradients.
-        4. Updates the model parameters using the optimizer.
-        """
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        if self.clipgrad is not None:
-            torch.nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
-        self.optimizer.step()
+        return loss, preds

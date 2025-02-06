@@ -62,9 +62,8 @@ class EWC(MethodABC):
             clipgrad (Optional[float], optional): The gradient clipping value. Defaults to None.
         """
 
-        super().__init__(module, criterion, first_lr, lr, reg_type, gamma)
+        super().__init__(module, criterion, first_lr, lr, reg_type, gamma, clipgrad)
         self.task_id = None
-        self.clipgrad = clipgrad
         self.alpha = alpha
 
         self.data_buffer = []
@@ -96,60 +95,26 @@ class EWC(MethodABC):
         self.data_buffer = []
 
 
-    def forward(self, x, y):
+    def _forward(self, x, y, loss, preds):
         """
-        Perform a forward pass, compute the loss, and return predictions.
+        Perform a forward pass and compute the loss with Elastic Weight Consolidation (EWC) regularization.
 
         Args:
-            x (torch.Tensor): Input data.
-            y (torch.Tensor): Target labels.
-
+            x (Tensor): Input data.
+            y (Tensor): Target labels.
+            loss (Tensor): Computed loss from the model's predictions.
+            preds (Tensor): Model's predictions.
+            
         Returns:
-            tuple: A tuple containing the computed loss and the predictions.
-        The method performs the following steps:
-        1. Appends the input data and target labels to the data buffer.
-        2. Computes the predictions using the module.
-        3. Computes the loss using the criterion and adds additional loss components.
-        4. If the task_id is greater than 0, adjusts the loss using the alpha parameter and adds the EWC loss.
-
-        Note:
-            - `self.data_buffer` is a list that stores input data and target labels.
-            - `self.module` is the model used for making predictions.
-            - `self.criterion` is the loss function used to compute the primary loss.
-            - `self.add_ael` is a method that adds additional loss components.
-            - `self.alpha` is a parameter used to balance the primary loss and the EWC loss.
-            - `ewc_loss` is a function that computes the EWC loss.
-            - `self.fisher_diag` and `self.params_buffer` are used in the computation of the EWC loss.
+            Tuple[Tensor, Tensor]: The adjusted loss with EWC regularization and the model's predictions.
         """
 
         self.data_buffer.append((x, y))
-        preds = self.module(x)
-        loss = self.add_ael(self.criterion(preds, y))
 
         if self.task_id > 0:
             loss *= self.alpha
             loss += (1-self.alpha)*ewc_loss(self.module, self.fisher_diag, self.params_buffer)
         return loss, preds
-    
-
-    def backward(self, loss):
-        """
-        Perform a backward pass and update the model parameters.
-
-        Args:
-            loss (torch.Tensor): The loss tensor from which to compute gradients.
-        This method performs the following steps:
-        1. Resets the gradients of the optimizer.
-        2. Computes the gradients of the loss with respect to the model parameters.
-        3. Optionally clips the gradients to a maximum norm if `self.clipgrad` is set.
-        4. Updates the model parameters using the optimizer.
-        """     
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        if self.clipgrad is not None:
-            torch.nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
-        self.optimizer.step()
 
 
     def _get_fisher_diag(self):

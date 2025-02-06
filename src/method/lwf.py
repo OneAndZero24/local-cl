@@ -63,11 +63,10 @@ class LwF(MethodABC):
             clipgrad (Optional[float]): The gradient clipping value. Default is None.
         """
                 
-        super().__init__(module, criterion, first_lr, lr, reg_type, gamma)
+        super().__init__(module, criterion, first_lr, lr, reg_type, gamma, clipgrad)
         self.task_id = None
         self.T = T
         self.alpha = alpha
-        self.clipgrad = clipgrad
 
 
     def setup_task(self, task_id: int):
@@ -92,20 +91,20 @@ class LwF(MethodABC):
                 self.old_module.eval()
 
 
-    def forward(self, x, y):
+    def _forward(self, x, y, loss, preds):
         """
-        Perform a forward pass through the network and compute the loss.
+        Perform a forward pass and compute the loss with optional distillation.
 
         Args:
             x (torch.Tensor): Input tensor.
             y (torch.Tensor): Target tensor.
-
+            loss (torch.Tensor): Initial loss value.
+            preds (torch.Tensor): Predictions from the current model.
+            
         Returns:
-            tuple: A tuple containing the computed loss and the predictions.
+            tuple: A tuple containing the updated loss and predictions.
         """
-        
-        preds = self.module(x)
-        loss = self.add_ael(self.criterion(preds, y))
+
 
         if self.task_id > 0:
             with torch.no_grad():
@@ -114,24 +113,3 @@ class LwF(MethodABC):
             loss *= self.alpha
             loss += distillation_loss(preds, old_preds, self.T)*(1-self.alpha)
         return loss, preds
-    
-
-    def backward(self, loss):
-        """
-        Perform a backward pass and update the model parameters.
-
-        Args:
-            loss (torch.Tensor): The loss tensor from which to compute gradients.
-            
-        This method performs the following steps:
-        1. Resets the gradients of the optimizer.
-        2. Computes the gradients of the loss with respect to the model parameters.
-        3. Optionally clips the gradients to prevent exploding gradients.
-        4. Updates the model parameters using the optimizer.
-        """
-        
-        self.optimizer.zero_grad()
-        loss.backward()
-        if self.clipgrad is not None:
-            torch.nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
-        self.optimizer.step()
