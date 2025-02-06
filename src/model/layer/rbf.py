@@ -60,57 +60,35 @@ def rbf_bump(x):
 
 class RBFLayer(nn.Module):
     """
-    Defines a Radial Basis Function Layer
+    A Radial Basis Function (RBF) Layer.
 
-    An RBF is defined by 5 elements:
-        1. A radial kernel phi
-        2. A positive shape parameter epsilon
-        3. The number of kernels N, and their relative
-           centers c_i, i=1, ..., N
-        4. A norm ||.||
-        5. A set of weights w_i, i=1, ..., N
+    An RBF layer is defined by the following elements:
+        1. A radial kernel function `phi`.
+        2. A positive shape parameter `epsilon`.
+        3. The number of kernels `N` and their centers `c_i`, where `i=1, ..., N`.
+        4. A norm function `||.||`.
+        5. A set of weights `w_i`, where `i=1, ..., N`.
 
-    The output of an RBF is given by
-    y(x) = sum_{i=1}^N a_i * phi(eps_i * ||x - c_i||)
+    The output of an RBF layer is given by:
+        y(x) = sum_{i=1}^N a_i * phi(eps_i * ||x - c_i||)
 
-    For more information check [1,2]
+    For more information, refer to:
+        [1] https://en.wikipedia.org/wiki/Radial_basis_function
+        [2] https://en.wikipedia.org/wiki/Radial_basis_function_network
 
-    [1] https://en.wikipedia.org/wiki/Radial_basis_function
-    [2] https://en.wikipedia.org/wiki/Radial_basis_function_network
-
-    Parameters
-    ----------
-        in_features: int
-            Dimensionality of the input features
-        num_kernels: int
-            Number of kernels to use
-        out_features: int
-            Dimensionality of the output features
-        radial_function: Callable[[torch.Tensor], torch.Tensor]
-            A radial basis function that returns a tensor of real values
-            given a tensor of real values
-        norm_function: Callable[[torch.Tensor], torch.Tensor]
-            Normalization function applied on the features
-        normalization: bool, optional
-            if True applies the normalization trick to the rbf layer
-        initial_shape_parameter: torch.Tensor, optional
-            Sets the shape parameter to the desired value.
-        initial_centers_parameter: torch.Tensor, optional
-            Sets the centers to the desired value.
-        initial_weights_parameters: torch.Tensor, optional
-            Sets the weights parameter to the desired value.
-        constant_shape_parameter: bool, optional
-            Sets the shapes parameters to a non-learnable constant.
-            initial_shape_parameter must be different than None if
-            constant_shape_parameter is True
-        constant_centers_parameter: bool, optional
-            Sets the centers to a non-learnable constant.
-            initial_centers_parameter must be different than None if
-            constant_centers_parameter is True
-        constant_weights_parameters: bool, optional
-            Sets the weights to a non-learnable constant.
-            initial_weights_parameters must be different than None if
-            constant_weights_parameters is True
+    Args:
+        in_features (int): Dimensionality of the input features.
+        num_kernels (int): Number of kernels to use.
+        out_features (int): Dimensionality of the output features.
+        radial_function (Callable[[torch.Tensor], torch.Tensor]): A radial basis function that returns a tensor of real values given a tensor of real values.
+        norm_function (Callable[[torch.Tensor], torch.Tensor]): Normalization function applied to the features.
+        normalization (bool, optional): If True, applies the normalization trick to the RBF layer. Default is True.
+        initial_shape_parameter (torch.Tensor, optional): Sets the shape parameter to the desired value. Default is None.
+        initial_centers_parameter (torch.Tensor, optional): Sets the centers to the desired value. Default is None.
+        initial_weights_parameters (torch.Tensor, optional): Sets the weights parameter to the desired value. Default is None.
+        constant_shape_parameter (bool, optional): Sets the shape parameters to a non-learnable constant. `initial_shape_parameter` must be provided if True. Default is False.
+        constant_centers_parameter (bool, optional): Sets the centers to a non-learnable constant. `initial_centers_parameter` must be provided if True. Default is False.
+        constant_weights_parameters (bool, optional): Sets the weights to a non-learnable constant. `initial_weights_parameters` must be provided if True. Default is False.
     """
 
     def __init__(self,
@@ -188,20 +166,12 @@ class RBFLayer(nn.Module):
               std_shapes: float = 0.1,
               gain_weights: float = 1.0) -> None:
         """
-        Resets all the parameters.
+        Resets the parameters of the RBF layer.
 
-        Parameters
-        ----------
-            upper_bound_kernels: float, optional
-                Randomly samples the centers of the kernels from a uniform
-                distribution U(-x, x) where x = upper_bound_kernels
-            std_shapes: float, optional
-                Randomly samples the log-shape parameters from a normal
-                distribution with mean 0 and std std_shapes
-            gain_weights: float, optional
-                Randomly samples the weights used to linearly combine the
-                output of the kernels from a xavier_uniform with gain
-                equal to gain_weights
+        Args:
+            upper_bound_kernels (float, optional): Upper bound for the uniform distribution used to initialize the kernel centers. Default is 1.0.
+            std_shapes (float, optional): Standard deviation for the normal distribution used to initialize the log-shape parameters. Default is 0.1.
+            gain_weights (float, optional): Gain for the Xavier uniform initialization of the weights. Default is 1.0.
         """
         if self.initial_centers_parameter is None:
             nn.init.uniform_(
@@ -217,20 +187,13 @@ class RBFLayer(nn.Module):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
-        Computes the ouput of the RBF layer given an input vector
+        Forward pass of the RBF layer.
 
-        Parameters
-        ----------
-            input: torch.Tensor
-                Input tensor of size B x Fin, where B is the batch size,
-                and Fin is the feature space dimensionality of the input
+        Args:
+            input (torch.Tensor): Input tensor of shape (batch_size, in_features).
 
-        Returns
-        ----------
-            out: torch.Tensor
-                Output tensor of size B x Fout, where B is the batch
-                size of the input, and Fout is the output feature space
-                dimensionality
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, out_features).
         """
 
         # Input has size B x Fin

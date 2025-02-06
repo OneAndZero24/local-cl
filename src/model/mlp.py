@@ -8,7 +8,25 @@ from model.layer import instantiate, LayerType
 
 class MLP(ActivationRecordingModuleABC):
     """
-    Simple MLP model with incremental classifier head.
+    Multi-Layer Perceptron (MLP) class that extends ActivationRecordingModuleABC.
+
+    Args:
+        initial_out_features (int): The number of output features for the initial layer.
+        sizes (list[int]): A list of integers representing the sizes of each layer.
+        layers (list[str]): A list of strings representing the type of each layer.
+        head_type (str, optional): The type of the head layer. Defaults to "Normal".
+        **kwargs: Additional keyword arguments for layer instantiation.
+
+    Attributes:
+        layers (nn.ModuleList): A list of instantiated layers.
+
+    Methods:
+        forward(x):
+            Performs a forward pass through the network and records activations.
+            Args:
+                x (torch.Tensor): The input tensor.
+            Returns:
+                torch.Tensor: The output tensor after passing through the head layer.
     """
 
     def __init__(self,
@@ -18,6 +36,22 @@ class MLP(ActivationRecordingModuleABC):
         head_type: str="Normal",
         **kwargs
     ):
+        """
+        Initializes the MLP model.
+        
+        Args:
+            initial_out_features (int): The initial number of output features.
+            sizes (list[int]): A list of integers representing the sizes of each layer.
+            layers (list[str]): A list of strings representing the types of each layer.
+            head_type (str, optional): The type of the head layer. Defaults to "Normal".
+            **kwargs: Additional keyword arguments for layer instantiation.
+
+        Keyword Args:
+            train_head_domain (bool, optional): If head_type is LOCAL, specifies whether to train the head domain. Defaults to False.
+            masking (optional): Masking parameter for layers.
+            mask_value (optional): Mask value parameter for layers.
+        """
+                
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
 
@@ -55,6 +89,16 @@ class MLP(ActivationRecordingModuleABC):
         self.layers = nn.ModuleList(layers)
        
     def forward(self, x):
+        """
+        Perform a forward pass through the network.
+
+        Args:
+            x (torch.Tensor): Input tensor to the network.
+            
+        Returns:
+            torch.Tensor: Output tensor after passing through the network.
+        """
+
         self.reset_activations()
 
         x = torch.flatten(x, start_dim=1)

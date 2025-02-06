@@ -3,9 +3,9 @@ import wandb
 
 
 def setup_wandb(config: omegaconf.DictConfig):
-    '''
+    """
     Sets up W&B run based on config.
-    '''
+    """
 
     group, name = config.exp.log_dir.parts[-2:]
     wandb_config = omegaconf.OmegaConf.to_container(

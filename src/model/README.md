@@ -1,6 +1,7 @@
 ## Models
-- `layer/*` - This subfolder contains implementation of fully connected and conv2d layers with locality property. As well as `instantiate`, `instantiate2D` factory methods.
-- `inc_classifier.py` - `IncerementalClassifier` automatically extends given layer to handle output in class incremental setting
-- `activation_recording_abc.py` - `ActivationRecordingModuleABC` acts as a base class for Modules which record their layer activity on each step
-- `lenet.py` - LeNet
-- `mlp.py` - MLP
+Full models and custom layers.
+- `inc_classifier.py` - `IncerementalClassifier` automatically extends given layer to handle new classes in CIL, used as head in each model
+- `activation_recording_abc.py` - `ActivationRecordingModuleABC` acts as a base class for Modules that record activations
+- `lenet.py` - **Deprecated** LeNet
+- `mlp.py` - Cutomizable MLP wrapper
+- `layer/` - Custom layer implementations. Use `instantiate` & `instantiate2D` API

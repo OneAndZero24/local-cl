@@ -12,7 +12,23 @@ class IncrementalClassifier(nn.Module):
 
     Typically used in class-incremental benchmarks where the number of
     classes grows over time.
+
+    Attributes:
+        masking (bool): Whether to apply masking to the output.
+        mask_value (int): The value to use for masked outputs.
+        mul (float): A multiplier used during forward pass when old classes exist.
+        old_nclasses (int or None): The number of classes before the last increment.
+        get_classifier (Callable): A function to instantiate the classifier layer.
+        classifier (nn.Module): The classifier layer.
+        active_units (torch.Tensor): A tensor indicating active units for masking.
+
+    Methods:
+        increment(new_classes: list[int]):
+            Increment the classifier to accommodate new classes.
+        forward(x: torch.Tensor) -> torch.Tensor:
+            Forward pass through the classifier.
     """
+
 
     def __init__(
         self,
@@ -23,6 +39,27 @@ class IncrementalClassifier(nn.Module):
         mask_value: int=-1000,
         **kwargs,
     ):
+        """
+        Initializes the IncClassifier.
+
+        Args:
+            in_features (int): Number of input features.
+            initial_out_features (int, optional): Number of initial output features. Defaults to 2.
+            layer_type (LayerType, optional): Type of layer to use for the classifier. Defaults to LayerType.NORMAL.
+            masking (bool, optional): Whether to apply masking. Defaults to True.
+            mask_value (int, optional): Value to use for masking. Defaults to -1000.
+            **kwargs: Additional keyword arguments to pass to the layer instantiation.
+
+        Attributes:
+            masking (bool): Whether masking is enabled.
+            mask_value (int): Value used for masking.
+            mul (float): Multiplier value, initialized to 1.0.
+            old_nclasses (None): Placeholder for old number of classes, initialized to None.
+            get_classifier (function): Lambda function to instantiate the classifier layer.
+            classifier (nn.Module): The instantiated classifier layer.
+            active_units (torch.Tensor): Buffer to keep track of active units, initialized to zeros.
+        """
+
         super().__init__()
         self.masking = masking
         self.mask_value = mask_value
@@ -46,6 +83,25 @@ class IncrementalClassifier(nn.Module):
 
     @torch.no_grad()
     def increment(self, new_classes: list[int]):
+        """
+        Increment the classifier to accommodate new classes.
+
+        Args:
+            new_classes (list[int]): A list of new class indices to be added.
+
+        This method updates the classifier to handle new classes by adjusting the 
+        output layer and active units if masking is enabled. It ensures that the 
+        classifier's parameters are updated to reflect the new number of classes.
+        Steps:
+        1. Determine the device on which the classifier's parameters are located.
+        2. Calculate the new number of classes based on the maximum index in new_classes.
+        3. If masking is enabled and the number of classes has changed:
+            - Update the active units tensor to accommodate the new classes.
+        4. If the number of classes has changed:
+            - Adjust the classifier's parameters to reflect the new number of classes.
+            - Update the classifier's state dictionary with the new parameters.
+        """
+
         device = next(self.classifier.parameters()).device
 
         in_features = self.classifier.in_features
@@ -79,6 +135,26 @@ class IncrementalClassifier(nn.Module):
     
 
     def forward(self, x):
+        """
+        Perform a forward pass through the classifier.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            
+        Returns:
+            torch.Tensor: Output tensor after applying the classifier and optional masking.
+        The forward pass includes the following steps:
+        1. If the classifier is an instance of LocalLayer and old_nclasses is not None:
+            - Clone the input tensor.
+            - Apply hardtanh activation to the cloned tensor.
+            - Modify the first old_nclasses elements of the cloned tensor using a linear combination of the original input and the minimum left bounds of the classifier.
+            - Replace the original input tensor with the modified tensor.
+        2. Pass the (possibly modified) input tensor through the classifier.
+        3. If masking is enabled and the model is in training mode:
+            - Create a mask from the active_units tensor.
+            - Apply the mask to the output tensor, filling masked positions with mask_value.
+        """
+
         if isinstance(self.classifier, LocalLayer) and (self.old_nclasses is not None):
             new_x = x.clone()
             new_x = F.hardtanh(new_x, -1.0, 1.0)

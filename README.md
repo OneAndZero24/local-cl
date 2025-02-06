@@ -3,6 +3,8 @@
 
 🚀 *Let's forget about catastrophic forgetting!* 🚀
 
+***Work in progress... There may be bugs and features might be missing.***
+
 ## Commands
 **Setup**
 ```
