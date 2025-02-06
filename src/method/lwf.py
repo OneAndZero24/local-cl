@@ -4,8 +4,8 @@ from copy import deepcopy
 import torch
 from torch import nn
 
-from model.activation_recording_abc import ActivationRecordingModuleABC
-from src.method.regularization import distillation_loss
+from model.cl_module_abc import CLModuleABC
+from method.regularization import distillation_loss
 from method.method_abc import MethodABC
 
 
@@ -14,7 +14,7 @@ class LwF(MethodABC):
     LwF (Learning without Forgetting) method for continual learning.
 
     Attributes:
-        module (ActivationRecordingModuleABC): The module to be trained.
+        module (CLModuleABC): The module to be trained.
         criterion (nn.Module): The loss function.
         first_lr (float): The initial learning rate.
         lr (float): The learning rate.
@@ -24,7 +24,7 @@ class LwF(MethodABC):
         reg_type (Optional[str]): The type of regularization.
         clipgrad (Optional[float]): The gradient clipping value.
         task_id (int): The current task identifier.
-        old_module (ActivationRecordingModuleABC): The module from the previous task.
+        old_module (CLModuleABC): The module from the previous task.
 
     Methods:
         __init__(module, criterion, first_lr, lr, T, alpha, gamma=None, reg_type=None, clipgrad=None):
@@ -38,7 +38,7 @@ class LwF(MethodABC):
     """
 
     def __init__(self, 
-        module: ActivationRecordingModuleABC,
+        module: CLModuleABC,
         criterion: nn.Module, 
         first_lr: float, 
         lr: float,
@@ -52,7 +52,7 @@ class LwF(MethodABC):
         Initialize the LwF (Learning without Forgetting) method.
 
         Args:
-            module (ActivationRecordingModuleABC): The module to record activations.
+            module (CLModuleABC): The module to record activations.
             criterion (nn.Module): The loss function.
             first_lr (float): The initial learning rate.
             lr (float): The learning rate.

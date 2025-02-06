@@ -1,16 +1,16 @@
 import torch.nn as nn
 
 from util import deprecation_warning
-from model.activation_recording_abc import ActivationRecordingModuleABC
+from model.cl_module_abc import CLModuleABC
 from model.inc_classifier import IncrementalClassifier
 from model.layer import LayerType, instantiate2D
 
 
-class LeNet(ActivationRecordingModuleABC):
+class LeNet(CLModuleABC):
     """
     DEPRECATED  
 
-    LeNet is a convolutional neural network model that extends the ActivationRecordingModuleABC.
+    LeNet is a convolutional neural network model that extends the CLModuleABC.
     This implementation includes convolutional layers, activation functions, and fully connected layers.
 
     Attributes:

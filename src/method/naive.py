@@ -2,7 +2,7 @@ from typing import Optional
 
 from torch import nn
 
-from model.activation_recording_abc import ActivationRecordingModuleABC
+from model.cl_module_abc import CLModuleABC
 from method.method_abc import MethodABC
 
 
@@ -11,7 +11,7 @@ class Naive(MethodABC):
     Naive joint-training method
 
     Args:
-        module (ActivationRecordingModuleABC): The module to be used for activation recording.
+        module (CLModuleABC): The module to be used for activation recording.
         criterion (nn.Module): The loss function.
         first_lr (float): The initial learning rate.
         lr (float): The learning rate.
@@ -29,7 +29,7 @@ class Naive(MethodABC):
     """
     
     def __init__(self, 
-        module: ActivationRecordingModuleABC,
+        module: CLModuleABC,
         criterion: nn.Module, 
         first_lr: float, 
         lr: float,
@@ -41,7 +41,7 @@ class Naive(MethodABC):
         Initializes the Naive class.
 
         Args:
-            module (ActivationRecordingModuleABC): The module to be used for activation recording.
+            module (CLModuleABC): The module to be used for activation recording.
             criterion (nn.Module): The loss function to be used.
             first_lr (float): The initial learning rate.
             lr (float): The learning rate.

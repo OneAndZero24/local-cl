@@ -4,10 +4,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .local_module import LocalModule
 from util import deprecation_warning
 
 
-class LocalLayer(nn.Module):
+class LocalLayer(LocalModule):
     """
     DEPRECATED  
     

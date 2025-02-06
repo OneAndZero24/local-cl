@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 
-from model.activation_recording_abc import ActivationRecordingModuleABC
+from model.cl_module_abc import CLModuleABC
 from model.inc_classifier import IncrementalClassifier
 from model.layer import instantiate, LayerType
 
 
-class MLP(ActivationRecordingModuleABC):
+class MLP(CLModuleABC):
     """
-    Multi-Layer Perceptron (MLP) class that extends ActivationRecordingModuleABC.
+    Multi-Layer Perceptron (MLP) class that extends CLModuleABC.
 
     Args:
         initial_out_features (int): The number of output features for the initial layer.

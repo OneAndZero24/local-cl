@@ -6,6 +6,7 @@ from torch import nn
 from .rbf import RBFLayer
 from .local import LocalLayer
 from .local_conv2d import LocalConv2DLayer
+from .local_module import LocalModule
 
 
 class LayerType(Enum):

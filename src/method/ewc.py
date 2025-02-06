@@ -5,8 +5,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from model.activation_recording_abc import ActivationRecordingModuleABC
-from src.method.regularization import ewc_loss
+from model.cl_module_abc import CLModuleABC
+from method.regularization import ewc_loss
 from method.method_abc import MethodABC
 
 
@@ -39,7 +39,7 @@ class EWC(MethodABC):
 
 
     def __init__(self, 
-        module: ActivationRecordingModuleABC,
+        module: CLModuleABC,
         criterion: nn.Module, 
         first_lr: float, 
         lr: float,
@@ -52,7 +52,7 @@ class EWC(MethodABC):
         Initializes the EWC (Elastic Weight Consolidation) method.
 
         Args:
-            module (ActivationRecordingModuleABC): The module to be used for activation recording.
+            module (CLModuleABC): The module to be used for activation recording.
             criterion (nn.Module): The loss function to be used.
             first_lr (float): The initial learning rate.
             lr (float): The learning rate for subsequent updates.

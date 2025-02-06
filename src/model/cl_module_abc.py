@@ -1,13 +1,10 @@
 from abc import ABCMeta
 
 from torch import nn
+from model.layer import LocalModule
 
-from model.layer import LocalLayer, RBFLayer, LocalConv2DLayer
 
-
-LOCAL_LAYERS = (LocalLayer, RBFLayer, LocalConv2DLayer)
-
-class ActivationRecordingModuleABC(nn.Module, metaclass=ABCMeta):
+class CLModuleABC(nn.Module, metaclass=ABCMeta):
     """
     Abstract base class for modules that record activations of specified layers during forward passes.
 
@@ -58,6 +55,6 @@ class ActivationRecordingModuleABC(nn.Module, metaclass=ABCMeta):
         Returns:
             None
         """
-
-        if isinstance(layer, LOCAL_LAYERS):
+        
+        if isinstance(layer, LocalModule):
             self.activations.append(x)

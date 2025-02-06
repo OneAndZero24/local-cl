@@ -26,6 +26,8 @@ import torch.nn as nn
 
 from typing import Callable
 
+from .local_module import LocalModule
+
 
 def l_norm(x, p=2):
     return torch.norm(x, p=p, dim=-1)
@@ -58,7 +60,7 @@ def rbf_bump(x):
     return torch.zeros_like(x)
 
 
-class RBFLayer(nn.Module):
+class RBFLayer(LocalModule):
     """
     A Radial Basis Function (RBF) Layer.
 

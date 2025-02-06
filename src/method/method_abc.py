@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from torch import nn
 from torch import optim
 
-from model.activation_recording_abc import ActivationRecordingModuleABC
+from model.cl_module_abc import CLModuleABC
 from method.regularization import regularization
 
 
@@ -13,7 +13,7 @@ class MethodABC(metaclass=ABCMeta):
     An abstract base class for methods using activation recording modules.
 
     Attributes:
-        module (ActivationRecordingModuleABC): The activation recording module.
+        module (CLModuleABC): The activation recording module.
         criterion (nn.Module): The loss function.
         optimizer (Optional[torch.optim.Optimizer]): The optimizer, initialized as None.
         first_lr (float): The initial learning rate for the first task.
@@ -35,7 +35,7 @@ class MethodABC(metaclass=ABCMeta):
     """
 
     def __init__(self, 
-        module: ActivationRecordingModuleABC,
+        module: CLModuleABC,
         criterion: nn.Module, 
         first_lr: float, 
         lr: float,
