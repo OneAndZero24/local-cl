@@ -20,9 +20,9 @@ class LwF(MethodPluginABC):
     Methods:
         __init__(T: float, alpha: float):
             Initializes the LwF method with the given temperature and alpha values.
-        _setup_task(task_id: int):
+        setup_task(task_id: int):
             Sets up the task for the given task ID. If the task ID is greater than 0, 
-        _forward(x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, preds: torch.Tensor) -> tuple:
+        forward(x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, preds: torch.Tensor) -> tuple:
             Performs a forward pass and computes the loss with optional distillation. 
             If the task ID is greater than 0, it computes the distillation loss using the 
             predictions from the old module and combines it with the initial loss.
@@ -46,7 +46,7 @@ class LwF(MethodPluginABC):
         self.alpha = alpha
 
 
-    def _setup_task(self, task_id: int):
+    def setup_task(self, task_id: int):
         """
         Sets up the task for the given task ID.
         This method initializes the task by setting the task ID. If the task ID is greater than 0, 
@@ -66,7 +66,7 @@ class LwF(MethodPluginABC):
                 self.old_module.eval()
 
 
-    def _forward(self, x, y, loss, preds):
+    def forward(self, x, y, loss, preds):
         """
         Perform a forward pass and compute the loss with optional distillation.
 

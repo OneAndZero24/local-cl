@@ -5,6 +5,33 @@
 
 ***Work in progress... There may be bugs and features might be missing.***
 
+## Features
+- Hydra Configuration
+- WANDB Logging
+- Lightning Fabric
+- Custom Plugin System for Methods
+- Incremental Classifier
+
+| Method | Status |
+| ------ | -- |
+| Naive | ✅ |
+| LwF | ✅ |
+| EWC | ✅ |
+| SI | ❌ |
+| MAS | ❌ |
+
+| Custom Layers | Status |
+| ------ | -- |
+| Local | ✅ |
+| RBF | ✅ |
+| LocalHead | ⭕️ |
+| LocalConv2D | ⭕️ |
+
+| Model | Status |
+| ------ | -- |
+| MLP | ✅ |
+| LeNet | ⭕️ |
+
 ## Commands
 **Setup**
 ```

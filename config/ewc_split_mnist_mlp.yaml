@@ -3,7 +3,7 @@ defaults:
   - dataset: mnist
   - scenario: class_inc
   - model: mlp
-  - method: ewc
+  - method: composer_ewc
 
 exp:
   run_func:

@@ -13,7 +13,7 @@ parameters:
   model:
     value: mlp
   method:
-    value: lwf
+    value: composer_lwf
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -45,7 +45,7 @@ parameters:
   method._partial_: 
     value: True
   method._target_: 
-    value: method.LwF
+    value: method.Composer
   method.criterion._target_: 
     value: torch.nn.CrossEntropyLoss
   method.first_lr: 
@@ -72,6 +72,10 @@ parameters:
     value: 0.000001
   method.reg_type:
     values: ["entropy", "l1", "l0"]
+  method.plugins:
+    - _target_: method.LwF
+      T: 2
+      alpha: 0.4
 
 
 command:

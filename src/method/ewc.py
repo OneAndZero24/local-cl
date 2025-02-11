@@ -21,8 +21,8 @@ class EWC(MethodPluginABC):
 
     Methods:
         __init__(alpha: float): Initializes the EWC method.
-        _setup_task(task_id: int): Sets up the task with the given task ID. 
-        _forward(x, y, loss, preds): Forward.
+        setup_task(task_id: int): Sets up the task with the given task ID. 
+        forward(x, y, loss, preds): Forward.
         _get_fisher_diag(): Compute the diagonal of the Fisher Information Matrix for the model parameters.
     """
 
@@ -45,7 +45,7 @@ class EWC(MethodPluginABC):
         self.params_buffer = {}
 
 
-    def _setup_task(self, task_id: int):
+    def setup_task(self, task_id: int):
         """
         Sets up the task with the given task ID.
         This method initializes the task by setting the task ID. If the task ID is greater than 0, it 
@@ -68,7 +68,7 @@ class EWC(MethodPluginABC):
         self.data_buffer = []
 
 
-    def _forward(self, x, y, loss, preds):
+    def forward(self, x, y, loss, preds):
         """
         Perform a forward pass and compute the loss with Elastic Weight Consolidation (EWC) regularization.
 

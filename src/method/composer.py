@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from torch import nn
@@ -7,6 +8,9 @@ from model.cl_module_abc import CLModuleABC
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 class Composer:
     def __init__(self, 
@@ -28,7 +32,10 @@ class Composer:
         self.gamma = gamma
         self.clipgrad = clipgrad
         self.plugins = plugins
-        # TODO init plugins with module
+        
+        for plugin in self.plugins:
+            plugin.set_module(self.module)
+            log.info(f'Plugin {plugin.__class__.__name__} added to composer')
 
     def _setup_optim(self, task_id: int):
         params = list(self.module.parameters())
@@ -45,7 +52,7 @@ class Composer:
     def setup_task(self, task_id: int):
         self._setup_optim(task_id)
         for plugin in self.plugins:
-            plugin._setup_task(task_id)
+            plugin.setup_task(task_id)
 
 
     def forward(self, x, y):
@@ -54,7 +61,7 @@ class Composer:
         loss = self._add_reg(loss)
 
         for plugin in self.plugins:
-            loss, preds = plugin._forward(x, y, loss, preds)
+            loss, preds = plugin.forward(x, y, loss, preds)
         return loss, preds
 
     def backward(self, loss):  

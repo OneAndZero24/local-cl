@@ -1,21 +1,32 @@
 from abc import ABCMeta, abstractmethod
 
+from torch import nn
+
 
 class MethodPluginABC(metaclass=ABCMeta):
     """
-    Interface for continual learning methods as plugins for composer.
+    Base class for continual learning methods as plugins for composer.
 
     Methods:
-        _setup_task(task_id: int):
+        setup_task(task_id: int):
             Abstract method for setting up a task. Must be implemented by subclasses.
-        _forward(x, y, loss, preds):
+        forward(x, y, loss, preds):
             Abstract method for the forward pass. Must be implemented by subclasses.
     """
 
-    # TODO module
+    def set_module(self, module: nn.Module):
+        """
+        Set the module for the plugin.
+        
+        Args:
+            module(nn.Module): The model to be set.
+        """
+
+        self.module = module
+
 
     @abstractmethod
-    def _setup_task(self, task_id: int):
+    def setup_task(self, task_id: int):
         """
         Internal setup task.
         
@@ -27,7 +38,7 @@ class MethodPluginABC(metaclass=ABCMeta):
 
 
     @abstractmethod
-    def _forward(self, x, y, loss, preds):
+    def forward(self, x, y, loss, preds):
         """
         Internal forward pass.
         """
