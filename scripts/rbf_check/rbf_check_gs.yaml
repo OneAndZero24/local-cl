@@ -1,0 +1,79 @@
+program: src/main.py
+method: bayes          # Use Bayesian optimization
+metric:               # Metric to optimize
+  name: avg_acc      # Replace with your evaluation metric
+  goal: maximize      # Can be "minimize" or "maximize"
+ 
+parameters:
+  # Experiment defaults
+  dataset:
+    value: mnist
+  scenario:
+    value: class_inc
+  model:
+    value: mlp_rbf
+  method:
+    value: composer_naive
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    value: 64     
+  exp.epochs: 
+    values: [50, 10, 5]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False       
+ 
+  # Model configuration
+  model._target_: 
+    value: model.MLP
+  model.initial_out_features:
+    value: 2          
+  model.sizes:
+    values: [[1024, 100], [1024, 50], [1024, 400], [1024, 10]]     
+  model.head_type: 
+    value: Normal
+  model.layers: 
+    values: [["RBF"], ["RBF", "RBF"]]
+  model.local_linear:
+    values: [True, False]
+  model.normalization:
+    values: [True, False]
+  model.radial_function._target_:
+    value: model.layer.rbf.rbf_gaussian
+  model.num_kernels:
+    values: [5, 10, 100]
+ 
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.Composer
+  method.criterion._target_: 
+    value: torch.nn.CrossEntropyLoss
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+  method.gamma: 
+    distribution: uniform  
+    min: 0.0
+    max: 1.0
+  method.clipgrad: 
+    value: 0.000001
+  method.reg_type:
+    values: ["entropy", "l1", "l0"]
+ 
+ 
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - naive_split_mnist_mlp.yaml
+  - ${args_no_hyphens}

@@ -85,6 +85,7 @@ class RBFLayer(LocalModule):
         radial_function (Callable[[torch.Tensor], torch.Tensor]): A radial basis function that returns a tensor of real values given a tensor of real values.
         norm_function (Callable[[torch.Tensor], torch.Tensor]): Normalization function applied to the features.
         normalization (bool, optional): If True, applies the normalization trick to the RBF layer. Default is True.
+        local_linear (bool, optional): If True, applies a trainable linear transformation to x-c. Default is False.
         initial_shape_parameter (torch.Tensor, optional): Sets the shape parameter to the desired value. Default is None.
         initial_centers_parameter (torch.Tensor, optional): Sets the centers to the desired value. Default is None.
         initial_weights_parameters (torch.Tensor, optional): Sets the weights parameter to the desired value. Default is None.
@@ -100,6 +101,7 @@ class RBFLayer(LocalModule):
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
+                 local_linear: bool = False,
                  initial_shape_parameter: torch.Tensor = None,
                  initial_centers_parameter: torch.Tensor = None,
                  initial_weights_parameters: torch.Tensor = None,
@@ -114,6 +116,7 @@ class RBFLayer(LocalModule):
         self.radial_function = radial_function
         self.norm_function = norm_function
         self.normalization = normalization
+        self.local_linear = local_linear
 
         self.initial_shape_parameter = initial_shape_parameter
         self.constant_shape_parameter = constant_shape_parameter
@@ -161,11 +164,21 @@ class RBFLayer(LocalModule):
             self.log_shapes = nn.Parameter(
                 torch.zeros(self.num_kernels, dtype=torch.float32))
 
+        if self.local_linear:
+            self.local_linear_weights = nn.Parameter(
+                torch.zeros(self.num_kernels, self.in_features, dtype=torch.float32)
+            )
+            self.local_linear_bias = nn.Parameter(
+                torch.zeros(self.num_kernels, dtype=torch.float32)
+            )
+
         self.reset()
 
     def reset(self,
+              lower_bound_kernels: float = 0.0,
+              lower_bound_shapes: float = 0.5,
               upper_bound_kernels: float = 1.0,
-              std_shapes: float = 0.1,
+              upper_bound_shapes: float = 1.0,
               gain_weights: float = 1.0) -> None:
         """
         Resets the parameters of the RBF layer.
@@ -176,16 +189,17 @@ class RBFLayer(LocalModule):
             gain_weights (float, optional): Gain for the Xavier uniform initialization of the weights. Default is 1.0.
         """
         if self.initial_centers_parameter is None:
-            nn.init.uniform_(
-                self.kernels_centers,
-                a=-upper_bound_kernels,
-                b=upper_bound_kernels)
+            nn.init.uniform_(self.kernels_centers, a=lower_bound_kernels, b=upper_bound_kernels)
 
         if self.initial_shape_parameter is None:
-            nn.init.normal_(self.log_shapes, mean=0.0, std=std_shapes)
+            nn.init.uniform_(self.log_shapes, a=lower_bound_shapes, b=upper_bound_shapes)
 
         if self.initial_weights_parameters is None:
             nn.init.xavier_uniform_(self.weights, gain=gain_weights)
+
+        if self.local_linear:
+            nn.init.xavier_uniform_(self.local_linear_weights, gain=gain_weights)
+            nn.init.zeros_(self.local_linear_bias)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
@@ -208,6 +222,11 @@ class RBFLayer(LocalModule):
 
         diff = input.view(batch_size, 1, self.in_features) - c
 
+        # Apply local linear transformation
+        if self.local_linear:
+            local_outputs = torch.matmul(diff, self.local_linear_weights)
+            local_outputs = local_outputs + self.local_linear_bias
+
         # Apply norm function; c has size B x num_kernels
         r = self.norm_function(diff)
 
@@ -216,6 +235,9 @@ class RBFLayer(LocalModule):
 
         # Apply radial basis function; rbf has size B x num_kernels
         rbfs = self.radial_function(eps_r)
+
+        if self.local_linear:
+            rbfs = rbfs * local_outputs
 
         # Apply normalization
         # (check https://en.wikipedia.org/wiki/Radial_basis_function_network)
@@ -248,3 +270,4 @@ class RBFLayer(LocalModule):
     def incrementable_params(self):
         """ Returns the incrementable parameters of the module. """
         return ["weights"]
+    
