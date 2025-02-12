@@ -61,13 +61,11 @@ parameters:
     min: 0.0001
     max: 0.01
   method.gamma: 
-    distribution: uniform  
-    min: 0.0
-    max: 1.0
+    value: 0.0
   method.clipgrad: 
     value: 0.000001
   method.reg_type:
-    values: ["entropy", "l1", "l0"]
+    values: [ "l0"]
  
  
 command:
