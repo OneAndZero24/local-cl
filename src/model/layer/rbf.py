@@ -166,10 +166,10 @@ class RBFLayer(LocalModule):
 
         if self.local_linear:
             self.local_linear_weights = nn.Parameter(
-                torch.zeros(self.num_kernels, self.in_features, dtype=torch.float32)
+                torch.zeros(self.num_kernels, self.in_features, self.out_features, dtype=torch.float32)
             )
             self.local_linear_bias = nn.Parameter(
-                torch.zeros(self.num_kernels, dtype=torch.float32)
+                torch.zeros(self.out_features, self.num_kernels, dtype=torch.float32)
             )
 
         self.reset()
@@ -199,7 +199,7 @@ class RBFLayer(LocalModule):
 
         if self.local_linear:
             nn.init.xavier_uniform_(self.local_linear_weights, gain=gain_weights)
-            nn.init.zeros_(self.local_linear_bias)
+            nn.init.constant_(self.local_linear_bias, 0.01)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
@@ -222,11 +222,6 @@ class RBFLayer(LocalModule):
 
         diff = input.view(batch_size, 1, self.in_features) - c
 
-        # Apply local linear transformation
-        if self.local_linear:
-            local_outputs = torch.matmul(diff, self.local_linear_weights)
-            local_outputs = local_outputs + self.local_linear_bias
-
         # Apply norm function; c has size B x num_kernels
         r = self.norm_function(diff)
 
@@ -236,19 +231,21 @@ class RBFLayer(LocalModule):
         # Apply radial basis function; rbf has size B x num_kernels
         rbfs = self.radial_function(eps_r)
 
-        if self.local_linear:
-            rbfs = rbfs * local_outputs
-
         # Apply normalization
         # (check https://en.wikipedia.org/wiki/Radial_basis_function_network)
         if self.normalization:
             # 1e-9 prevents division by 0
             rbfs = rbfs / (1e-9 + rbfs.sum(dim=-1)).unsqueeze(-1)
 
-        # Take linear combination
-        out = self.weights.expand(batch_size, self.out_features,
-                                  self.num_kernels) * rbfs.view(
-                                      batch_size, 1, self.num_kernels)
+        weights = self.weights.expand(batch_size, self.out_features, self.num_kernels)
+
+        # Apply local linear transformation
+        if self.local_linear:
+            weights = torch.einsum('bni,nio->bon', diff, self.local_linear_weights) + self.local_linear_bias
+
+        # Apply linear combination; out has size B x Fout
+        out = weights * rbfs.view(
+            batch_size, 1, self.num_kernels)
 
         return out.sum(dim=-1)
 
