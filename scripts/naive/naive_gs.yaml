@@ -13,7 +13,7 @@ parameters:
   model:
     value: mlp
   method:
-    value: naive
+    value: composer_naive
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -45,7 +45,7 @@ parameters:
   method._partial_: 
     value: True
   method._target_: 
-    value: method.Naive
+    value: method.Composer
   method.criterion._target_: 
     value: torch.nn.CrossEntropyLoss
   method.first_lr: 

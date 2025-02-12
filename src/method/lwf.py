@@ -1,69 +1,46 @@
-from typing import Optional
 from copy import deepcopy
 
 import torch
-from torch import nn
 
-from model.cl_module_abc import CLModuleABC
 from method.regularization import distillation_loss
-from method.method_abc import MethodABC
+from src.method.method_plugin_abc import MethodPluginABC
 
 
-class LwF(MethodABC):
+class LwF(MethodPluginABC):
     """
     LwF (Learning without Forgetting) method for continual learning.
+    This class implements the Learning without Forgetting (LwF) method, which helps in retaining 
+    knowledge from previous tasks while learning new tasks. It uses a distillation loss to 
+    preserve the performance on old tasks.
 
     Attributes:
-        module (CLModuleABC): The module to be trained.
-        criterion (nn.Module): The loss function.
-        first_lr (float): The initial learning rate.
-        lr (float): The learning rate.
-        T (float): The temperature for distillation loss.
-        alpha (float): The weight for the distillation loss.
-        gamma (Optional[float]): The regularization parameter.
-        reg_type (Optional[str]): The type of regularization.
-        clipgrad (Optional[float]): The gradient clipping value.
-        task_id (int): The current task identifier.
-        old_module (CLModuleABC): The module from the previous task.
+        T (float): Temperature scaling parameter for distillation.
+        alpha (float): Weighting factor for the distillation loss.
 
     Methods:
-        __init__(module, criterion, first_lr, lr, T, alpha, gamma=None, reg_type=None, clipgrad=None):
-            Initializes the LwF method with the given parameters.
-        setup_task(task_id):
-            Sets up the task by initializing the task identifier and preparing the old module for distillation.
-        forward(x, y):
-            Performs the forward pass, computes the loss, and applies the distillation loss if not the first task.
-        backward(loss):
-            Performs the backward pass, applies gradient clipping if specified, and updates the model parameters.
+        __init__(T: float, alpha: float):
+            Initializes the LwF method with the given temperature and alpha values.
+        setup_task(task_id: int):
+            Sets up the task for the given task ID. If the task ID is greater than 0, 
+        forward(x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, preds: torch.Tensor) -> tuple:
+            Performs a forward pass and computes the loss with optional distillation. 
+            If the task ID is greater than 0, it computes the distillation loss using the 
+            predictions from the old module and combines it with the initial loss.
     """
 
     def __init__(self, 
-        module: CLModuleABC,
-        criterion: nn.Module, 
-        first_lr: float, 
-        lr: float,
         T: float,
         alpha: float,
-        gamma: Optional[float]=None,
-        reg_type: Optional[str]=None,
-        clipgrad: Optional[float]=None
     ):
         """
-        Initialize the LwF (Learning without Forgetting) method.
+        Initializes the LwF (Learning without Forgetting) method.
 
         Args:
-            module (CLModuleABC): The module to record activations.
-            criterion (nn.Module): The loss function.
-            first_lr (float): The initial learning rate.
-            lr (float): The learning rate.
-            T (float): The temperature for knowledge distillation.
-            alpha (float): The weight for the distillation loss.
-            gamma (Optional[float]): The regularization parameter. Default is None.
-            reg_type (Optional[str]): The type of regularization. Default is None.
-            clipgrad (Optional[float]): The gradient clipping value. Default is None.
+            T (float): Temperature scaling parameter for distillation.
+            alpha (float): Weighting factor for the distillation loss.
         """
-                
-        super().__init__(module, criterion, first_lr, lr, reg_type, gamma, clipgrad)
+
+        super().__init__()
         self.task_id = None
         self.T = T
         self.alpha = alpha
@@ -72,8 +49,7 @@ class LwF(MethodABC):
     def setup_task(self, task_id: int):
         """
         Sets up the task for the given task ID.
-        This method initializes the task by setting the task ID and calling the 
-        setup_optim method from the superclass. If the task ID is greater than 0, 
+        This method initializes the task by setting the task ID. If the task ID is greater than 0, 
         it creates a deep copy of the current module, disables gradient computation 
         for the copied module's parameters, and sets the copied module to evaluation mode.
 
@@ -82,7 +58,6 @@ class LwF(MethodABC):
         """
 
         self.task_id = task_id
-        super().setup_optim(task_id)
         if task_id > 0:         
             with torch.no_grad():   
                 self.old_module = deepcopy(self.module)
@@ -91,7 +66,7 @@ class LwF(MethodABC):
                 self.old_module.eval()
 
 
-    def _forward(self, x, y, loss, preds):
+    def forward(self, x, y, loss, preds):
         """
         Perform a forward pass and compute the loss with optional distillation.
 
@@ -104,7 +79,6 @@ class LwF(MethodABC):
         Returns:
             tuple: A tuple containing the updated loss and predictions.
         """
-
 
         if self.task_id > 0:
             with torch.no_grad():

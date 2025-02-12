@@ -5,13 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .local_module import LocalModule
-from util import deprecation_warning
 
 
 class LocalLayer(LocalModule):
     """
-    DEPRECATED  
-    
     A custom neural network layer that applies a local transformation to the input features.
 
     Args:
@@ -72,8 +69,6 @@ class LocalLayer(LocalModule):
             eps (float, optional): Small value to avoid division by zero. Defaults to 1e-8.
             use_importance_params (bool, optional): Whether to use importance parameters. Defaults to True.
         """
-
-        deprecation_warning("LocalLayer is deprecated!")
 
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()

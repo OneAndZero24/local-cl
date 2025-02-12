@@ -1,68 +1,43 @@
-from typing import Optional
 from copy import deepcopy
 
 import torch
-from torch import nn
 from torch.nn import functional as F
 
-from model.cl_module_abc import CLModuleABC
 from method.regularization import ewc_loss
-from method.method_abc import MethodABC
+from src.method.method_plugin_abc import MethodPluginABC
 
 
-class EWC(MethodABC):
+class EWC(MethodPluginABC):
     """
     Elastic Weight Consolidation (EWC) method for continual learning.
     EWC is a regularization-based method that mitigates catastrophic forgetting by 
     penalizing changes to important parameters for previously learned tasks.
 
     Attributes:
-        task_id (int): Identifier for the current task.
-        clipgrad (float): Gradient clipping value.
-        alpha (float): Weighting factor for the EWC loss.
-        data_buffer (list): Buffer to store data samples.
-        params_buffer (dict): Buffer to store parameters of the model.
-        fisher_diag (dict): Diagonal of the Fisher Information Matrix.
+        task_id (int or None): The ID of the current task.
+        data_buffer (list): A buffer to store data samples.
+        params_buffer (dict): A buffer to store model parameters.
+        fisher_diag (dict): A dictionary to store the Fisher Information diagonal values.
 
     Methods:
-        __init__(module, criterion, first_lr, lr, alpha, gamma=None, reg_type=None, clipgrad=None):
-            Initializes the EWC method with the given parameters.
-        setup_task(task_id):
-            Sets up the task with the given task identifier.
-        forward(x, y):
-            Performs the forward pass and computes the loss.
-        backward(loss):
-            Performs the backward pass and updates the model parameters.
-        _get_fisher_diag():
-            Calculates the diagonal of the Fisher Information Matrix.
+        __init__(alpha: float): Initializes the EWC method.
+        setup_task(task_id: int): Sets up the task with the given task ID. 
+        forward(x, y, loss, preds): Forward.
+        _get_fisher_diag(): Compute the diagonal of the Fisher Information Matrix for the model parameters.
     """
 
 
     def __init__(self, 
-        module: CLModuleABC,
-        criterion: nn.Module, 
-        first_lr: float, 
-        lr: float,
-        alpha: float,
-        gamma: Optional[float]=None,
-        reg_type: Optional[str]=None,
-        clipgrad: Optional[float]=None
+        alpha: float
     ):
         """
         Initializes the EWC (Elastic Weight Consolidation) method.
 
         Args:
-            module (CLModuleABC): The module to be used for activation recording.
-            criterion (nn.Module): The loss function to be used.
-            first_lr (float): The initial learning rate.
-            lr (float): The learning rate for subsequent updates.
             alpha (float): The regularization strength.
-            gamma (Optional[float], optional): The scaling factor for the regularization term. Defaults to None.
-            reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
-            clipgrad (Optional[float], optional): The gradient clipping value. Defaults to None.
         """
 
-        super().__init__(module, criterion, first_lr, lr, reg_type, gamma, clipgrad)
+        super().__init__()
         self.task_id = None
         self.alpha = alpha
 
@@ -73,8 +48,7 @@ class EWC(MethodABC):
     def setup_task(self, task_id: int):
         """
         Sets up the task with the given task ID.
-        This method initializes the task by setting the task ID and calling the 
-        parent class's setup_optim method. If the task ID is greater than 0, it 
+        This method initializes the task by setting the task ID. If the task ID is greater than 0, it 
         freezes the parameters of the module and stores them in the params_buffer. 
         It also calculates the Fisher information diagonal and stores it in 
         fisher_diag. Finally, it initializes an empty data buffer.
@@ -85,7 +59,6 @@ class EWC(MethodABC):
         
 
         self.task_id = task_id
-        super().setup_optim(task_id)
 
         if task_id > 0:
             for name, p in deepcopy(list(self.module.named_parameters())):
@@ -95,7 +68,7 @@ class EWC(MethodABC):
         self.data_buffer = []
 
 
-    def _forward(self, x, y, loss, preds):
+    def forward(self, x, y, loss, preds):
         """
         Perform a forward pass and compute the loss with Elastic Weight Consolidation (EWC) regularization.
 

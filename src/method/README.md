@@ -1,7 +1,7 @@
 ## Methods
 Continual learning methods.
-- `method_abc.py` - `MethodABC` base class
+- `composer.py` - Main `Composer` class implements naive joint training flow, can be extended via plugins
+- `method_plugin_abc.py` - `MethodABC` base class
 - `regularization.py` - Loss components used in different methods for regularization
-- `naive.py` - Naive joint training strategy
 - `lwf.py` - Learning without Forgetting
 - `ewc.py` - Elastic Weight Consolidation

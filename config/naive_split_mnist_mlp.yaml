@@ -3,7 +3,7 @@ defaults:
   - dataset: mnist
   - scenario: class_inc
   - model: mlp
-  - method: naive
+  - method: composer_naive
 
 exp:
   run_func:
