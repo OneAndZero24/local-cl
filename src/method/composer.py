@@ -50,6 +50,7 @@ class Composer:
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         clipgrad: Optional[float]=None,
+        retaingraph: Optional[bool]=False,
         plugins: Optional[list[MethodPluginABC]]=[]
     ):
         """
@@ -63,6 +64,7 @@ class Composer:
             reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
             gamma (Optional[float], optional): The gamma value for learning rate decay. Defaults to None.
             clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.
+            retaingraph (Optional[bool], optional): Whether to retain the computation graph. Defaults to False.
             plugins (Optional[list[MethodPluginABC]], optional): A list of plugins to be used. Defaults to an empty list.
         """
 
@@ -74,6 +76,7 @@ class Composer:
         self.reg_type = reg_type
         self.gamma = gamma
         self.clipgrad = clipgrad
+        self.retaingraph = retaingraph
         self.plugins = plugins
         
         for plugin in self.plugins:
@@ -168,7 +171,7 @@ class Composer:
         """
 
         self.optimizer.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=self.retaingraph)
         if self.clipgrad is not None:
             nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()

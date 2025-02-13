@@ -69,16 +69,17 @@ class Sharpening(MethodPluginABC):
 
         if task_id > 0:         
             self.activations_buffer /= self.N
-            _, indices = torch.topk(self.activations_buffer, self.K)
+            flattened_activations = self.activations_buffer.view(-1)
+            _, indices = torch.topk(flattened_activations, self.K)
             
             new_activations = self.activations_buffer.clone()
-            mask = torch.zeros_like(new_activations, dtype=torch.bool)
+            mask = torch.zeros_like(flattened_activations, dtype=torch.bool)
             mask[indices] = True
             
-            new_activations[mask] = new_activations[mask] + self.alpha*(1 - new_activations[mask])
-            new_activations[~mask] = new_activations[~mask] - self.alpha*new_activations[~mask]  
+            self.activations_buffer.view(-1)[mask] += self.alpha * (1 - self.activations_buffer.view(-1)[mask])
+            self.activations_buffer.view(-1)[~mask] -= self.alpha * self.activations_buffer.view(-1)[~mask]
 
-            diff = new_activations - self.activations_buffer
+            diff = torch.sum(torch.square(new_activations - self.activations_buffer))
             self.composer.backward(diff)
 
         self.N = 0
@@ -104,6 +105,6 @@ class Sharpening(MethodPluginABC):
         if self.activations_buffer is None:
             self.activations_buffer = activations_t
         else:
-            self.activations_buffer += activations_t
+            self.activations_buffer[tuple(slice(0, s) for s in activations_t.shape)] += activations_t
         
         return loss, preds
