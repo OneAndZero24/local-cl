@@ -55,6 +55,8 @@ class MLP(CLModuleABC):
             mask_value (optional): Mask value parameter for layers.
         """
                 
+        assert len(sizes)-1 == len(layers), "Number of sizes and layers must match"
+
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
 
