@@ -1,26 +1,20 @@
 import torch
 
 
-def compute_ema_and_emv(tensors, alpha=0.1):
+def compute_mean_and_var(tensors, alpha=0.1):
     """
-    Compute the Exponential Moving Average (EMA) and Exponential Moving Variance (EMV) of a list of tensors.
-    
+    Compute the mean and variance of a list of tensors.
+
     Args:
-        tensors (list of torch.Tensor): A list of tensors for which the EMA and EMV are to be computed.
-        alpha (float, optional): The smoothing factor for the EMA and EMV calculations. Default is 0.1.
+        tensors (list of torch.Tensor): A list of tensors to compute the mean and variance for.
+        alpha (float, optional): A parameter that is currently not used in the function. Defaults to 0.1.
 
     Returns:
-        tuple: A tuple containing two tensors:
-            - ema (torch.Tensor): The computed Exponential Moving Average.
-            - emv (torch.Tensor): The computed Exponential Moving Variance.
+        tuple: A tuple containing the mean of means and the mean of variances of the input tensors.
     """
 
-    ema = torch.zeros_like(tensors[0])
-    emv = torch.zeros_like(tensors[0])
 
-    for tensor in tensors:
-        diff = tensor - ema
-        ema = alpha * tensor + (1 - alpha) * ema
-        emv = alpha * diff**2 + (1 - alpha) * emv
-    
-    return ema, emv
+    means = torch.stack([tensor.mean(dim=-1) for tensor in tensors])
+    variances = torch.stack([tensor.var(dim=-1) for tensor in tensors])
+
+    return means.mean(), variances.mean()
