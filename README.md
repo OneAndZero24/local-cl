@@ -17,6 +17,7 @@
 | Naive | ✅ |
 | LwF | ✅ |
 | EWC | ✅ |
+| Sharpening | ✅ |
 | SI | ❌ |
 | MAS | ❌ |
 
