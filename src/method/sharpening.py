@@ -29,6 +29,7 @@ class Sharpening(MethodPluginABC):
     def __init__(self, 
         alpha: float,
         K : int,
+        M : int = 1
     ):
         """
         Initialize the sharpening method.
@@ -36,6 +37,7 @@ class Sharpening(MethodPluginABC):
         Args:
             alpha (float): The alpha parameter for the sharpening method.
             K (int): The K parameter for the sharpening method.
+            M (int): Log activations every M steps. Default is 1.
         """
 
         super().__init__()
@@ -45,6 +47,7 @@ class Sharpening(MethodPluginABC):
 
         self.alpha = alpha
         self.K = K
+        self.M = M
 
 
     def setup_task(self, task_id: int):
@@ -101,10 +104,10 @@ class Sharpening(MethodPluginABC):
         """
 
         self.N += 1
-        activations_t = torch.stack(self.module.activations)
-        if self.activations_buffer is None:
-            self.activations_buffer = activations_t
-        else:
-            self.activations_buffer[tuple(slice(0, s) for s in activations_t.shape)] += activations_t
-        
+        if (self.N % self.M) == 0:
+            activations_t = torch.stack(self.module.activations)
+            if self.activations_buffer is None:
+                self.activations_buffer = activations_t
+            else:
+                self.activations_buffer[tuple(slice(0, s) for s in activations_t.shape)] += activations_t
         return loss, preds

@@ -2,13 +2,14 @@ _partial_: True
 _target_: method.Composer
 criterion: 
   _target_: torch.nn.CrossEntropyLoss
-first_lr: 0.001
-lr: 0.001
+first_lr: 0.01
+lr: 0.01
 reg_type: l0
 gamma: 0.0
 clipgrad: 0.000001
-retaingraph: True
+retaingraph: False
 plugins:
   - _target_: method.Sharpening
     K: 64
+    M: 1
     alpha: 0.1

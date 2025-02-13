@@ -41,6 +41,7 @@ class CLModuleABC(nn.Module, metaclass=ABCMeta):
         setting the `activations` attribute to an empty list.
         """
 
+        del self.activations
         self.activations = []
 
 
