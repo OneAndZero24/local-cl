@@ -176,9 +176,8 @@ class RBFLayer(LocalModule):
 
     def reset(self,
               lower_bound_kernels: float = 0.0,
-              lower_bound_shapes: float = 0.5,
               upper_bound_kernels: float = 1.0,
-              upper_bound_shapes: float = 1.0,
+              log_shapes_std: float = 0.1,
               gain_weights: float = 1.0) -> None:
         """
         Resets the parameters of the RBF layer.
@@ -192,7 +191,7 @@ class RBFLayer(LocalModule):
             nn.init.uniform_(self.kernels_centers, a=lower_bound_kernels, b=upper_bound_kernels)
 
         if self.initial_shape_parameter is None:
-            nn.init.uniform_(self.log_shapes, a=lower_bound_shapes, b=upper_bound_shapes)
+            nn.init.normal_(self.log_shapes, mean=upper_bound_kernels/2, std=log_shapes_std)
 
         if self.initial_weights_parameters is None:
             nn.init.xavier_uniform_(self.weights, gain=gain_weights)
