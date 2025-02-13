@@ -17,4 +17,4 @@ def compute_mean_and_var(tensors, alpha=0.1):
     means = torch.stack([tensor.mean(dim=-1) for tensor in tensors])
     variances = torch.stack([tensor.var(dim=-1) for tensor in tensors])
 
-    return means.mean(), variances.mean()
+    return means.mean(dim=0), variances.mean(dim=0)
