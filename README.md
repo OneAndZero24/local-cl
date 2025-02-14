@@ -3,6 +3,8 @@
 
 🚀 *Let's forget about catastrophic forgetting!* 🚀
 
+<p align="center"><img src="rbf.png" alt="rbf" width="200"/></p>
+
 ***Work in progress... There may be bugs and features might be missing.***
 
 ## Features
