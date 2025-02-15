@@ -6,3 +6,4 @@ Continual learning methods.
 - `lwf.py` - Learning without Forgetting
 - `ewc.py` - Elastic Weight Consolidation
 - `mas.py` - Memory Aware Synapses
+- `si.py` - Synaptic Intelligence

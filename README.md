@@ -19,13 +19,14 @@
 | Naive | ✅ |
 | LwF | ✅ |
 | EWC | ✅ |
-| SI | ❌ |
+| SI | ✅ |
 | MAS | ✅ |
 
 | Custom Layers | Status |
 | ------ | -- |
 | Local | ✅ |
 | RBF | ✅ |
+| KAN | ❌ |
 | LocalHead | ⭕️ |
 | LocalConv2D | ⭕️ |
 

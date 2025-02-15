@@ -1,0 +1,12 @@
+_partial_: True
+_target_: method.Composer
+criterion: 
+  _target_: torch.nn.CrossEntropyLoss
+first_lr: 0.001
+lr: 0.001
+reg_type: l0
+gamma: 0.0
+clipgrad: 1e-16
+plugins:
+  - _target_: method.SI
+    alpha: 0.4
