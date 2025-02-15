@@ -5,3 +5,4 @@ Continual learning methods.
 - `regularization.py` - Loss components used in different methods for regularization
 - `lwf.py` - Learning without Forgetting
 - `ewc.py` - Elastic Weight Consolidation
+- `mas.py` - Memory Aware Synapses

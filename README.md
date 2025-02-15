@@ -20,7 +20,7 @@
 | LwF | ✅ |
 | EWC | ✅ |
 | SI | ❌ |
-| MAS | ❌ |
+| MAS | ✅ |
 
 | Custom Layers | Status |
 | ------ | -- |

@@ -9,11 +9,10 @@ def distillation_loss(outputs_new, outputs_old, T=2):
     return prob_old.mul(-1*torch.log(prob_new)).sum(1).mean()*T*T
 
 
-def ewc_loss(model, fisher_diag, params_buffer):
+def param_change_loss(model, multiplier, params_buffer):
     loss = 0
     for name, p in model.named_parameters():
-        _loss = fisher_diag[name] * (p - params_buffer[name]) ** 2
-        loss += _loss.sum()
+        loss += (multiplier[name] * (p - params_buffer[name]) ** 2).sum()
     return loss
 
 

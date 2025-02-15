@@ -3,7 +3,7 @@ from copy import deepcopy
 import torch
 from torch.nn import functional as F
 
-from method.regularization import ewc_loss
+from method.regularization import param_change_loss
 from src.method.method_plugin_abc import MethodPluginABC
 
 
@@ -86,7 +86,7 @@ class EWC(MethodPluginABC):
 
         if self.task_id > 0:
             loss *= self.alpha
-            loss += (1-self.alpha)*ewc_loss(self.module, self.fisher_diag, self.params_buffer)
+            loss += (1-self.alpha)*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
         return loss, preds
 
 

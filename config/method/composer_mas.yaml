@@ -8,6 +8,5 @@ reg_type: l0
 gamma: 0.0
 clipgrad: 1e-16
 plugins:
-  - _target_: method.LwF
-    T: 2
+  - _target_: method.MAS
     alpha: 0.4
