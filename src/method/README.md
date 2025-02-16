@@ -5,3 +5,4 @@ Continual learning methods.
 - `regularization.py` - Loss components used in different methods for regularization
 - `lwf.py` - Learning without Forgetting
 - `ewc.py` - Elastic Weight Consolidation
+- `sharpening.py` - Sharpening https://cdn.aaai.org/Symposia/Spring/1993/SS-93-06/SS93-06-007.pdf
