@@ -4,6 +4,7 @@ sizes: [1024, 400]
 layers: ["RBF"]
 head_type: Normal
 num_kernels: 100
+no_groups: 50
 local_linear: False
 normalization: True
 radial_function: 

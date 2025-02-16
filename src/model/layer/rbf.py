@@ -23,6 +23,7 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from typing import Callable
 
@@ -98,6 +99,7 @@ class RBFLayer(LocalModule):
                  in_features: int,
                  out_features: int,
                  num_kernels: int,
+                 no_groups: int,
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
@@ -112,6 +114,7 @@ class RBFLayer(LocalModule):
 
         self.in_features = in_features
         self.num_kernels = num_kernels
+        self.no_groups = no_groups
         self.out_features = out_features
         self.radial_function = radial_function
         self.norm_function = norm_function
@@ -172,7 +175,39 @@ class RBFLayer(LocalModule):
                 torch.zeros(self.out_features, self.num_kernels, dtype=torch.float32)
             )
 
+        # Initialize mask to define groups
+        self.mask = self.init_group_mask()
+
         self.reset()
+
+    def init_group_mask(self):
+        """Initialize masks to define group of neurons within a neural network"""
+        mask = torch.zeros(self.num_kernels, self.in_features)
+        assert self.no_groups > 0, "Number of created groups should be greater than 0."
+        group_size_neurons = self.num_kernels // self.no_groups
+        group_size_features = self.in_features // self.no_groups
+
+        group_size_features = self.in_features // self.no_groups 
+        group_size_neurons = self.num_kernels // self.no_groups
+
+        mask = torch.zeros((self.num_kernels, self.in_features))
+
+        for g in range(self.no_groups):
+            start_feature = g * group_size_features
+            end_feature = min((g + 1) * group_size_features, self.in_features)
+            feature_indices = range(start_feature, end_feature)
+
+            start_neuron = g * group_size_neurons
+            end_neuron = min((g + 1) * group_size_neurons, self.num_kernels)
+            neuron_indices = range(start_neuron, end_neuron)
+
+            mask[np.ix_(list(neuron_indices), list(feature_indices))] = 1
+            
+        # Check if all neurons are used
+        unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
+        assert len(unused_neurons) == 0, "There are unused neurons!"
+
+        return nn.Parameter(mask, requires_grad=False)
 
     def reset(self,
               lower_bound_kernels: float = 0.0,
@@ -220,6 +255,7 @@ class RBFLayer(LocalModule):
                                         self.in_features)
 
         diff = input.view(batch_size, 1, self.in_features) - c
+        diff *= self.mask
 
         # Apply norm function; c has size B x num_kernels
         r = self.norm_function(diff)
