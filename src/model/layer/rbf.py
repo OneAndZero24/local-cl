@@ -101,6 +101,7 @@ class RBFLayer(LocalModule):
                  num_kernels: int,
                  no_groups: int,
                  no_mask_update_iterations: int,
+                 growing_mask: bool,
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
@@ -136,6 +137,7 @@ class RBFLayer(LocalModule):
         assert normalization is False or normalization is True
 
         self.no_mask_update_iterations = no_mask_update_iterations
+        self.growing_mask = growing_mask
         self.iteration = 0
 
         self._make_parameters()
@@ -268,7 +270,7 @@ class RBFLayer(LocalModule):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, out_features).
         """
-        if self.training:
+        if self.growing_mask and self.training:
             self.update_mask()
         # Input has size B x Fin
         batch_size = input.size(0)
