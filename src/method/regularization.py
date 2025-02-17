@@ -12,7 +12,8 @@ def distillation_loss(outputs_new, outputs_old, T=2):
 def param_change_loss(model, multiplier, params_buffer):
     loss = 0
     for name, p in model.named_parameters():
-        loss += (multiplier[name] * (p - params_buffer[name]) ** 2).sum()
+        if p.requires_grad:
+            loss += (multiplier[name] * (p - params_buffer[name]) ** 2).sum()
     return loss
 
 

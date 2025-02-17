@@ -41,7 +41,7 @@ class EWC(MethodPluginABC):
         self.task_id = None
         self.alpha = alpha
 
-        self.data_buffer = []
+        self.data_buffer = set()
         self.params_buffer = {}
 
 
@@ -65,7 +65,7 @@ class EWC(MethodPluginABC):
                 p.requires_grad = False
                 self.params_buffer[name] = p     
             self.fisher_diag = self._get_fisher_diag()
-        self.data_buffer = []
+        self.data_buffer = set()
 
 
     def forward(self, x, y, loss, preds):
@@ -82,7 +82,7 @@ class EWC(MethodPluginABC):
             Tuple[Tensor, Tensor]: The adjusted loss with EWC regularization and the model's predictions.
         """
 
-        self.data_buffer.append((x, y))
+        self.data_buffer.add((x, y))
 
         if self.task_id > 0:
             loss *= self.alpha

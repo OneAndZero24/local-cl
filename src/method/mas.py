@@ -1,4 +1,7 @@
 from copy import deepcopy
+from functools import reduce
+import operator
+
 import torch
 
 from method.regularization import param_change_loss
@@ -49,7 +52,7 @@ class MAS(MethodPluginABC):
         self.task_id = None
         self.alpha = alpha
 
-        self.data_buffer = []
+        self.data_buffer = set()
         self.params_buffer = {}
         self.importance = {}
 
@@ -73,10 +76,11 @@ class MAS(MethodPluginABC):
         self.task_id = task_id
         if task_id > 0:
             for name, p in deepcopy(list(self.module.named_parameters())):
-                p.requires_grad = False
-                self.params_buffer[name] = p    
+                if p.requires_grad:
+                    p.requires_grad = False
+                    self.params_buffer[name] = p    
             self.importance = self._compute_importance()
-        self.data_buffer = []
+        self.data_buffer = set()
 
 
     def forward(self, x, y, loss, preds):
@@ -93,7 +97,7 @@ class MAS(MethodPluginABC):
             Tuple[Tensor, Tensor]: Updated loss and predictions.
         """
 
-        self.data_buffer.append((x, y))
+        self.data_buffer.add((x, y))
 
         if self.task_id > 0:
             loss *= self.alpha
@@ -115,16 +119,16 @@ class MAS(MethodPluginABC):
         """
 
         self.module.eval()
-        importance = {name: torch.zeros_like(param) for name, param in self.module.named_parameters()}
+        importance = {name: torch.zeros_like(param) for name, param in self.module.named_parameters() if param.requires_grad}
         
         for inputs, _ in self.data_buffer:
             self.module.zero_grad()
             outputs = self.module(inputs)
-            loss = outputs.norm(2) ** 2
+            loss = (outputs.norm(2) ** 2)/reduce(operator.mul, outputs.shape[1:])
             loss.backward()
             
             for name, param in self.module.named_parameters():
-                if param.grad is not None:
+                if param.requires_grad and param.grad is not None:
                     importance[name] += param.grad.abs() * len(inputs)
 
         for name in importance:
