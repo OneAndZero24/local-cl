@@ -24,6 +24,23 @@ def distillation_loss(outputs_new, outputs_old, T=2):
 
 
 def param_change_loss(model, multiplier, params_buffer):
+    """
+    Computes the parameter change loss for a given model.
+    This function calculates the loss based on the difference between the current 
+    parameters of the model and a buffer of previous parameters, weighted by a 
+    multiplier. The loss is computed only for parameters that require gradients.
+
+    Args:
+        model (torch.nn.Module): The neural network model containing the parameters.
+        multiplier (dict): A dictionary where keys are parameter names and values 
+                           are the corresponding multipliers for the loss calculation.
+        params_buffer (dict): A dictionary where keys are parameter names and values 
+                              are the previous parameter values to compare against.
+                              
+    Returns:
+        torch.Tensor: The computed parameter change loss.
+    """
+
     loss = 0
     for name, p in model.named_parameters():
         if p.requires_grad:
