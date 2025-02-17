@@ -1,10 +1,11 @@
 _target_: model.MLP
 initial_out_features: 2
-sizes: [1024, 400]
-layers: ["RBF"]
+sizes: [1024, 100, 100]
+layers: ["RBF", "RBF"]
 head_type: Normal
 num_kernels: 100
 no_groups: 50
+no_mask_update_iterations: 1500
 local_linear: False
 normalization: True
 radial_function: 

@@ -100,6 +100,7 @@ class RBFLayer(LocalModule):
                  out_features: int,
                  num_kernels: int,
                  no_groups: int,
+                 no_mask_update_iterations: int,
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
@@ -133,6 +134,9 @@ class RBFLayer(LocalModule):
         assert radial_function is not None  \
             and norm_function is not None
         assert normalization is False or normalization is True
+
+        self.no_mask_update_iterations = no_mask_update_iterations
+        self.iteration = 0
 
         self._make_parameters()
 
@@ -208,6 +212,25 @@ class RBFLayer(LocalModule):
         assert len(unused_neurons) == 0, "There are unused neurons!"
 
         return nn.Parameter(mask, requires_grad=False)
+    
+    def update_mask(self):
+        """Gradually increases the number of ones in a mask, guaranteeing full ones at the final epoch."""
+        growth_factor = (self.iteration + 1) / self.no_mask_update_iterations
+        target_ones = int(growth_factor * self.in_features)
+
+        for neuron in range(self.num_kernels):
+            current_active = torch.sum(self.mask[neuron]).item()
+            additional_needed = max(0, target_ones - int(current_active))
+
+            if additional_needed > 0:
+                inactive_features = torch.where(self.mask[neuron] == 0)[0]
+                if len(inactive_features) > 0:
+                    chosen_features = inactive_features[torch.randperm(len(inactive_features))[:additional_needed]]
+                    self.mask[neuron, chosen_features] = 1
+        self.iteration += 1
+
+        if self.iteration == self.no_mask_update_iterations - 1:
+            self.mask[:, :] = 1
 
     def reset(self,
               lower_bound_kernels: float = 0.0,
@@ -245,7 +268,8 @@ class RBFLayer(LocalModule):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, out_features).
         """
-
+        if self.training:
+            self.update_mask()
         # Input has size B x Fin
         batch_size = input.size(0)
 
