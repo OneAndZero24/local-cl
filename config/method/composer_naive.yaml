@@ -6,4 +6,4 @@ first_lr: 0.01
 lr: 0.01
 reg_type: l0
 gamma: 0.0
-clipgrad: 1e-16
+clipgrad: 1e-8
