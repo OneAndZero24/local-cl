@@ -20,13 +20,14 @@
 | LwF | ✅ |
 | EWC | ✅ |
 | Sharpening | ✅ |
-| SI | ❌ |
-| MAS | ❌ |
+| SI | ✅ |
+| MAS | ✅ |
 
 | Custom Layers | Status |
 | ------ | -- |
 | Local | ✅ |
 | RBF | ✅ |
+| KAN | ❌ |
 | LocalHead | ⭕️ |
 | LocalConv2D | ⭕️ |
 

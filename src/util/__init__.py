@@ -6,6 +6,8 @@ from torchvision import transforms
 from .hydra import *
 from .wandb import *
 from .fabric import *
+from .calc import *
+from .tensor import *
 
 resize_transform = lambda : [
     transforms.Resize(32), 

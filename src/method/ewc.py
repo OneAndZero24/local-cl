@@ -3,7 +3,7 @@ from copy import deepcopy
 import torch
 from torch.nn import functional as F
 
-from method.regularization import ewc_loss
+from method.regularization import param_change_loss
 from src.method.method_plugin_abc import MethodPluginABC
 
 
@@ -41,7 +41,7 @@ class EWC(MethodPluginABC):
         self.task_id = None
         self.alpha = alpha
 
-        self.data_buffer = []
+        self.data_buffer = set()
         self.params_buffer = {}
 
 
@@ -65,7 +65,7 @@ class EWC(MethodPluginABC):
                 p.requires_grad = False
                 self.params_buffer[name] = p     
             self.fisher_diag = self._get_fisher_diag()
-        self.data_buffer = []
+        self.data_buffer = set()
 
 
     def forward(self, x, y, loss, preds):
@@ -82,11 +82,11 @@ class EWC(MethodPluginABC):
             Tuple[Tensor, Tensor]: The adjusted loss with EWC regularization and the model's predictions.
         """
 
-        self.data_buffer.append((x, y))
+        self.data_buffer.add((x, y))
 
         if self.task_id > 0:
             loss *= self.alpha
-            loss += (1-self.alpha)*ewc_loss(self.module, self.fisher_diag, self.params_buffer)
+            loss += (1-self.alpha)*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
         return loss, preds
 
 
