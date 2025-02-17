@@ -1,6 +1,9 @@
-from src.method.method_plugin_abc import MethodPluginABC
+import torch
 
+from src.method.method_plugin_abc import MethodPluginABC
 from method.regularization import sharpen_loss
+from util.tensor import pad_zero_dim0
+
 
 class Sharpening(MethodPluginABC):
     """
@@ -40,6 +43,8 @@ class Sharpening(MethodPluginABC):
         self.gamma = gamma
         self.K = K
 
+        self.activation_buffer = None
+
 
     def setup_task(self, task_id: int):
         """
@@ -49,7 +54,7 @@ class Sharpening(MethodPluginABC):
             task_id (int): The unique identifier for the task to be set up.
         """
 
-        pass  
+        self.activation_buffer = None
 
 
     def forward(self, x, y, loss, preds):
@@ -66,6 +71,16 @@ class Sharpening(MethodPluginABC):
             tuple: Updated loss and predictions tensors.
         """
 
+        activations = torch.stack(self.module.activations).sum(dim=0)/x.shape[0]
+        activations_det = activations.clone().detach_()
+        activations_det.requires_grad = False
+        if self.activation_buffer is None:
+            self.activation_buffer = torch.zeros_like(activations_det)
+        tmp = pad_zero_dim0(activations_det, self.activation_buffer.shape)
+        self.activation_buffer += tmp
+
+        _, indices = torch.topk(self.activation_buffer.view(-1), self.K)
+
         loss *= self.alpha
-        loss += (1-self.alpha)*sharpen_loss(self.module.activations, x.shape[0], self.gamma, self.K)
+        loss += (1-self.alpha)*sharpen_loss(indices, tmp, self.gamma)
         return loss, preds

@@ -48,36 +48,30 @@ def param_change_loss(model, multiplier, params_buffer):
     return loss
 
 
-def sharpen_loss(activations, batch_size, gamma, K):
+def sharpen_loss(indices, activations, gamma):
     """
-    Computes the sharpen loss for a given set of activations.
-    The sharpen loss is designed to adjust the activations by emphasizing the top-K activations
-    and suppressing the rest, controlled by the parameter gamma. The loss is calculated as the 
-    sum of squared differences between the adjusted activations and the original activations.
+    Compute the sharpen loss for given activations.
+    This function modifies the activations based on the provided indices and a sharpening factor gamma.
+    It increases the activations at the specified indices and decreases the activations at other indices,
+    then calculates the difference between the new and original activations.
 
     Args:
-        activations (list of torch.Tensor): A list of activation tensors.
-        batch_size (int): The size of the batch.
-        gamma (float): The sharpening factor. A higher gamma increases the emphasis on top-K activations.
-        K (int): The number of top activations to emphasize.
+        indices (Tensor): A 1D tensor containing the indices of the activations to be sharpened.
+        activations (Tensor): A tensor containing the original activations.
+        gamma (float): The sharpening factor to adjust the activations.
 
     Returns:
-        torch.Tensor: The computed sharpen loss.
+        Tensor: The sum of squared differences between the new and original activations.
     """
 
-    activations_t = torch.stack(activations).sum(dim=0)
-    activations_t /= batch_size
-    flattened_activations = activations_t.view(-1)
-    _, indices = torch.topk(flattened_activations, K)
-    
-    old_activations = activations_t.clone()
-    mask = torch.zeros_like(flattened_activations, dtype=torch.bool)
+    new_activations = activations.clone()
+    mask = torch.zeros_like(new_activations.view(-1), dtype=torch.bool)
     mask[indices] = True
     
-    activations_t.view(-1)[mask] = gamma * (1 - activations_t.view(-1)[mask])
-    activations_t.view(-1)[~mask] -= gamma * activations_t.view(-1)[~mask]
+    new_activations.view(-1)[mask] = gamma * (1 - activations.view(-1)[mask])
+    new_activations.view(-1)[~mask] -= gamma * activations.view(-1)[~mask]
 
-    diff = torch.sum(torch.square(activations_t - old_activations))
+    diff = torch.sum(torch.square(new_activations - activations))
     return diff
     
 
