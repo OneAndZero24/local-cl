@@ -6,7 +6,7 @@ first_lr: 0.001
 lr: 0.001
 reg_type: l0
 gamma: 0.0
-clipgrad: 1e-8
+clipgrad: 1e-3
 plugins:
   - _target_: method.EWC
     alpha: 0.4

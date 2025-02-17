@@ -81,7 +81,6 @@ class Composer:
         
         for plugin in self.plugins:
             plugin.set_module(self.module)
-            plugin.set_composer(self)
             log.info(f'Plugin {plugin.__class__.__name__} added to composer')
 
 

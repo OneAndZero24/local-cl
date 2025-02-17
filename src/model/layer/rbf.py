@@ -23,6 +23,7 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from typing import Callable
 
@@ -98,6 +99,8 @@ class RBFLayer(LocalModule):
                  in_features: int,
                  out_features: int,
                  num_kernels: int,
+                 no_groups: int,
+                 no_mask_update_iterations: int,
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
@@ -112,6 +115,7 @@ class RBFLayer(LocalModule):
 
         self.in_features = in_features
         self.num_kernels = num_kernels
+        self.no_groups = no_groups
         self.out_features = out_features
         self.radial_function = radial_function
         self.norm_function = norm_function
@@ -130,6 +134,9 @@ class RBFLayer(LocalModule):
         assert radial_function is not None  \
             and norm_function is not None
         assert normalization is False or normalization is True
+
+        self.no_mask_update_iterations = no_mask_update_iterations
+        self.iteration = 0
 
         self._make_parameters()
 
@@ -172,7 +179,58 @@ class RBFLayer(LocalModule):
                 torch.zeros(self.out_features, self.num_kernels, dtype=torch.float32)
             )
 
+        # Initialize mask to define groups
+        self.mask = self.init_group_mask()
+
         self.reset()
+
+    def init_group_mask(self):
+        """Initialize masks to define group of neurons within a neural network"""
+        mask = torch.zeros(self.num_kernels, self.in_features)
+        assert self.no_groups > 0, "Number of created groups should be greater than 0."
+        group_size_neurons = self.num_kernels // self.no_groups
+        group_size_features = self.in_features // self.no_groups
+
+        group_size_features = self.in_features // self.no_groups 
+        group_size_neurons = self.num_kernels // self.no_groups
+
+        mask = torch.zeros((self.num_kernels, self.in_features))
+
+        for g in range(self.no_groups):
+            start_feature = g * group_size_features
+            end_feature = min((g + 1) * group_size_features, self.in_features)
+            feature_indices = range(start_feature, end_feature)
+
+            start_neuron = g * group_size_neurons
+            end_neuron = min((g + 1) * group_size_neurons, self.num_kernels)
+            neuron_indices = range(start_neuron, end_neuron)
+
+            mask[np.ix_(list(neuron_indices), list(feature_indices))] = 1
+            
+        # Check if all neurons are used
+        unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
+        assert len(unused_neurons) == 0, "There are unused neurons!"
+
+        return nn.Parameter(mask, requires_grad=False)
+    
+    def update_mask(self):
+        """Gradually increases the number of ones in a mask, guaranteeing full ones at the final epoch."""
+        growth_factor = (self.iteration + 1) / self.no_mask_update_iterations
+        target_ones = int(growth_factor * self.in_features)
+
+        for neuron in range(self.num_kernels):
+            current_active = torch.sum(self.mask[neuron]).item()
+            additional_needed = max(0, target_ones - int(current_active))
+
+            if additional_needed > 0:
+                inactive_features = torch.where(self.mask[neuron] == 0)[0]
+                if len(inactive_features) > 0:
+                    chosen_features = inactive_features[torch.randperm(len(inactive_features))[:additional_needed]]
+                    self.mask[neuron, chosen_features] = 1
+        self.iteration += 1
+
+        if self.iteration == self.no_mask_update_iterations - 1:
+            self.mask[:, :] = 1
 
     def reset(self,
               lower_bound_kernels: float = 0.0,
@@ -210,7 +268,8 @@ class RBFLayer(LocalModule):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, out_features).
         """
-
+        if self.training:
+            self.update_mask()
         # Input has size B x Fin
         batch_size = input.size(0)
 
@@ -220,6 +279,7 @@ class RBFLayer(LocalModule):
                                         self.in_features)
 
         diff = input.view(batch_size, 1, self.in_features) - c
+        diff *= self.mask
 
         # Apply norm function; c has size B x num_kernels
         r = self.norm_function(diff)

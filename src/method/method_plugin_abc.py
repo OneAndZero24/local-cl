@@ -12,21 +12,9 @@ class MethodPluginABC(metaclass=ABCMeta):
             Abstract method for setting up a task. Must be implemented by subclasses.
         forward(x, y, loss, preds):
             Abstract method for the forward pass. Must be implemented by subclasses.
-        set_composer(composer):
-            Set the parent composer for the plugin.
         set_module(module):
             Set the module for the plugin.
     """
-
-    def set_composer(self, composer):
-        """
-        Set the parent composer for the plugin.
-        
-        Args:
-            composer: The composer to be set.
-        """
-
-        self.composer = composer
 
     def set_module(self, module: nn.Module):
         """

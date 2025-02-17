@@ -47,7 +47,7 @@ class CLModuleABC(nn.Module, metaclass=ABCMeta):
 
     def add_activation(self, layer: nn.Module, x):
         """
-        Adds the activation output of a given layer to the activations list if the layer is an instance of LOCAL_LAYERS.
+        Adds the activation output of a given layer to the activations list.
 
         Args:
             layer (nn.Module): The neural network layer whose activation is to be recorded.
@@ -57,5 +57,4 @@ class CLModuleABC(nn.Module, metaclass=ABCMeta):
             None
         """
         
-        if isinstance(layer, LocalModule):
-            self.activations.append(x)
+        self.activations.append(x)
