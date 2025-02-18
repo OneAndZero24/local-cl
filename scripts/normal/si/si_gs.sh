@@ -6,6 +6,6 @@
 #SBATCH --mem=32G
 #SBATCH --partition=dgx
 
-source ../../main.sh
+source scripts/main.sh
 
 run_sweep_and_agent "scripts/normal/si/si_gs"
