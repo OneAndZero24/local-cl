@@ -53,20 +53,18 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
-  method.plugin.T: 
-    distribution: uniform      
-    min: 0.5
-    max: 2
-  method.plugin.alpha: 
-    distribution: uniform      
-    min: 0.4
-    max: 1.0
   method.clipgrad: 
     value: 0.001
   method.plugins:
     - _target_: method.LwF
-      T: 2
-      alpha: 0.4
+      T: 
+        distribution: uniform      
+        min: 0.4
+        max: 1.0
+      alpha:
+        distribution: uniform      
+        min: 0.4
+        max: 1.0
 
 
 command:
