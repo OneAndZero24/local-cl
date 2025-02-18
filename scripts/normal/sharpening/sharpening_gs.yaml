@@ -65,14 +65,8 @@ parameters:
     distribution: uniform      
     min: 64
     max: 1024
-  method.gamma: 
-    distribution: uniform  
-    min: 0.0
-    max: 1.0
   method.clipgrad: 
     value: 0.001
-  method.reg_type:
-    values: ["entropy", "l1", "l0"]
   method.plugins:
     - _target_: method.Sharpening
       K: 64
