@@ -55,16 +55,14 @@ parameters:
     max: 0.01
   method.clipgrad: 
     value: 0.001
-  method.plugins:
-    - _target_: method.LwF
-      T: 
-        distribution: uniform      
-        min: 0.4
-        max: 1.0
-      alpha:
-        distribution: uniform      
-        min: 0.4
-        max: 1.0
+  method.plugins@0.T:
+    distribution: uniform      
+    min: 0.4
+    max: 1.0
+  method.plugins@0.alpha:
+    distribution: uniform      
+    min: 0.4
+    max: 1.0
 
 
 command:
