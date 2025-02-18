@@ -35,7 +35,7 @@ parameters:
     value: [1024, 400, 400]
   model.head_type: 
     value: Normal
-  model.layer_types: 
+  model.layers: 
     value: ["Normal", "Normal"]     
 
   # Method configuration
