@@ -5,6 +5,3 @@ layers: ["Normal", "Normal"]
 head_type: Normal
 activation: 
   _target_: torch.nn.Tanh
-train_domain: True
-train_head_domain: False
-use_importance_params: True
