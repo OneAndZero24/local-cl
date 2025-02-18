@@ -53,15 +53,12 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
-  method.plugin.alpha: 
+  method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.4
     max: 1.0
   method.clipgrad: 
     value: 0.001
-  method.plugins:
-    - _target_: method.EWC
-      alpha: 0.4
 
 
 command:
