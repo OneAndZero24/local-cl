@@ -36,9 +36,7 @@ parameters:
   model.head_type: 
     value: Normal
   model.layer_types: 
-    value: ["Normal", "Normal"]
-  model.activation: 
-    _target_: torch.nn.Tanh        
+    value: ["Normal", "Normal"]      
 
   # Method configuration
   method._partial_: 
