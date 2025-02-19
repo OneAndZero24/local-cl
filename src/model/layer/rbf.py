@@ -171,7 +171,10 @@ class RBFLayer(LocalModule):
                 self.initial_shape_parameter, requires_grad=False)
         else:
             self.log_shapes = nn.Parameter(
-                torch.zeros(self.num_kernels, dtype=torch.float32))
+                torch.zeros(
+                    self.num_kernels, 
+                    self.in_features,
+                    dtype=torch.float32))
 
         if self.local_linear:
             self.local_linear_weights = nn.Parameter(
@@ -279,18 +282,20 @@ class RBFLayer(LocalModule):
         # c has size B x num_kernels x Fin
         c = self.kernels_centers.expand(batch_size, self.num_kernels,
                                         self.in_features)
+        
+        # Compute shape
+        # sigma has size B x num_kernels x Fin
+        sigma = self.log_shapes.exp().expand(batch_size, self.num_kernels,
+                                             self.in_features)
 
-        diff = input.view(batch_size, 1, self.in_features) - c
+        diff = sigma * (input.view(batch_size, 1, self.in_features) - c)
         diff *= self.mask
 
         # Apply norm function; c has size B x num_kernels
         r = self.norm_function(diff)
 
-        # Apply parameter, eps_r has size B x num_kernels
-        eps_r = self.log_shapes.exp().expand(batch_size, self.num_kernels) * r
-
         # Apply radial basis function; rbf has size B x num_kernels
-        rbfs = self.radial_function(eps_r)
+        rbfs = self.radial_function(r)
 
         # Apply normalization
         # (check https://en.wikipedia.org/wiki/Radial_basis_function_network)
