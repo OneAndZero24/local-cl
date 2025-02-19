@@ -1,11 +1,3 @@
-#!/bin/bash
-#SBATCH --job-name=local_cl_split_mnist_lwf_check
-#SBATCH --qos=normal
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --partition=dgx
-
 if [ -f .env ]; then
   export $(cat .env | grep -v '#' | xargs) 
   echo ".env file loaded successfully"
@@ -40,5 +32,3 @@ run_sweep_and_agent () {
   echo "Starting WandB agent for sweep ID: $SWEEP_ID"
   wandb agent "$SWEEP_ID"
 }
-
-run_sweep_and_agent "lwfcheck_gs"
