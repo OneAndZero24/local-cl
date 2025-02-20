@@ -1,6 +1,9 @@
 import torch
 
 from src.method.method_plugin_abc import MethodPluginABC
+from util.tensor import pad_zero_dim0
+
+from copy import deepcopy
 
 class RBFNeuronOutReg(MethodPluginABC):
     """
@@ -84,10 +87,10 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         return loss, preds
 
-    def compute_log_gaussian_convolution(self, c1, sigma1, c2, sigma2):
+    def compute_gaussian_convolution(self, c1, sigma1, c2, sigma2):
         """
         Computes the Gaussian integral:
-        ∫ exp( - (x - c1)^T A^{-1} (x - c1) - (x - c2)^T B^{-1} (x - c2) ) dx
+        log(∫ exp( - (x - c1)^T A^{-1} (x - c1) - (x - c2)^T B^{-1} (x - c2) ) dx)
         """
 
         d = c1.shape[1]  # Dimension of x
@@ -100,22 +103,22 @@ class RBFNeuronOutReg(MethodPluginABC):
         A_B = A + B + self.eps * torch.eye(d, device=A.device).expand(A.shape)  # (K, d, d) for numerical stability
         A_B_inv = torch.linalg.inv(A_B)  # Inverse of (A + B)
 
-        det_A = torch.prod(sigma1**2 + self.eps, dim=1)  
-        det_B = torch.prod(sigma2**2 + self.eps, dim=1)  
-        det_A_B = torch.prod(sigma1**2 + sigma2**2 + self.eps, dim=1)  
+        # Compute log-determinants
+        log_det_A = torch.sum(torch.log(sigma1**2), dim=1)  # log(det(A)) (K,)
+        log_det_B = torch.sum(torch.log(sigma2**2), dim=1)  # log(det(B)) (K,)
+        log_det_A_B = torch.sum(torch.log(sigma1**2 + sigma2**2), dim=1)  # log(det(A+B)) (K,)
 
         # Quadratic exponent term
         exp_term = torch.einsum('bi,bij,bj->b', c1 - c2, A_B_inv, c1 - c2)  # (K,)
 
-        integral = (
-            torch.pi ** (d/2)
-            * torch.sqrt(det_A)
-            * torch.sqrt(det_B)
-            / torch.sqrt(det_A_B)
-            * torch.exp(exp_term)
+        # Compute final integral in log-space first
+        log_integral = (
+            torch.tensor(d / 2) * torch.log(torch.tensor(torch.pi))
+            + 0.5 * (log_det_A + log_det_B - log_det_A_B)
+            - exp_term
         )
 
-        return integral
+        return log_integral
 
     def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
@@ -134,13 +137,13 @@ class RBFNeuronOutReg(MethodPluginABC):
         """
 
         # Compute integrals ∫ e_j(x) e_i(x) dx
-        E_integrals = self.compute_log_gaussian_convolution(C_curr, Sigma_curr, C_curr, Sigma_curr)  # (K,)
+        E_integrals = self.compute_gaussian_convolution(C_curr, Sigma_curr, C_curr, Sigma_curr)  # (K,)
 
         # Compute integrals ∫ f_j(x) f_i(x) dx
-        F_integrals = self.compute_log_gaussian_convolution(C_old, Sigma_old, C_old, Sigma_old)  # (K,)
+        F_integrals = self.compute_gaussian_convolution(C_old, Sigma_old, C_old, Sigma_old)  # (K,)
 
         # Compute integrals ∫ e_j(x) f_i(x) dx
-        EF_integrals = self.compute_log_gaussian_convolution(C_curr, Sigma_curr, C_old, Sigma_old)  # (K,)
+        EF_integrals = self.compute_gaussian_convolution(C_curr, Sigma_curr, C_old, Sigma_old)  # (K,)
 
         # Expand tensors for element-wise broadcasting
         W1_old = W_old.unsqueeze(1)  # Shape (K, 1, M)
@@ -156,5 +159,5 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         # Final integral value
         integral_value = first_term + second_term + third_term  # Shape (M,)
-
+        print(integral_value.mean())
         return integral_value.mean()
