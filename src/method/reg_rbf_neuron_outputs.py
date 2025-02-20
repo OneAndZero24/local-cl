@@ -118,7 +118,7 @@ class RBFNeuronOutReg(MethodPluginABC):
             - exp_term
         )
 
-        return log_integral
+        return log_integral.exp()
 
     def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
