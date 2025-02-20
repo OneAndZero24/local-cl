@@ -159,5 +159,5 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         # Final integral value
         integral_value = first_term + second_term + third_term  # Shape (M,)
-        print(integral_value.mean())
+
         return integral_value.mean()
