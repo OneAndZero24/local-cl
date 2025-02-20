@@ -90,34 +90,30 @@ class RBFNeuronOutReg(MethodPluginABC):
         log(∫ exp( - (x - c1)^T A^{-1} (x - c1) - (x - c2)^T B^{-1} (x - c2) ) dx)
         """
 
-        # Dimension of x
+        # Compute squared sigma to form diagonal covariance matrices
+        sigma1_sq = sigma1**2  # (K, d)
+        sigma2_sq = sigma2**2  # (K, d)
+        corr_mat_12 = sigma1_sq[:, None, :] + sigma2_sq[None, :, :]  # (K, K, d)
+
+        # Compute log-determinants, shape (K, K)
+        log_det_corr_mat_1 = torch.sum(torch.log(sigma1_sq), dim=1, keepdim=True)  # (K, 1)
+        log_det_corr_mat_2 = torch.sum(torch.log(sigma2_sq), dim=1, keepdim=True)  # (K, 1)
+        log_det_corr_mat_12 = torch.sum(torch.log(corr_mat_12), dim=2)  # (K, K)
+
+        # Quadratic exponent term (c1 - c2)^T * (corr_mat_12)^(-1) * (c1 - c2)
+        c_diff = c1[:, None, :] - c2[None, :, :]  # (K, K, d)
+
+        exp_term = torch.sum((c_diff**2) / corr_mat_12, dim=2)  # (K, K)
+
+        # Compute final integral in log-space
         d = c1.shape[1]
-
-        c_diff = c1 - c2
-
-        corr_mat_1 = torch.diag_embed(sigma1**2)
-        corr_mat_2 = torch.diag_embed(sigma2**2)
-        corr_mat_12 = corr_mat_1 + corr_mat_2
-
-        corr_mat_inv_12 = torch.linalg.inv(corr_mat_12)
-
-        # Compute log-determinants, shape (K,)
-        log_det_corr_mat_1 = torch.logdet(corr_mat_1)
-        log_det_corr_mat_2 = torch.logdet(corr_mat_2)
-        log_det_corr_mat_12 = torch.logdet(corr_mat_12)
-
-        # Quadratic exponent term        
-        exp_term = torch.einsum('kij,kj->ki', corr_mat_inv_12, c_diff)  # Shape (K, d)
-        exp_term = torch.einsum('ki,ji->kj', c_diff, exp_term)  # Shape (K, K), symmetric
-        
-        # Compute final integral in log-space first
         log_integral = (
-            torch.tensor(d / 2) * torch.log(torch.tensor(torch.pi))
-            + 0.5 * (log_det_corr_mat_1 + log_det_corr_mat_2 - log_det_corr_mat_12)
+            (d / 2) * torch.log(torch.tensor(torch.pi))
+            + 0.5 * (log_det_corr_mat_1 + log_det_corr_mat_2.T - log_det_corr_mat_12)
             - exp_term
         )
-    
-        return log_integral
+        print(exp_term)
+        return log_integral  # (K, K)
 
     def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
@@ -163,5 +159,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         exp_term = torch.log((first_term + second_term + third_term).relu() + self.eps)
         log_integral_value = (integrals_max + exp_term).mean()
+
+        print(log_integral_value)
 
         return log_integral_value
