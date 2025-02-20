@@ -1,144 +1,160 @@
 import torch
 
 from src.method.method_plugin_abc import MethodPluginABC
-from util.tensor import pad_zero_dim0
-
 
 class RBFNeuronOutReg(MethodPluginABC):
     """
-    RBF neuron output regularization to overcome catastrophic forgetting problem.
-
+    RBF neuron output regularization to mitigate catastrophic forgetting.
+    
     Attributes:
-        params_buffer (dict): A buffer to store the parameters of the model.
-
-    Methods:
-        setup_task(task_id: int):
-            Placeholder method for setting up a task. Currently does nothing.
-
-        forward(x, y, loss, preds):
-            Adjusts the loss by combining the original loss with a RBF neuron 
-            output regularization loss.
+        params_buffer (dict): Stores model parameters for regularization.
+        alpha (float): Regularization strength.
+        eps (float): Small value to prevent division by zero.
     """
 
-    def __init__(self, 
-        alpha: float,
-        eps: float = 1e-6
-    ):
+    def __init__(self, alpha: float, eps: float = 1e-6):
         """
-        Initializes the RBF neuron output regularization method within the whole domain
-        with the given parameters.
+        Initializes the RBF neuron output regularization method.
 
         Args:
-            alpha (float): 
-            eps (float, optional): A small value to avoid division by zero. Defaults to 1e-6.
+            alpha (float): Regularization coefficient.
+            eps (float, optional): A small value to prevent division by zero. Defaults to 1e-6.
         """
-                
         super().__init__()
-
         self.params_buffer = {}
         self.importance = {}
-
         self.alpha = alpha
-
+        self.eps = eps
 
     def setup_task(self, task_id: int):
         """
-        Sets up a task with the given task ID.
+        Sets up a new task and stores parameters from RBF layers.
 
         Args:
-            task_id (int): The unique identifier for the task to be set up.
+            task_id (int): Unique task identifier.
         """
+        self.task_id = task_id
 
+        if task_id > 0:
+            model = self.module.module  # Access the wrapped model
+            for module in model.children():
+                if isinstance(module, torch.nn.ModuleList):
+                    for idx, layer in enumerate(module):
+                        if type(layer).__name__ == "RBFLayer":
+                            self.params_buffer.update({
+                                f"weights_{idx}": layer.weights.detach().clone(),
+                                f"kernels_centers_{idx}": layer.kernels_centers.detach().clone(),
+                                f"log_shapes_{idx}": layer.log_shapes.detach().clone(),
+                            })
 
     def forward(self, x, y, loss, preds):
         """
-        Perform the forward pass of the RBF neuron output regularization method.
+        Forward pass with RBF neuron output regularization.
 
         Args:
             x (torch.Tensor): Input tensor.
             y (torch.Tensor): Target tensor.
-            loss (torch.Tensor): Initial loss value.
-            preds (torch.Tensor): Predictions tensor.
-            
+            loss (torch.Tensor): Initial loss.
+            preds (torch.Tensor): Model predictions.
+        
         Returns:
-            tuple: Updated loss and predictions tensors.
+            tuple: Updated loss and predictions.
         """
+        if self.task_id > 0:
+            for module in self.module.module.children():
+                if isinstance(module, torch.nn.ModuleList):
+                    for idx, layer in enumerate(module):
+                        if type(layer).__name__ == "RBFLayer":
+                            # Get current parameters
+                            W_curr = layer.weights.T
+                            C_curr = layer.kernels_centers
+                            Sigma_curr = layer.log_shapes.exp()
 
-    def gaussian_integral(self, c1, sigma1, c2, sigma2):
+                            # Retrieve old stored parameters
+                            W_old = self.params_buffer[f"weights_{idx}"].T
+                            C_old = self.params_buffer[f"kernels_centers_{idx}"]
+                            Sigma_old = self.params_buffer[f"log_shapes_{idx}"].exp()
+
+                            # Add regularization loss
+                            loss += self.alpha * self.compute_integral_gaussian(
+                                W_old=W_old, W_curr=W_curr,
+                                C_old=C_old, C_curr=C_curr,
+                                Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
+                            )
+
+        return loss, preds
+
+    def compute_log_gaussian_convolution(self, c1, sigma1, c2, sigma2):
         """
         Computes the Gaussian integral:
-        ∫ exp( -|| (x - c1) / sigma1 ||² - || (x - c2) / sigma2 ||² ) dx
-
-        Args:
-        - c1, c2: Tensors of shape (K, d) representing centers of Gaussians.
-        - sigma1, sigma2: Tensors of shape (K, d) representing standard deviations.
-
-        Returns:
-        - Tensor of shape (K,) with computed integral values.
+        ∫ exp( - (x - c1)^T A^{-1} (x - c1) - (x - c2)^T B^{-1} (x - c2) ) dx
         """
 
-        d = c1.shape[1]
-        A = torch.diag_embed(1 / sigma1**2)  # (K, d, d)
-        B = torch.diag_embed(1 / sigma2**2)  # (K, d, d)
+        d = c1.shape[1]  # Dimension of x
 
-        A_B = A + B  # (K, d, d)
-        A_B_inv = torch.linalg.inv(A_B)  # (K, d, d)
+        # Covariance matrices (diagonal)
+        A = torch.diag_embed(sigma1**2)  # (K, d, d)
+        B = torch.diag_embed(sigma2**2)  # (K, d, d)
 
-        det_A = torch.prod(sigma1**-2, dim=1)  # Determinant of A (K,)
-        det_B = torch.prod(sigma2**-2, dim=1)  # Determinant of B (K,)
-        det_A_B = torch.prod(sigma1**-2 + sigma2**-2, dim=1)  # Determinant of (A+B) (K,)
+        # Compute A + B
+        A_B = A + B + self.eps * torch.eye(d, device=A.device).expand(A.shape)  # (K, d, d) for numerical stability
+        A_B_inv = torch.linalg.inv(A_B)  # Inverse of (A + B)
 
-        exp_term = torch.einsum('bi,bij,bj->b', c1 - c2, A_B_inv, c1 - c2)  # Quadratic form
+        det_A = torch.prod(sigma1**2 + self.eps, dim=1)  
+        det_B = torch.prod(sigma2**2 + self.eps, dim=1)  
+        det_A_B = torch.prod(sigma1**2 + sigma2**2 + self.eps, dim=1)  
+
+        # Quadratic exponent term
+        exp_term = torch.einsum('bi,bij,bj->b', c1 - c2, A_B_inv, c1 - c2)  # (K,)
 
         integral = (
-            (torch.pi ** (d / 2)) 
-            * torch.sqrt(det_A) 
-            * torch.sqrt(det_B) 
+            torch.pi ** (d/2)
+            * torch.sqrt(det_A)
+            * torch.sqrt(det_B)
             / torch.sqrt(det_A_B)
-            * torch.exp(-exp_term)
+            * torch.exp(exp_term)
         )
 
-        return integral  # Shape (K,)
+        return integral
 
-
-    def compute_integral_gaussian(self, W, delta_W, C, delta_C, Sigma, delta_Sigma):
+    def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
         Computes the full integral based on Gaussian kernel parametrization.
 
         Args:
-        - W: Tensor of shape (K, M) containing weights w_j.
-        - delta_W: Tensor of shape (K, M) containing perturbations Δw_j.
-        - C: Tensor of shape (K, d) representing Gaussian centers c_j.
-        - delta_C: Tensor of shape (K, d) representing perturbations Δc_j.
-        - Sigma: Tensor of shape (K, d) representing standard deviations σ_j.
-        - delta_Sigma: Tensor of shape (K, d) representing perturbations Δσ_j.
+        - W_old: Tensor of shape (K, M) containing weights w_j.
+        - W_curr: Tensor of shape (K, M) containing perturbations Δw_j.
+        - C_old: Tensor of shape (K, d) representing Gaussian centers c_j.
+        - C_curr: Tensor of shape (K, d) representing perturbations Δc_j.
+        - Sigma_old: Tensor of shape (K, d) representing standard deviations σ_j.
+        - Sigma_curr: Tensor of shape (K, d) representing perturbations Δσ_j.
 
         Returns:
         - The computed integral values as a tensor of shape (M,).
         """
 
         # Compute integrals ∫ e_j(x) e_i(x) dx
-        E_integrals = self.gaussian_integral(C + delta_C, Sigma + delta_Sigma, C + delta_C, Sigma + delta_Sigma)  # (K,)
+        E_integrals = self.compute_log_gaussian_convolution(C_curr, Sigma_curr, C_curr, Sigma_curr)  # (K,)
 
         # Compute integrals ∫ f_j(x) f_i(x) dx
-        F_integrals = self.gaussian_integral(C, Sigma, C, Sigma)  # (K,)
+        F_integrals = self.compute_log_gaussian_convolution(C_old, Sigma_old, C_old, Sigma_old)  # (K,)
 
         # Compute integrals ∫ e_j(x) f_i(x) dx
-        EF_integrals = self.gaussian_integral(C + delta_C, Sigma + delta_Sigma, C, Sigma)  # (K,)
+        EF_integrals = self.compute_log_gaussian_convolution(C_curr, Sigma_curr, C_old, Sigma_old)  # (K,)
 
         # Expand tensors for element-wise broadcasting
-        W1 = W.unsqueeze(1)  # Shape (K, 1, M)
-        W2 = W.unsqueeze(0)  # Shape (1, K, M)
-        Delta_W1 = delta_W.unsqueeze(1)  # Shape (K, 1, M)
-        Delta_W2 = delta_W.unsqueeze(0)  # Shape (1, K, M)
+        W1_old = W_old.unsqueeze(1)  # Shape (K, 1, M)
+        W2_old = W_old.unsqueeze(0)  # Shape (1, K, M)
+
+        W1_curr = W_curr.unsqueeze(1)  # Shape (K, 1, M)
+        W2_curr = W_curr.unsqueeze(0)  # Shape (1, K, M)
 
         # Compute the three terms in the expression
-        first_term = torch.sum((W1 + Delta_W1) * (W2 + Delta_W2) * E_integrals.unsqueeze(-1), dim=(0, 1))
-        second_term = -2 * torch.sum((W1 + Delta_W1) * W2 * EF_integrals.unsqueeze(-1), dim=(0, 1))
-        third_term = torch.sum(W1 * W2 * F_integrals.unsqueeze(-1), dim=(0, 1))
+        first_term = torch.sum(W1_curr * W2_curr * E_integrals.unsqueeze(-1), dim=(0, 1))
+        second_term = -2 * torch.sum(W1_curr * W2_old * EF_integrals.unsqueeze(-1), dim=(0, 1))
+        third_term = torch.sum(W1_old * W2_old * F_integrals.unsqueeze(-1), dim=(0, 1))
 
         # Final integral value
         integral_value = first_term + second_term + third_term  # Shape (M,)
 
-        return integral_value
-
+        return integral_value.mean()

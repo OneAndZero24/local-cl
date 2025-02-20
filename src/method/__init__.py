@@ -4,3 +4,4 @@ from .ewc import EWC
 from .mas import MAS
 from .si import SI
 from .sharpening import Sharpening
+from .reg_rbf_neuron_outputs import RBFNeuronOutReg
