@@ -112,7 +112,7 @@ class RBFNeuronOutReg(MethodPluginABC):
             + 0.5 * (log_det_corr_mat_1 + log_det_corr_mat_2.T - log_det_corr_mat_12)
             - exp_term
         )
-        print(exp_term)
+
         return log_integral  # (K, K)
 
     def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
@@ -159,7 +159,5 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         exp_term = torch.log((first_term + second_term + third_term).relu() + self.eps)
         log_integral_value = (integrals_max + exp_term).mean()
-
-        print(log_integral_value)
 
         return log_integral_value
