@@ -1,9 +1,6 @@
 import torch
 
 from src.method.method_plugin_abc import MethodPluginABC
-from util.tensor import pad_zero_dim0
-
-from copy import deepcopy
 
 class RBFNeuronOutReg(MethodPluginABC):
     """
@@ -87,77 +84,84 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         return loss, preds
 
-    def compute_gaussian_convolution(self, c1, sigma1, c2, sigma2):
+    def compute_log_gaussian_convolution(self, c1, sigma1, c2, sigma2):
         """
-        Computes the Gaussian integral:
+        Computes the log of Gaussian convolution integral:
         log(∫ exp( - (x - c1)^T A^{-1} (x - c1) - (x - c2)^T B^{-1} (x - c2) ) dx)
         """
 
-        d = c1.shape[1]  # Dimension of x
+        # Dimension of x
+        d = c1.shape[1]
 
-        # Covariance matrices (diagonal)
-        A = torch.diag_embed(sigma1**2)  # (K, d, d)
-        B = torch.diag_embed(sigma2**2)  # (K, d, d)
+        c_diff = c1 - c2
 
-        # Compute A + B
-        A_B = A + B + self.eps * torch.eye(d, device=A.device).expand(A.shape)  # (K, d, d) for numerical stability
-        A_B_inv = torch.linalg.inv(A_B)  # Inverse of (A + B)
+        corr_mat_1 = torch.diag_embed(sigma1**2)
+        corr_mat_2 = torch.diag_embed(sigma2**2)
+        corr_mat_12 = corr_mat_1 + corr_mat_2
 
-        # Compute log-determinants
-        log_det_A = torch.sum(torch.log(sigma1**2), dim=1)  # log(det(A)) (K,)
-        log_det_B = torch.sum(torch.log(sigma2**2), dim=1)  # log(det(B)) (K,)
-        log_det_A_B = torch.sum(torch.log(sigma1**2 + sigma2**2), dim=1)  # log(det(A+B)) (K,)
+        corr_mat_inv_12 = torch.linalg.inv(corr_mat_12)
 
-        # Quadratic exponent term
-        exp_term = torch.einsum('bi,bij,bj->b', c1 - c2, A_B_inv, c1 - c2)  # (K,)
+        # Compute log-determinants, shape (K,)
+        log_det_corr_mat_1 = torch.logdet(corr_mat_1)
+        log_det_corr_mat_2 = torch.logdet(corr_mat_2)
+        log_det_corr_mat_12 = torch.logdet(corr_mat_12)
 
+        # Quadratic exponent term        
+        exp_term = torch.einsum('kij,kj->ki', corr_mat_inv_12, c_diff)  # Shape (K, d)
+        exp_term = torch.einsum('ki,ji->kj', c_diff, exp_term)  # Shape (K, K), symmetric
+        
         # Compute final integral in log-space first
         log_integral = (
             torch.tensor(d / 2) * torch.log(torch.tensor(torch.pi))
-            + 0.5 * (log_det_A + log_det_B - log_det_A_B)
+            + 0.5 * (log_det_corr_mat_1 + log_det_corr_mat_2 - log_det_corr_mat_12)
             - exp_term
         )
-
-        return log_integral.exp()
+    
+        return log_integral
 
     def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
-        Computes the full integral based on Gaussian kernel parametrization.
+        Computes the logarithm of the integral of the square of the difference between the old neuron's response and the current one.
 
         Args:
-        - W_old: Tensor of shape (K, M) containing weights w_j.
-        - W_curr: Tensor of shape (K, M) containing perturbations Δw_j.
-        - C_old: Tensor of shape (K, d) representing Gaussian centers c_j.
-        - C_curr: Tensor of shape (K, d) representing perturbations Δc_j.
-        - Sigma_old: Tensor of shape (K, d) representing standard deviations σ_j.
-        - Sigma_curr: Tensor of shape (K, d) representing perturbations Δσ_j.
+            W_old (torch.Tensor): Tensor of shape (K, M) containing the old weights w_j.
+            W_curr (torch.Tensor): Tensor of shape (K, M) containing the current weights w_j.
+            C_old (torch.Tensor): Tensor of shape (K, d) representing the old Gaussian centers c_j.
+            C_curr (torch.Tensor): Tensor of shape (K, d) representing the current Gaussian centers c_j.
+            Sigma_old (torch.Tensor): Tensor of shape (K, d) representing the old standard deviations σ_j.
+            Sigma_curr (torch.Tensor): Tensor of shape (K, d) representing the current standard deviations σ_j.
 
         Returns:
-        - The computed integral values as a tensor of shape (M,).
+            torch.Tensor: A tensor of shape (M,) containing the computed logarithmic integral values.
         """
 
-        # Compute integrals ∫ e_j(x) e_i(x) dx
-        E_integrals = self.compute_gaussian_convolution(C_curr, Sigma_curr, C_curr, Sigma_curr)  # (K,)
+        # Compute integrals log(∫ e_j(x) e_i(x) dx)
+        E_integrals = self.compute_log_gaussian_convolution(C_curr, Sigma_curr, C_curr, Sigma_curr)  # (K,K)
+        E_integrals_max = E_integrals.max()
 
-        # Compute integrals ∫ f_j(x) f_i(x) dx
-        F_integrals = self.compute_gaussian_convolution(C_old, Sigma_old, C_old, Sigma_old)  # (K,)
+        # Compute integrals log(∫ f_j(x) f_i(x) dx)
+        F_integrals = self.compute_log_gaussian_convolution(C_old, Sigma_old, C_old, Sigma_old)  # (K,K)
+        F_integrals_max = F_integrals.max()
 
-        # Compute integrals ∫ e_j(x) f_i(x) dx
-        EF_integrals = self.compute_gaussian_convolution(C_curr, Sigma_curr, C_old, Sigma_old)  # (K,)
+        # Compute integrals log(∫ e_j(x) f_i(x) dx)
+        EF_integrals = self.compute_log_gaussian_convolution(C_curr, Sigma_curr, C_old, Sigma_old)  # (K,K)
+        EF_integrals_max = EF_integrals.max()
 
-        # Expand tensors for element-wise broadcasting
-        W1_old = W_old.unsqueeze(1)  # Shape (K, 1, M)
-        W2_old = W_old.unsqueeze(0)  # Shape (1, K, M)
+        integrals_max = torch.stack([
+            E_integrals_max,
+            EF_integrals_max,
+            F_integrals_max
+        ]).max()
 
-        W1_curr = W_curr.unsqueeze(1)  # Shape (K, 1, M)
-        W2_curr = W_curr.unsqueeze(0)  # Shape (1, K, M)
+        EF_integrals = torch.exp(EF_integrals - integrals_max)
+        F_integrals = torch.exp(F_integrals - integrals_max)
+        E_integrals = torch.exp(E_integrals - integrals_max)
 
-        # Compute the three terms in the expression
-        first_term = torch.sum(W1_curr * W2_curr * E_integrals.unsqueeze(-1), dim=(0, 1))
-        second_term = -2 * torch.sum(W1_curr * W2_old * EF_integrals.unsqueeze(-1), dim=(0, 1))
-        third_term = torch.sum(W1_old * W2_old * F_integrals.unsqueeze(-1), dim=(0, 1))
+        first_term = W_curr.T @ E_integrals @ W_curr
+        second_term = W_curr.T @ EF_integrals @ W_old
+        third_term = W_old.T @ F_integrals @ W_old
 
-        # Final integral value
-        integral_value = first_term + second_term + third_term  # Shape (M,)
+        exp_term = torch.log((first_term + second_term + third_term).relu() + self.eps)
+        log_integral_value = (integrals_max + exp_term).mean()
 
-        return integral_value.mean()
+        return log_integral_value
