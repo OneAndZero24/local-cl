@@ -153,11 +153,10 @@ class RBFNeuronOutReg(MethodPluginABC):
         F_integrals = torch.exp(F_integrals - integrals_max)
         E_integrals = torch.exp(E_integrals - integrals_max)
 
-        first_term = W_curr.T @ E_integrals @ W_curr
-        second_term = W_curr.T @ EF_integrals @ W_old
-        third_term = W_old.T @ F_integrals @ W_old
+        first_term = (W_curr.T @ E_integrals @ W_curr).mean()
+        second_term = (-2)*(W_curr.T @ EF_integrals @ W_old).mean()
+        third_term = (W_old.T @ F_integrals @ W_old).mean()
 
-        exp_term = torch.log((first_term + second_term + third_term).relu() + self.eps)
-        log_integral_value = (integrals_max + exp_term).mean()
+        exp_term = torch.log(first_term + second_term + third_term + self.eps)
 
-        return log_integral_value
+        return exp_term * integrals_max
