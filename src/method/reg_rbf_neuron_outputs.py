@@ -95,7 +95,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         sigma2_sq = sigma2**2  # (K, d)
         corr_mat_12 = sigma1_sq[:, None, :] + sigma2_sq[None, :, :]  # (K, K, d)
 
-        # Compute log-determinants, shape (K, K)
+        # Compute log-determinants
         log_det_corr_mat_1 = torch.sum(torch.log(sigma1_sq), dim=1, keepdim=True)  # (K, 1)
         log_det_corr_mat_2 = torch.sum(torch.log(sigma2_sq), dim=1, keepdim=True)  # (K, 1)
         log_det_corr_mat_12 = torch.sum(torch.log(corr_mat_12), dim=2)  # (K, K)
@@ -103,13 +103,14 @@ class RBFNeuronOutReg(MethodPluginABC):
         # Quadratic exponent term (c1 - c2)^T * (corr_mat_12)^(-1) * (c1 - c2)
         c_diff = c1[:, None, :] - c2[None, :, :]  # (K, K, d)
 
+        # This trick sppeds up computations
         exp_term = torch.sum((c_diff**2) / corr_mat_12, dim=2)  # (K, K)
 
         # Compute final integral in log-space
         d = c1.shape[1]
         log_integral = (
             (d / 2) * torch.log(torch.tensor(torch.pi))
-            + 0.5 * (log_det_corr_mat_1 + log_det_corr_mat_2.T - log_det_corr_mat_12)
+            + 0.5 * (log_det_corr_mat_1 + log_det_corr_mat_2.T - log_det_corr_mat_12) # Determinants are broadcasted here
             - exp_term
         )
 
@@ -128,7 +129,7 @@ class RBFNeuronOutReg(MethodPluginABC):
             Sigma_curr (torch.Tensor): Tensor of shape (K, d) representing the current standard deviations σ_j.
 
         Returns:
-            torch.Tensor: A tensor of shape (M,) containing the computed logarithmic integral values.
+            torch.Tensor: A tensor of shape (M,) containing the computed integral values.
         """
 
         # Compute integrals log(∫ e_j(x) e_i(x) dx)
@@ -162,7 +163,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         final_integral = first_term + second_term + third_term
 
         # torch.exp(F_integrals_max) is a constant and has to be added to
-        # prevent overflow
+        # prevent overflow. It does not change the final minimum.
         final_integral = final_integral*torch.exp(integrals_max - F_integrals_max)
 
         return final_integral
