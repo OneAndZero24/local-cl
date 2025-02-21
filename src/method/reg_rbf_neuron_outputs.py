@@ -1,7 +1,8 @@
 import torch
 
 from src.method.method_plugin_abc import MethodPluginABC
-
+from src.model import IncrementalClassifier, LayerType
+from src.model.layer.rbf import RBFLayer
 class RBFNeuronOutReg(MethodPluginABC):
     """
     RBF neuron output regularization to mitigate catastrophic forgetting.
@@ -36,7 +37,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         self.task_id = task_id
 
         if task_id > 0:
-            model = self.module.module  # Access the wrapped model
+            model = self.module.module
             for module in model.children():
                 if isinstance(module, torch.nn.ModuleList):
                     for idx, layer in enumerate(module):
@@ -46,7 +47,16 @@ class RBFNeuronOutReg(MethodPluginABC):
                                 f"kernels_centers_{idx}": layer.kernels_centers.detach().clone(),
                                 f"log_shapes_{idx}": layer.log_shapes.detach().clone(),
                             })
-
+                elif type(module).__name__ == "IncrementalClassifier":
+                    layer = module.classifier
+                    old_nclasses = module.old_nclasses
+                    if type(layer).__name__ == "RBFLayer":
+                        self.params_buffer.update({
+                                f"weights_head": layer.weights[:old_nclasses,:].detach().clone(),
+                                f"kernels_centers_head": layer.kernels_centers.detach().clone(),
+                                f"log_shapes_head": layer.log_shapes.detach().clone(),
+                            })
+                       
     def forward(self, x, y, loss, preds):
         """
         Forward pass with RBF neuron output regularization.
@@ -74,6 +84,26 @@ class RBFNeuronOutReg(MethodPluginABC):
                             W_old = self.params_buffer[f"weights_{idx}"].T
                             C_old = self.params_buffer[f"kernels_centers_{idx}"]
                             Sigma_old = self.params_buffer[f"log_shapes_{idx}"].exp()
+
+                            # Add regularization loss
+                            loss += self.alpha * self.compute_integral_gaussian(
+                                W_old=W_old, W_curr=W_curr,
+                                C_old=C_old, C_curr=C_curr,
+                                Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
+                            )
+                elif type(module).__name__ == "IncrementalClassifier":
+                    layer = module.classifier
+                    old_nclasses = module.old_nclasses
+                    if type(layer).__name__ == "RBFLayer":
+                         # Get current parameters
+                            W_curr = layer.weights[:old_nclasses,:].T
+                            C_curr = layer.kernels_centers
+                            Sigma_curr = layer.log_shapes.exp()
+
+                            # Retrieve old stored parameters
+                            W_old = self.params_buffer[f"weights_head"].T
+                            C_old = self.params_buffer[f"kernels_centers_head"]
+                            Sigma_old = self.params_buffer[f"log_shapes_head"].exp()
 
                             # Add regularization loss
                             loss += self.alpha * self.compute_integral_gaussian(
@@ -165,5 +195,4 @@ class RBFNeuronOutReg(MethodPluginABC):
         # torch.exp(F_integrals_max) is a constant and has to be added to
         # prevent overflow. It does not change the final minimum.
         final_integral = final_integral*torch.exp(integrals_max - F_integrals_max)
-
         return final_integral
