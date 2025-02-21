@@ -9,7 +9,7 @@ class RBFNeuronOutReg(MethodPluginABC):
     Attributes:
         params_buffer (dict): Stores model parameters for regularization.
         alpha (float): Regularization strength.
-        eps (float): Small value to prevent division by zero.
+        eps (float): Safety net value.
     """
 
     def __init__(self, alpha: float, eps: float = 1e-6):
@@ -18,7 +18,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         Args:
             alpha (float): Regularization coefficient.
-            eps (float, optional): A small value to prevent division by zero. Defaults to 1e-6.
+            eps (float, optional): Safety net value. Defaults to 1e-6.
         """
         super().__init__()
         self.params_buffer = {}
@@ -117,7 +117,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
     def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
-        Computes the logarithm of the integral of the square of the difference between the old neuron's response and the current one.
+        Computes the integral of the square of the difference between the old neuron's response and the current one.
 
         Args:
             W_old (torch.Tensor): Tensor of shape (K, M) containing the old weights w_j.
@@ -157,6 +157,12 @@ class RBFNeuronOutReg(MethodPluginABC):
         second_term = (-2)*(W_curr.T @ EF_integrals @ W_old).mean()
         third_term = (W_old.T @ F_integrals @ W_old).mean()
 
-        exp_term = torch.log(first_term + second_term + third_term + self.eps)
+        assert first_term + second_term + third_term + self.eps >= 0, f"This expression has to be greater than 0"
 
-        return exp_term * integrals_max
+        final_integral = first_term + second_term + third_term
+
+        # torch.exp(F_integrals_max) is a constant and has to be added to
+        # prevent overflow
+        final_integral = final_integral*torch.exp(integrals_max - F_integrals_max)
+
+        return final_integral
