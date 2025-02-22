@@ -53,6 +53,8 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
+  method.plugins.0._target_:
+    value: method.Sharpening
   method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.1
@@ -65,6 +67,10 @@ parameters:
     distribution: int_uniform      
     min: 64
     max: 1024
+  method.gamma: 
+    value: 0.0
+  method.reg_type:
+    value: "l0"
 
 
 command:
