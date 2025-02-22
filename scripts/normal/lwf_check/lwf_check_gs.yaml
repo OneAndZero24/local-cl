@@ -33,7 +33,7 @@ parameters:
     value: 2          
   model.sizes:
     value: [1024, 400, 400] 
-  model.layer_types: 
+  model.layers: 
     value: ["Normal", "Normal"]    
   model.head_type: 
     value: Normal     
@@ -47,6 +47,8 @@ parameters:
     value: torch.nn.CrossEntropyLoss
   method.first_lr: 
     value: 0.001
+  method.plugins.0._target_:
+    value: method.LwF
   method.plugins.0.T: 
     value: 2
   method.plugins.0.alpha: 
@@ -55,8 +57,8 @@ parameters:
     value: 0.001
   method.gamma: 
     value: 0.0
-  method.clipgrad: 
-    value: 0.000001
+  method.reg_type:
+    value: "l0"
 
 
 command:
