@@ -183,16 +183,18 @@ class RBFNeuronOutReg(MethodPluginABC):
         EF_integrals = torch.exp(EF_integrals - integrals_max)
         F_integrals = torch.exp(F_integrals - integrals_max)
         E_integrals = torch.exp(E_integrals - integrals_max)
-
-        first_term = (W_curr.T @ E_integrals @ W_curr).mean()
-        second_term = (-2)*(W_curr.T @ EF_integrals @ W_old).mean()
-        third_term = (W_old.T @ F_integrals @ W_old).mean()
-
-        assert first_term + second_term + third_term + self.eps >= 0, f"This expression has to be greater than 0"
-
+        
+        first_term = torch.sum(W_curr * (E_integrals @ W_curr), dim=0)
+        second_term = (-2)*torch.sum(W_curr * (EF_integrals @ W_old), dim=0)
+        third_term = torch.sum(W_old * (F_integrals @ W_old), dim=0)
+        
         final_integral = first_term + second_term + third_term
 
-        # torch.exp(F_integrals_max) is a constant and has to be added to
+        assert (final_integral + self.eps).all() >= 0, f"This expression has to be greater than 0"
+
+        # torch.exp(F_integrals_max) is a constant and has to be included to
         # prevent overflow. It does not change the final minimum.
-        final_integral = final_integral*torch.exp(integrals_max - F_integrals_max)
+        final_integral = torch.exp(integrals_max - F_integrals_max) * final_integral
+        final_integral = final_integral.mean()
+
         return final_integral
