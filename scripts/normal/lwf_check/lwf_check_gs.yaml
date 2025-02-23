@@ -50,9 +50,11 @@ parameters:
   method.plugins.0._target_:
     value: method.LwF
   method.plugins.0.T: 
-    values: [2, 0.5, 1]
+    values: [2, 0.5]
   method.plugins.0.alpha: 
-    value: 0.5
+    distribution: log_uniform_values 
+    min: 0.0
+    max: 0.7
   method.lr: 
     value: 0.001
   method.gamma: 
