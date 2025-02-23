@@ -57,10 +57,6 @@ parameters:
     max: 0.7
   method.lr: 
     value: 0.001
-  method.gamma: 
-    value: 0.0
-  method.reg_type:
-    value: "l0"
 
 
 command:

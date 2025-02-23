@@ -67,10 +67,6 @@ parameters:
     distribution: int_uniform      
     min: 64
     max: 1024
-  method.gamma: 
-    value: 0.0
-  method.reg_type:
-    value: "l0"
 
 
 command:
