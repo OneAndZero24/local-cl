@@ -52,7 +52,7 @@ parameters:
   method.plugins.0.T: 
     values: [2, 0.5]
   method.plugins.0.alpha: 
-    distribution: log_uniform_values 
+    distribution: uniform
     min: 0.0
     max: 0.7
   method.lr: 
