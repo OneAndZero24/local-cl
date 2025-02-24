@@ -1,9 +1,12 @@
-import pyrootutils
 import shutil
+import time
+
+import pyrootutils
 
 from omegaconf import DictConfig
 import hydra
 from hydra.utils import call
+import wandb
 
 import util
 
@@ -13,7 +16,9 @@ def main(config: DictConfig):
     util.preprocess_config(config)
     util.setup_wandb(config)
     call(config.exp.run_func, config)
+    wandb.finish()
     if config.exp.cleanup:
+        time.sleep(1)
         shutil.rmtree(config.exp.log_dir)
 
 if __name__ == "__main__":
