@@ -24,7 +24,11 @@ parameters:
   exp.detect_anomaly:
     value: False
   fabric.accelerator:
-    value: gpu       
+    value: gpu   
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True    
 
   # Model configuration
   model._target_: 

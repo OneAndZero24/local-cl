@@ -1,4 +1,5 @@
 import pyrootutils
+import shutil
 
 from omegaconf import DictConfig
 import hydra
@@ -12,6 +13,8 @@ def main(config: DictConfig):
     util.preprocess_config(config)
     util.setup_wandb(config)
     call(config.exp.run_func, config)
+    if config.exp.cleanup:
+        shutil.rmtree(config.exp.log_dir)
 
 if __name__ == "__main__":
     pyrootutils.setup_root(
