@@ -13,6 +13,7 @@ exp:
   batch_size: 32
   epochs: 1
   gen_cm: False
+  log_per_batch: False
   detect_anomaly: False
 
 fabric:

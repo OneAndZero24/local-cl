@@ -52,6 +52,7 @@ def experiment(config: DictConfig):
     method = instantiate(config.method)(model)
 
     gen_cm = config.exp.gen_cm
+    log_per_batch = config.exp.log_per_batch
 
     log.info(f'Setting up dataloaders')
     train_tasks = []
@@ -85,21 +86,21 @@ def experiment(config: DictConfig):
             for epoch in range(config.exp.epochs):
                 lastepoch = (epoch == config.exp.epochs-1)
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
-                train(method, train_task, task_id)
-                acc = test(method, test_task, task_id, gen_cm)
+                train(method, train_task, task_id, log_per_batch)
+                acc = test(method, test_task, task_id, gen_cm, log_per_batch)
                 if lastepoch:
                     avg_acc = 0.0
                     avg_acc += acc
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
-                        acc = test(method, test_tasks[j], j, gen_cm, cm_suffix=f' after {task_id}')
+                        acc = test(method, test_tasks[j], j, gen_cm, log_per_batch, cm_suffix=f' after {task_id}')
                         if lastepoch:
                             avg_acc += acc
         avg_acc /= task_id+1
         wandb.log({f'avg_acc': avg_acc})
 
 
-def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int):
+def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool):
     """
     Train one epoch.
     """
@@ -112,13 +113,14 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int):
         method.backward(loss)
 
         avg_loss += loss
-        wandb.log({f'Loss/train/{task_id}/per_batch': loss})
+        if log_per_batch:
+            wandb.log({f'Loss/train/{task_id}/per_batch': loss})
 
     avg_loss /= len(dataloader)
     wandb.log({f'Loss/train/{task_id}': avg_loss})
 
 
-def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, cm_suffix: str = '') -> float:
+def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, log_per_batch: bool, cm_suffix: str = '') -> float:
     """
     Test one epoch.
     """
@@ -138,7 +140,8 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             _, preds = torch.max(preds.data, 1)
             total += y.size(0)
             correct += (preds == y).sum().item()
-            wandb.log({f'Loss/test/{task_id}/per_batch': loss})
+            if log_per_batch:
+                wandb.log({f'Loss/test/{task_id}/per_batch': loss})
 
             if gen_cm:
                 y_total.extend(y.cpu().numpy())
