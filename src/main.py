@@ -1,5 +1,4 @@
 import shutil
-import time
 
 import pyrootutils
 
@@ -18,7 +17,6 @@ def main(config: DictConfig):
     call(config.exp.run_func, config)
     wandb.finish()
     if config.exp.cleanup:
-        time.sleep(1)
         shutil.rmtree(config.exp.log_dir, ignore_errors=True)
 
 if __name__ == "__main__":
