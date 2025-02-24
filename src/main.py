@@ -19,7 +19,7 @@ def main(config: DictConfig):
     wandb.finish()
     if config.exp.cleanup:
         time.sleep(1)
-        shutil.rmtree(config.exp.log_dir)
+        shutil.rmtree(config.exp.log_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     pyrootutils.setup_root(
