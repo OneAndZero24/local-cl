@@ -22,6 +22,7 @@
 | Sharpening | ✅ |
 | SI | ✅ |
 | MAS | ✅ |
+| RBFReg | ✅ |
 
 | Custom Layers | Status |
 | ------ | -- |
