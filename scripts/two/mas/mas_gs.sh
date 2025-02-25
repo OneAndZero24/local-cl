@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_mnist_mas_rbf
+#SBATCH --job-name=local_cl_split_mnist_two_mas_rbf
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/rbf/mas/mas_gs"
+run_sweep_and_agent "scripts/two/mas/mas_gs"

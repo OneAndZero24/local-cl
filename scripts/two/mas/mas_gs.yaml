@@ -12,7 +12,7 @@ parameters:
   model:
     value: mlp_rbf
   method:
-    value: composer_lwf
+    value: composer_two
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -54,7 +54,7 @@ parameters:
   model.no_mask_update_iterations:
     value: 1500
   model.local_linear:
-    value: False 
+    value: False  
 
   # Method configuration
   method._partial_: 
@@ -72,12 +72,14 @@ parameters:
     min: 0.0001
     max: 0.01
   method.plugins.0._target_:
-    value: method.LwF
-  method.plugins.0.T:
+    value: method.RBFNeuronOutReg
+  method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.4
     max: 1.0
-  method.plugins.0.alpha:
+  method.plugins.1._target_:
+    value: method.MAS
+  method.plugins.1.alpha: 
     distribution: uniform      
     min: 0.4
     max: 1.0
@@ -88,5 +90,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - lwf_split_mnist_mlp.yaml
+  - two_split_mnist_mlp.yaml
   - ${args_no_hyphens}
