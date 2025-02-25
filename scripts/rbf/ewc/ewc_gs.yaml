@@ -25,6 +25,10 @@ parameters:
     value: False
   fabric.accelerator:
     value: gpu       
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True  
 
   # Model configuration
   model._target_: 
@@ -32,11 +36,11 @@ parameters:
   model.initial_out_features:
     value: 2          
   model.sizes:
-    values: [[1024, 400]]
+    value: [1024, 400]
   model.head_type: 
-    values: [Normal,RBF]
+    values: [Normal, RBF]
   model.layers: 
-    value: [RBF]
+    value: ["RBF"]
   model.num_kernels:
     distribution: int_uniform
     min: 1
@@ -67,12 +71,12 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
+  method.plugins.0._target_:
+    value: method.EWC
   method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.1
     max: 1.0
-  method.clipgrad: 
-    value: 0.001
 
 
 command:
