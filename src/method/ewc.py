@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 
 import torch
@@ -6,6 +7,9 @@ from torch.nn import functional as F
 from method.regularization import param_change_loss
 from src.method.method_plugin_abc import MethodPluginABC
 
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 class EWC(MethodPluginABC):
     """
@@ -40,6 +44,7 @@ class EWC(MethodPluginABC):
         super().__init__()
         self.task_id = None
         self.alpha = alpha
+        log.info(f"Initialized EWC with alpha={alpha}")
 
         self.data_buffer = set()
         self.params_buffer = {}

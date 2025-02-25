@@ -1,10 +1,15 @@
+import logging
 from copy import deepcopy
+
 import torch
 
 from method.regularization import param_change_loss
 from src.method.method_plugin_abc import MethodPluginABC
 from util import pad_zero_dim0
 
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 class SI(MethodPluginABC):
     """
@@ -46,6 +51,7 @@ class SI(MethodPluginABC):
         self.task_id = None
         self.alpha = alpha
         self.eps = eps
+        log.info(f"Initialized SI with alpha={alpha}")
 
         self.prev_param = {}
         self.omega = {}

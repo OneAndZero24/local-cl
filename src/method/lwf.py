@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 
 import torch
@@ -5,6 +6,9 @@ import torch
 from method.regularization import distillation_loss
 from src.method.method_plugin_abc import MethodPluginABC
 
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 class LwF(MethodPluginABC):
     """
@@ -44,6 +48,7 @@ class LwF(MethodPluginABC):
         self.task_id = None
         self.T = T
         self.alpha = alpha
+        log.info(f"Initialized LwF with T={T}, alpha={alpha}")
 
 
     def setup_task(self, task_id: int):

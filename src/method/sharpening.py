@@ -1,9 +1,14 @@
+import logging
+
 import torch
 
 from src.method.method_plugin_abc import MethodPluginABC
 from method.regularization import sharpen_loss
 from util.tensor import pad_zero_dim0
 
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 class Sharpening(MethodPluginABC):
     """
@@ -42,6 +47,7 @@ class Sharpening(MethodPluginABC):
         self.alpha = alpha
         self.gamma = gamma
         self.K = K
+        log.info(f"Initialized Sharpening with alpha={alpha}, gamma={gamma}, K={K}")
 
         self.activation_buffer = None
 

@@ -93,6 +93,7 @@ class RBFLayer(LocalModule):
         constant_shape_parameter (bool, optional): Sets the shape parameters to a non-learnable constant. `initial_shape_parameter` must be provided if True. Default is False.
         constant_centers_parameter (bool, optional): Sets the centers to a non-learnable constant. `initial_centers_parameter` must be provided if True. Default is False.
         constant_weights_parameters (bool, optional): Sets the weights to a non-learnable constant. `initial_weights_parameters` must be provided if True. Default is False.
+        start_empty (bool, optional): If True, the mask is initialized to zero and gradually increased to full ones. Default
     """
 
     def __init__(self,
@@ -111,7 +112,8 @@ class RBFLayer(LocalModule):
                  initial_weights_parameters: torch.Tensor = None,
                  constant_shape_parameter: bool = False,
                  constant_centers_parameter: bool = False,
-                 constant_weights_parameters: bool = False):
+                 constant_weights_parameters: bool = False,
+                 start_empty: bool = False):
         super(RBFLayer, self).__init__()
 
         self.in_features = in_features
@@ -131,6 +133,7 @@ class RBFLayer(LocalModule):
 
         self.initial_weights_parameters = initial_weights_parameters
         self.constant_weights_parameters = constant_weights_parameters
+        self.start_empty = start_empty
 
         assert radial_function is not None  \
             and norm_function is not None
@@ -201,20 +204,21 @@ class RBFLayer(LocalModule):
 
         mask = torch.zeros((self.num_kernels, self.in_features))
 
-        for g in range(self.no_groups):
-            start_feature = g * group_size_features
-            end_feature = min((g + 1) * group_size_features, self.in_features)
-            feature_indices = range(start_feature, end_feature)
+        if not self.start_empty:
+            for g in range(self.no_groups):
+                start_feature = g * group_size_features
+                end_feature = min((g + 1) * group_size_features, self.in_features)
+                feature_indices = range(start_feature, end_feature)
 
-            start_neuron = g * group_size_neurons
-            end_neuron = min((g + 1) * group_size_neurons, self.num_kernels)
-            neuron_indices = range(start_neuron, end_neuron)
+                start_neuron = g * group_size_neurons
+                end_neuron = min((g + 1) * group_size_neurons, self.num_kernels)
+                neuron_indices = range(start_neuron, end_neuron)
 
-            mask[np.ix_(list(neuron_indices), list(feature_indices))] = 1
-            
-        # # Check if all neurons are used
-        # unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
-        # assert len(unused_neurons) == 0, "There are unused neurons!"
+                mask[np.ix_(list(neuron_indices), list(feature_indices))] = 1
+                
+            # Check if all neurons are used
+            unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
+            assert len(unused_neurons) == 0, "There are unused neurons!"
 
         return nn.Parameter(mask, requires_grad=False)
     

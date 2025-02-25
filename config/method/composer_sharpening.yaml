@@ -4,10 +4,6 @@ criterion:
   _target_: torch.nn.CrossEntropyLoss
 first_lr: 0.01
 lr: 0.01
-reg_type: l0
-gamma: 0.0
-clipgrad: 1e-3
-retaingraph: False
 plugins:
   - _target_: method.Sharpening
     K: 64
