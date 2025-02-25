@@ -1,0 +1,88 @@
+program: src/main.py
+method: bayes
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: mnist
+  scenario:
+    value: class_inc
+  model:
+    value: mlp_rbf
+  method:
+    value: composer_rbf_neuron_output_reg
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    value: 64      
+  exp.epochs: 
+    values: [50, 10, 5, 1]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu       
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True  
+
+  # Model configuration
+  model._target_: 
+    value: model.MLP
+  model.initial_out_features:
+    value: 2          
+  model.sizes:
+    value: [1024, 400]
+  model.head_type: 
+    values: [Normal, RBF]
+  model.layers: 
+    value: ["RBF"]
+  model.num_kernels:
+    distribution: int_uniform
+    min: 1
+    max: 100
+  model.no_groups: 
+    distribution: int_uniform
+    min: 15
+    max: 50
+  model.growing_mask:
+    values: [True, False] 
+  model.no_mask_update_iterations:
+    value: 1500
+  model.local_linear:
+    value: False  
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.Composer
+  method.criterion._target_: 
+    value: torch.nn.CrossEntropyLoss
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+  method.plugins.0._target_:
+    value: method.RBFNeuronOutReg
+  method.plugins.0.alpha: 
+    distribution: uniform      
+    min: 0.4
+    max: 1.0
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - neuron_output_reg_mnist_mlp_rbf.yaml
+  - ${args_no_hyphens}
