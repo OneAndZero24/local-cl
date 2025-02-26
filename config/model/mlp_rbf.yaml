@@ -2,7 +2,7 @@ _target_: model.MLP
 initial_out_features: 2
 sizes: [1024, 400, 400]
 layers: ["RBF", "RBF"]
-head_type: Normal
+head_type: RBFHead
 num_kernels: 100
 no_groups: 50
 growing_mask: True

@@ -102,12 +102,12 @@ class RBFLayer(LocalModule):
     def __init__(self,
                  in_features: int,
                  out_features: int,
-                 num_kernels: int,
                  no_groups: int,
                  no_mask_update_iterations: int,
                  growing_mask: bool,
                  radial_function: Callable[[torch.Tensor], torch.Tensor],
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
+                 num_kernels: int = None,
                  normalization: bool = True,
                  local_linear: bool = False,
                  initial_shape_parameter: torch.Tensor = None,
@@ -340,4 +340,3 @@ class RBFLayer(LocalModule):
     def incrementable_params(self):
         """ Returns the incrementable parameters of the module. """
         return ["weights"]
-    
