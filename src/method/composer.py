@@ -4,6 +4,8 @@ from typing import Optional
 from torch import nn
 from torch import optim
 
+import wandb
+
 from model.cl_module_abc import CLModuleABC
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
@@ -51,6 +53,7 @@ class Composer:
         gamma: Optional[float]=None,
         clipgrad: Optional[float]=None,
         retaingraph: Optional[bool]=False,
+        log_reg: Optional[bool]=False,
         plugins: Optional[list[MethodPluginABC]]=[]
     ):
         """
@@ -65,6 +68,7 @@ class Composer:
             gamma (Optional[float], optional): The gamma value for learning rate decay. Defaults to None.
             clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.
             retaingraph (Optional[bool], optional): Whether to retain the computation graph. Defaults to False.
+            log_reg (Optional[bool], optional): Whether to log the regularization loss. Defaults to False.
             plugins (Optional[list[MethodPluginABC]], optional): A list of plugins to be used. Defaults to an empty list.
         """
 
@@ -78,6 +82,7 @@ class Composer:
         self.clipgrad = clipgrad
         self.retaingraph = retaingraph
         self.plugins = plugins
+        self.log_reg = log_reg
         
         for plugin in self.plugins:
             plugin.set_module(self.module)
@@ -132,13 +137,14 @@ class Composer:
             plugin.setup_task(task_id)
 
 
-    def forward(self, x, y):
+    def forward(self, x, y, task_id):
         """
         Perform a forward pass through the model and apply plugins.
 
         Args:
             x (torch.Tensor): Input tensor to the model.
             y (torch.Tensor): Target tensor for computing the loss.
+            task_id (int): The ID of the current task.
 
         Returns:
             tuple: A tuple containing:
@@ -150,8 +156,11 @@ class Composer:
         loss = self.criterion(preds, y)
         loss = self._add_reg(loss)
 
+        old_loss = loss
         for plugin in self.plugins:
             loss, preds = plugin.forward(x, y, loss, preds)
+        if self.log_reg:
+            wandb.log({f'Loss/train/{task_id}/reg': loss-old_loss})
         return loss, preds
 
 
