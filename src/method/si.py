@@ -103,7 +103,7 @@ class SI(MethodPluginABC):
             params_buffer[name] = pad_zero_dim0(self.prev_param[name], p.shape)
             if p.requires_grad and p.grad is not None:
                 delta_param = p.data - params_buffer[name]
-                self.omega[name] += p.grad * (self.prev_param[name] - p.data) / (delta_param ** 2 + self.eps)
+                self.omega[name] += p.grad * (-delta_param) / (delta_param ** 2 + self.eps)
                 self.prev_param[name] = p.data.clone()
 
         loss *= self.alpha
