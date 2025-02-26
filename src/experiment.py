@@ -134,7 +134,7 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             y_total = []
             preds_total = []
         for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
-            loss, preds = method.forward(X, y)
+            loss, preds = method.forward(X, y, task_id)
             avg_loss += loss
 
             _, preds = torch.max(preds.data, 1)
