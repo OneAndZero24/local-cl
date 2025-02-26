@@ -15,6 +15,6 @@ def pad_zero_dim0(tensor: torch.Tensor, size: torch.Size) -> torch.Tensor:
     """
 
     s = tensor.shape[0]
-    tmp = torch.zeros(size)
+    tmp = torch.zeros(size).to(tensor.device)
     tmp[:s] = tensor
     return tmp

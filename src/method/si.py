@@ -131,6 +131,5 @@ class SI(MethodPluginABC):
             if p.requires_grad:
                 tmp_omega = pad_zero_dim0(self.omega[name], p.shape)
                 tmp_prev = pad_zero_dim0(self.prev_param[name], p.shape)
-                self.importance[name] = pad_zero_dim0(self.importance[name], p.shape)
-                self.importance[name] += tmp_omega / (((p.data - tmp_prev)**2)+self.eps)
+                self.importance[name] = pad_zero_dim0(self.importance[name], p.shape)+(tmp_omega / (((p.data - tmp_prev)**2)+self.eps))
                 self.omega[name] = torch.zeros_like(p)
