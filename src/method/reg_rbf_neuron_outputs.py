@@ -87,7 +87,7 @@ class RBFNeuronOutReg(MethodPluginABC):
             tuple: Updated loss and predictions.
         """
 
-        def get_rbf_layer_params(layer, idx, classes=None):
+        def get_rbf_layer_params(layer, classes=None):
             if classes is not None:
                 W_curr = layer.weights[:classes,:].T
             else:
