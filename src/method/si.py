@@ -77,7 +77,7 @@ class SI(MethodPluginABC):
         if task_id == 0:
             for name, p in self.module.named_parameters():
                 if p.requires_grad:
-                    self.prev_param[name] = p.data.clone()
+                    self.prev_param[name] = p.data.clone().detach_()
                     self.omega[name] = torch.zeros_like(p)
                     self.importance[name] = torch.zeros_like(p)
         elif task_id > 0:
@@ -104,7 +104,7 @@ class SI(MethodPluginABC):
             if p.requires_grad and p.grad is not None:
                 delta_param = p.data - params_buffer[name]
                 self.omega[name] += p.grad * (-delta_param) / (delta_param ** 2 + self.eps)
-                self.prev_param[name] = p.data.clone()
+                self.prev_param[name] = p.data.clone().detach_()
 
         loss *= self.alpha
         loss += (1-self.alpha)*param_change_loss(self.module, self.importance, params_buffer)
