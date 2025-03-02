@@ -39,6 +39,10 @@ def experiment(config: DictConfig):
     if config.exp.detect_anomaly:
         torch.autograd.set_detect_anomaly(True)
 
+    stop_task = None
+    if 'stop_after_task' in config.exp:
+        stop_task = config.exp.stop_after_task
+
     log.info(f'Initializing scenarios')
     train_scenario, test_scenario = get_scenarios(config)
 
@@ -98,6 +102,9 @@ def experiment(config: DictConfig):
                             avg_acc += acc
         avg_acc /= task_id+1
         wandb.log({f'avg_acc': avg_acc})
+
+        if stop_task is not None and task_id == stop_task:
+            break
 
 
 def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool):
