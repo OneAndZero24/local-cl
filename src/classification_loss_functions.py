@@ -20,10 +20,7 @@ class LossCriterion(nn.Module):
     def __init__(self, criterion: str):
         super().__init__()
 
-        self.criterion = self._map_to_loss_type(criterion)
-
-        self.class_means = None
-        self.class_var_inv = None
+        self.criterion_name = self._map_to_loss_type(criterion)
 
         self.loss_functions = {
             LossCriterionType.CROSS_ENTROPY: self._cross_entropy_loss,
@@ -47,35 +44,36 @@ class LossCriterion(nn.Module):
         else:
             raise ValueError("Invalid criterion. Use 'CrossEntropyLoss' or 'MahalanobisDistanceLoss'.")
 
-    def set_class_statistics(self, means: dict, variances_inv: dict):
+    def compute_mahalanobis_distance(self, x: torch.Tensor, target: torch.Tensor,
+                                     margin: float = 0.5) -> torch.Tensor:
         """
-        Set class means and inverse variances (for Mahalanobis distance computation).
+        Contrastive loss using Mahalanobis distance for classification.
 
         Args:
-        - means (dict): A dictionary with class IDs as keys and means as values.
-        - variances_inv (dict): A dictionary with class IDs as keys and inverse variances as values.
-        """
-        self.class_means = means
-        self.class_var_inv = variances_inv
-
-    def compute_mahalanobis_distance(self, x: torch.Tensor, class_idx: torch.Tensor) -> torch.Tensor:
-        """
-        Compute Mahalanobis distance for each sample in the batch.
-
-        Args:
-        - x (torch.Tensor): Input features of shape [batch_size, n_features].
-        - class_idx (torch.Tensor): Class indices of shape [batch_size].
+        - x (torch.Tensor): Model output logits.
+        - target (torch.Tensor): True class labels of shape [batch_size].
+        - margin (float): Margin for separating correct class and incorrect classes.
 
         Returns:
-        - torch.Tensor: Mahalanobis distances of shape [batch_size].
+        - torch.Tensor: Loss value of shape [batch_size].
         """
-        means = torch.stack([self.class_means[c.item()] for c in class_idx])
-        inv_vars = torch.stack([self.class_var_inv[c.item()] for c in class_idx])
 
-        diff = x - means
-        mahalanobis_dist = torch.sqrt(torch.sum(diff**2 * inv_vars, dim=1))
+        # Convert similarity scores to a distance-like loss
+        distances = -torch.log(x)
 
-        return mahalanobis_dist
+        batch_size = distances.shape[0]
+
+        # Get Mahalanobis distance for the correct class
+        correct_class_distance = distances[torch.arange(batch_size), target]
+
+        # Compute distances for all incorrect classes
+        mask = torch.ones_like(distances, dtype=torch.bool)
+        mask[torch.arange(batch_size), target] = 0
+        incorrect_class_distances = distances[mask].view(batch_size, -1)
+
+        # Ensure the correct class has a much smaller Mahalanobis distance
+        loss = torch.relu(margin + correct_class_distance - incorrect_class_distances.min(dim=1)[0])
+        return loss.mean()
 
     def forward(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
@@ -89,7 +87,7 @@ class LossCriterion(nn.Module):
         - torch.Tensor: Computed loss.
         """
         # Call the appropriate loss function based on the selected criterion
-        loss_fn = self.loss_functions[self.criterion]
+        loss_fn = self.loss_functions[self.criterion_name]
         return loss_fn(x, target)
 
     def _cross_entropy_loss(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -116,4 +114,4 @@ class LossCriterion(nn.Module):
         Returns:
         - torch.Tensor: Mahalanobis distance loss.
         """
-        return self.compute_mahalanobis_distance(x, target).mean()
+        return self.compute_mahalanobis_distance(x, target)

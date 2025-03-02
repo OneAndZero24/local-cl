@@ -1,11 +1,8 @@
 import logging
 from typing import Optional
-from collections import defaultdict
 
 from torch import nn
 from torch import optim
-import torch
-from torch.utils.data import DataLoader
 
 from model.cl_module_abc import CLModuleABC
 from method.regularization import regularization
@@ -134,9 +131,6 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
-        self.means = None
-        self.variances = None
-
 
     def forward(self, x, y):
         """
@@ -180,28 +174,3 @@ class Composer:
         if self.clipgrad is not None:
             nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()
-
-    def calculate_statistics(self, data: DataLoader):
-        """
-        Estimates mean and variance of the data per class.
-        """
-        class_sums = defaultdict(lambda: torch.zeros_like(next(iter(data))[0][0]))
-        class_squares = defaultdict(lambda: torch.zeros_like(next(iter(data))[0][0]))
-        class_counts = defaultdict(int)
-        
-        for x, y in data:
-            for i in range(x.shape[0]):
-                label = y[i].item()
-                class_sums[label] += x[i]
-                class_squares[label] += x[i] ** 2
-                class_counts[label] += 1
-        
-        means = {}
-        variances = {}
-        
-        for label in class_sums:
-            means[label] = class_sums[label] / class_counts[label]
-            variances[label] = (class_squares[label] / class_counts[label]) - (means[label] ** 2)
-
-        self.means = means
-        self.variances = variances
