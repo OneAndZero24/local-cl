@@ -30,7 +30,6 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         super().__init__()
         self.params_buffer = {}
-        self.importance = {}
         self.alpha = alpha
         self.eps = eps
         log.info(f"Initialized RBFNeuronOutReg with alpha={alpha}")
@@ -46,11 +45,13 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         def get_rbf_layer_params(layer, idx, classes=None):
             if classes is not None:
-                weights = layer.weights[:classes,:].detach().clone()
+                weights = None
+                kernels_centers = layer.kernels_centers[:classes, :].detach().clone()
+                log_shapes = layer.log_shapes[:classes, :].detach().clone()
             else:
                 weights = layer.weights.detach().clone()
-            kernels_centers = layer.kernels_centers.detach().clone()
-            log_shapes = layer.log_shapes.detach().clone()
+                kernels_centers = layer.kernels_centers.detach().clone()
+                log_shapes = layer.log_shapes.detach().clone()
             return {
                 f"weights_{idx}": weights,
                 f"kernels_centers_{idx}": kernels_centers,
@@ -69,7 +70,7 @@ class RBFNeuronOutReg(MethodPluginABC):
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFLayer":
+                    if type(layer).__name__ == "RBFHeadLayer":
                         self.params_buffer.update(get_rbf_layer_params(layer, "head", old_nclasses))
 
 
@@ -89,15 +90,18 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         def get_rbf_layer_params(layer, classes=None):
             if classes is not None:
-                W_curr = layer.weights[:classes,:].T
+                W_curr = None
+                C_curr = layer.kernels_centers[:classes,:]
+                Sigma_curr = layer.log_shapes[:classes,:].exp()
             else:
                 W_curr = layer.weights.T
-            C_curr = layer.kernels_centers
-            Sigma_curr = layer.log_shapes.exp()
+                C_curr = layer.kernels_centers
+                Sigma_curr = layer.log_shapes.exp()
             return W_curr, C_curr, Sigma_curr
         
         def get_old_rbf_layer_params(idx):
-            W_old = self.params_buffer[f"weights_{idx}"].T
+            W_old = self.params_buffer.get(f"weights_{idx}", None)
+            W_old = W_old.T if W_old is not None else W_old
             C_old = self.params_buffer[f"kernels_centers_{idx}"]
             Sigma_old = self.params_buffer[f"log_shapes_{idx}"].exp()
             return W_old, C_old, Sigma_old
@@ -114,7 +118,7 @@ class RBFNeuronOutReg(MethodPluginABC):
                             W_old, C_old, Sigma_old = get_old_rbf_layer_params(idx)
 
                             # Add regularization loss
-                            loss += self.alpha * self.compute_integral_gaussian(
+                            loss += self.alpha * self.compute_hidden_integral_gaussian(
                                 W_old=W_old, W_curr=W_curr,
                                 C_old=C_old, C_curr=C_curr,
                                 Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
@@ -122,16 +126,15 @@ class RBFNeuronOutReg(MethodPluginABC):
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFLayer":
+                    if type(layer).__name__ == "RBFHeadLayer":
                             # Get current parameters
-                            W_curr, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses)
+                            _, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses)
 
                             # Retrieve old stored parameters
-                            W_old, C_old, Sigma_old = get_old_rbf_layer_params("head")
+                            _, C_old, Sigma_old = get_old_rbf_layer_params("head")
 
                             # Add regularization loss
-                            loss += self.alpha * self.compute_integral_gaussian(
-                                W_old=W_old, W_curr=W_curr,
+                            loss += self.alpha * self.compute_head_integral_gaussian(
                                 C_old=C_old, C_curr=C_curr,
                                 Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
                             )
@@ -172,9 +175,10 @@ class RBFNeuronOutReg(MethodPluginABC):
         return log_integral  # (K, K)
 
 
-    def compute_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
+    def compute_hidden_integral_gaussian(self, W_old, W_curr, C_old, C_curr, Sigma_old, Sigma_curr):
         """
-        Computes the integral of the square of the difference between the old neuron's response and the current one.
+        Computes the integral of the square of the difference between the old neuron's response and the current one
+        for a hidden RBF layer.
 
         Args:
             W_old (torch.Tensor): Tensor of shape (K, M) containing the old weights w_j.
@@ -224,3 +228,22 @@ class RBFNeuronOutReg(MethodPluginABC):
         final_integral = final_integral.mean()
 
         return final_integral
+    
+    def compute_head_integral_gaussian(self, C_old, C_curr, Sigma_old, Sigma_curr):
+        """
+        Computes the integral of the square of the difference between the old neuron's response and the current one
+        for an RBF layer used as incremental classification head.
+
+        Args:
+            C_old (torch.Tensor): Tensor of shape (K, d) representing the old Gaussian centers c_j.
+            C_curr (torch.Tensor): Tensor of shape (K, d) representing the current Gaussian centers c_j.
+            Sigma_old (torch.Tensor): Tensor of shape (K, d) representing the old standard deviations σ_j.
+            Sigma_curr (torch.Tensor): Tensor of shape (K, d) representing the current standard deviations σ_j.
+
+        Returns:
+            torch.Tensor: A tensor of shape (K,) containing the computed integral values.
+        """
+
+        raise NotImplementedError("Not implemented yet!")
+
+        
