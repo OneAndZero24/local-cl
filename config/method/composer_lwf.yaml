@@ -1,7 +1,6 @@
 _partial_: True
 _target_: method.Composer
-criterion: 
-  _target_: torch.nn.CrossEntropyLoss
+criterion: torch.nn.CrossEntropyLoss
 first_lr: 0.001
 lr: 0.001
 plugins:

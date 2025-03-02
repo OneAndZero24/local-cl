@@ -1,5 +1,5 @@
 _partial_: True
 _target_: method.Composer
-criterion: CrossEntropyLoss
+criterion: MahalanobisDistanceLoss
 first_lr: 0.01
 lr: 0.01
