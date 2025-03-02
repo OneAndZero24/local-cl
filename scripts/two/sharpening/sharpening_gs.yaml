@@ -38,7 +38,7 @@ parameters:
   model.sizes:
     value: [1024, 400]
   model.head_type: 
-    values: [Normal, RBF]
+    values: [Normal, RBFHead]
   model.layers: 
     value: ["RBF"]
   model.num_kernels:

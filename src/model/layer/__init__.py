@@ -4,6 +4,7 @@ from functools import partial
 from torch import nn
 
 from .rbf import RBFLayer
+from .rbf_head import RBFHeadLayer
 from .local import LocalLayer
 from .local_conv2d import LocalConv2DLayer
 from .local_module import LocalModule
@@ -17,6 +18,7 @@ class LayerType(Enum):
     LOCAL = "Local"
     NORMAL = "Normal"
     RBF = "RBF"
+    RBF_HEAD = "RBFHead"
 
 
 def _instantiate(
@@ -26,7 +28,7 @@ def _instantiate(
     **kwargs
 ):
     layer = map[layer_type]
-    if layer_type == LayerType.NORMAL:
+    if layer_type in [LayerType.NORMAL,LayerType.RBF_HEAD]:
         return layer(*args)
     return layer(*args, **kwargs)
 
@@ -34,7 +36,8 @@ def _instantiate(
 instantiate = partial(_instantiate, {
     LayerType.LOCAL: LocalLayer,
     LayerType.RBF: RBFLayer,
-    LayerType.NORMAL: nn.Linear
+    LayerType.NORMAL: nn.Linear,
+    LayerType.RBF_HEAD: RBFHeadLayer
 })
 
 

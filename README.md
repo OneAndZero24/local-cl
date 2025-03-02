@@ -28,6 +28,7 @@
 | ------ | -- |
 | Local | ✅ |
 | RBF | ✅ |
+| RBFHead | ✅ |
 | KAN | ❌ |
 | LocalHead | ⭕️ |
 | LocalConv2D | ⭕️ |

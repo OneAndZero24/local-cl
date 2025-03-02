@@ -9,7 +9,7 @@ import wandb
 from model.cl_module_abc import CLModuleABC
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
-
+from classification_loss_functions import LossCriterion
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -20,7 +20,7 @@ class Composer:
 
     Attributes:
         module (CLModuleABC): The module to be trained.
-        criterion (nn.Module): The loss function.
+        criterion (str): The loss function.
         optimizer (Optional[optim.Optimizer]): The optimizer for training.
         first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
@@ -46,7 +46,7 @@ class Composer:
 
     def __init__(self, 
         module: CLModuleABC,
-        criterion: nn.Module, 
+        criterion: str, 
         first_lr: float, 
         lr: float,
         reg_type: Optional[str]=None,
@@ -61,7 +61,7 @@ class Composer:
 
         Args:
             module (CLModuleABC): The module to be used.
-            criterion (nn.Module): The criterion (loss function) to be used.
+            criterion (str): The criterion (loss function) to be used.
             first_lr (float): The initial learning rate.
             lr (float): The learning rate.
             reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
@@ -73,7 +73,7 @@ class Composer:
         """
 
         self.module = module
-        self.criterion = criterion
+        self.criterion = LossCriterion(criterion)
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr

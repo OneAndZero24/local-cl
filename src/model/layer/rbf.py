@@ -67,13 +67,13 @@ class RBFLayer(LocalModule):
 
     An RBF layer is defined by the following elements:
         1. A radial kernel function `phi`.
-        2. A positive shape parameter `epsilon`.
+        2. A shape parameter `sigma_i`, where `i=1, ..., N`.
         3. The number of kernels `N` and their centers `c_i`, where `i=1, ..., N`.
         4. A norm function `||.||`.
         5. A set of weights `w_i`, where `i=1, ..., N`.
 
     The output of an RBF layer is given by:
-        y(x) = sum_{i=1}^N a_i * phi(eps_i * ||x - c_i||)
+        y(x) = sum_{i=1}^N a_i * phi(||(x - c_i)/sigma_i||)
 
     For more information, refer to:
         [1] https://en.wikipedia.org/wiki/Radial_basis_function
@@ -83,6 +83,9 @@ class RBFLayer(LocalModule):
         in_features (int): Dimensionality of the input features.
         num_kernels (int): Number of kernels to use.
         out_features (int): Dimensionality of the output features.
+        no_groups (int): Number of the neuron groups.
+        no_mask_update_iterations (int): Number of iterations required for convergence to a full matrix of ones in the mask. This is used only when growing_mask is set to True.
+        growing_mask (bool): If True, the number of ones in the mask is growing.
         radial_function (Callable[[torch.Tensor], torch.Tensor]): A radial basis function that returns a tensor of real values given a tensor of real values.
         norm_function (Callable[[torch.Tensor], torch.Tensor]): Normalization function applied to the features.
         normalization (bool, optional): If True, applies the normalization trick to the RBF layer. Default is True.
@@ -337,4 +340,3 @@ class RBFLayer(LocalModule):
     def incrementable_params(self):
         """ Returns the incrementable parameters of the module. """
         return ["weights"]
-    
