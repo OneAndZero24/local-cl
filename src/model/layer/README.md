@@ -4,3 +4,4 @@ Custom layers implementations
 - `rbf.py` - Radial Basis Functions from PyTorchRBFLayer by Alessio Russo, with masked input feature dimensions.
 - `local.py` - Local ReLU-based FC Layer
 - `local_conv.py` - **Deprecated** Local ReLU-based Conv Layer
+- `rbf_head.py` - RBF Head Layer
