@@ -77,7 +77,7 @@ class Sharpening(MethodPluginABC):
             tuple: Updated loss and predictions tensors.
         """
 
-        activations = torch.stack(self.module.activations).sum(dim=0)/x.shape[0]
+        activations = torch.cat(self.module.activations, dim=1).sum(dim=0)/x.shape[0]
         activations_det = activations.clone().detach_()
         activations_det.requires_grad = False
         if self.activation_buffer is None:
