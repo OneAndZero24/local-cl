@@ -220,7 +220,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         
         final_integral = first_term + second_term + third_term
 
-        assert (final_integral + self.eps).all() >= 0, f"This expression has to be greater than 0"
+        assert torch.all(final_integral >= -self.eps), "Integral values must be non-negative."
 
         # torch.exp(F_integrals_max) is a constant and has to be included to
         # prevent overflow. It does not change the final minimum.
@@ -231,19 +231,32 @@ class RBFNeuronOutReg(MethodPluginABC):
     
     def compute_head_integral_gaussian(self, C_old, C_curr, Sigma_old, Sigma_curr):
         """
-        Computes the integral of the square of the difference between the old neuron's response and the current one
-        for an RBF layer used as incremental classification head.
+        Computes the integral of the squared difference between the old and current neuron responses
+        for an RBF layer used as an incremental classification head.
 
         Args:
-            C_old (torch.Tensor): Tensor of shape (K, d) representing the old Gaussian centers c_j.
-            C_curr (torch.Tensor): Tensor of shape (K, d) representing the current Gaussian centers c_j.
-            Sigma_old (torch.Tensor): Tensor of shape (K, d) representing the old standard deviations σ_j.
-            Sigma_curr (torch.Tensor): Tensor of shape (K, d) representing the current standard deviations σ_j.
+            C_old (torch.Tensor): Tensor of shape (K, d) representing old Gaussian centers.
+            C_curr (torch.Tensor): Tensor of shape (K, d) representing current Gaussian centers.
+            Sigma_old (torch.Tensor): Tensor of shape (K, d) representing old standard deviations.
+            Sigma_curr (torch.Tensor): Tensor of shape (K, d) representing current standard deviations.
 
         Returns:
             torch.Tensor: A tensor of shape (K,) containing the computed integral values.
         """
+        det_sigma_curr = torch.sum(torch.log(Sigma_curr), dim=1)
+        det_sigma_old = torch.sum(torch.log(Sigma_old), dim=1)
+        det_sigma_combined = 0.5 * torch.sum(torch.log(Sigma_old**2 + Sigma_curr**2), dim=1)
 
-        raise NotImplementedError("Not implemented yet!")
+        exp_term = torch.exp(-((C_curr - C_old).pow(2) / (Sigma_old**2 + Sigma_curr**2)).sum(dim=1))
+
+        integral_value = torch.exp(det_sigma_curr) + torch.exp(det_sigma_old) \
+                        - 2 * torch.exp(det_sigma_curr + det_sigma_old - det_sigma_combined) * exp_term
+
+        # Ensure integral values are non-negative
+        assert (integral_value >= 0).all(), "Integral values must be non-negative."
+
+        return integral_value.mean()
+
+        
 
         
