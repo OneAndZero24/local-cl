@@ -12,7 +12,7 @@ parameters:
   model:
     value: mlp_rbf
   method:
-    value: composer_two
+    value: composer_two_mas
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -73,15 +73,15 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
-  ++method.plugins.0._target_:
+  method.plugins.0._target_:
     value: method.RBFNeuronOutReg
-  ++method.plugins.0.alpha: 
+  method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.4
     max: 1.0
-  ++method.plugins.1._target_:
+  method.plugins.1._target_:
     value: method.MAS
-  ++method.plugins.1.alpha: 
+  method.plugins.1.alpha: 
     distribution: uniform      
     min: 0.4
     max: 1.0

@@ -1,11 +1,10 @@
 _partial_: True
 _target_: method.Composer
-criterion: CrossEntropyLoss
+criterion: MahalanobisDistanceLoss
 first_lr: 0.001
 lr: 0.001
 plugins:
-  - _target_: method.LwF
-    T: 2
+  - _target_: method.RBFNeuronOutReg
     alpha: 0.4
-  - _target_: method.SI
+  - _target_: method.EWC
     alpha: 0.4
