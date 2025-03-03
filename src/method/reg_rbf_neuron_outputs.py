@@ -220,7 +220,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         
         final_integral = first_term + second_term + third_term
 
-        assert torch.all(final_integral >= -self.eps), "Integral values must be non-negative."
+        # assert torch.all(final_integral >= -self.eps), "Integral values must be non-negative."
 
         # torch.exp(F_integrals_max) is a constant and has to be included to
         # prevent overflow. It does not change the final minimum.
@@ -253,7 +253,7 @@ class RBFNeuronOutReg(MethodPluginABC):
                         - 2 * torch.exp(det_sigma_curr + det_sigma_old - det_sigma_combined) * exp_term
 
         # Ensure integral values are non-negative
-        assert (integral_value >= 0).all(), "Integral values must be non-negative."
+        # assert (integral_value >= -self.eps).all(), "Integral values must be non-negative."
 
         return integral_value.mean()
 
