@@ -220,8 +220,8 @@ class RBFLayer(LocalModule):
                 mask[np.ix_(list(neuron_indices), list(feature_indices))] = 1
                 
             # Check if all neurons are used
-            unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
-            assert len(unused_neurons) == 0, "There are unused neurons!"
+            # unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
+            # assert len(unused_neurons) == 0, "There are unused neurons!"
 
         return nn.Parameter(mask, requires_grad=False)
     

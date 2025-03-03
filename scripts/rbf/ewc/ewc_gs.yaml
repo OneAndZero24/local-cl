@@ -43,7 +43,7 @@ parameters:
     value: ["RBF", "RBF"]
   model.num_kernels:
     distribution: int_uniform
-    min: 1
+    min: 50
     max: 100
   model.no_groups: 
     distribution: int_uniform
