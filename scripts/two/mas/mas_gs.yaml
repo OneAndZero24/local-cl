@@ -36,11 +36,11 @@ parameters:
   model.initial_out_features:
     value: 2          
   model.sizes:
-    value: [1024, 400]
+    value: [1024, 100, 8]
   model.head_type: 
-    values: [Normal, RBFHead]
+    value: RBFHead
   model.layers: 
-    value: ["RBF"]
+    value: ["RBF", "RBF"]
   model.num_kernels:
     distribution: int_uniform
     min: 1
@@ -54,15 +54,17 @@ parameters:
   model.no_mask_update_iterations:
     value: 1500
   model.local_linear:
-    value: False  
+    values: [True, False]
+  model.normalization:
+    values: [True, False]  
 
   # Method configuration
   method._partial_: 
     value: True
   method._target_: 
     value: method.Composer
-  method.criterion._target_: 
-    value: torch.nn.CrossEntropyLoss
+  method.criterion: 
+    value: MahalanobisDistanceLoss
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001

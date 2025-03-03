@@ -47,8 +47,8 @@ parameters:
     value: True
   method._target_: 
     value: method.Composer
-  method.criterion._target_: 
-    value: torch.nn.CrossEntropyLoss
+  method.criterion: 
+    value: CrossEntropyLoss
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
