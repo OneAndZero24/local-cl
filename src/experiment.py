@@ -43,6 +43,11 @@ def experiment(config: DictConfig):
     if 'stop_after_task' in config.exp:
         stop_task = config.exp.stop_after_task
 
+    save_model = False
+    if 'model_path' in config.exp:
+        save_model = True
+        model_path = config.exp.model_path
+
     log.info(f'Initializing scenarios')
     train_scenario, test_scenario = get_scenarios(config)
 
@@ -105,6 +110,10 @@ def experiment(config: DictConfig):
 
         if stop_task is not None and task_id == stop_task:
             break
+    
+    if save_model:
+        log.info(f'Saving model')
+        torch.save(model.state_dict(), config.exp.model_path)
 
 
 def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool):
