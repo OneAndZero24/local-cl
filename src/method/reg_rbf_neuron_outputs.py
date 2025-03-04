@@ -19,19 +19,17 @@ class RBFNeuronOutReg(MethodPluginABC):
     """
 
 
-    def __init__(self, alpha: float, eps: float = 1e-6):
+    def __init__(self, alpha: float):
         """
         Initializes the RBF neuron output regularization method.
 
         Args:
             alpha (float): Regularization coefficient.
-            eps (float, optional): Safety net value. Defaults to 1e-6.
         """
 
         super().__init__()
         self.params_buffer = {}
         self.alpha = alpha
-        self.eps = eps
         log.info(f"Initialized RBFNeuronOutReg with alpha={alpha}")
 
 
@@ -220,7 +218,8 @@ class RBFNeuronOutReg(MethodPluginABC):
         
         final_integral = first_term + second_term + third_term
 
-        # assert torch.all(final_integral >= -self.eps), "Integral values must be non-negative."
+        # Ensure numerical stability
+        final_integral = torch.clamp(final_integral, min=0)
 
         # torch.exp(F_integrals_max) is a constant and has to be included to
         # prevent overflow. It does not change the final minimum.
@@ -243,17 +242,22 @@ class RBFNeuronOutReg(MethodPluginABC):
         Returns:
             torch.Tensor: A tensor of shape (K,) containing the computed integral values.
         """
-        det_sigma_curr = torch.sum(torch.log(Sigma_curr), dim=1)
-        det_sigma_old = torch.sum(torch.log(Sigma_old), dim=1)
-        det_sigma_combined = 0.5 * torch.sum(torch.log(Sigma_old**2 + Sigma_curr**2), dim=1)
+        d = C_old.shape[1]  # Dimensionality
 
-        exp_term = torch.exp(-((C_curr - C_old).pow(2) / (Sigma_old**2 + Sigma_curr**2)).sum(dim=1))
+        # Compute squared integral of each Gaussian
+        integral_old = (torch.pi ** (d / 2)) * torch.prod(Sigma_old / torch.sqrt(torch.tensor(2.0, device=Sigma_old.device)), dim=1)
+        integral_curr = (torch.pi ** (d / 2)) * torch.prod(Sigma_curr / torch.sqrt(torch.tensor(2.0, device=Sigma_curr.device)), dim=1)
 
-        integral_value = torch.exp(det_sigma_curr) + torch.exp(det_sigma_old) \
-                        - 2 * torch.exp(det_sigma_curr + det_sigma_old - det_sigma_combined) * exp_term
+        # Compute convolution integral
+        combined_sigma = torch.sqrt(Sigma_old**2 + Sigma_curr**2)
+        integral_cross = (torch.pi ** (d / 2)) * torch.prod(Sigma_old * Sigma_curr / combined_sigma, dim=1) * \
+                        torch.exp(-torch.sum((C_old - C_curr) ** 2 / (Sigma_old ** 2 + Sigma_curr ** 2), dim=1))
 
-        # Ensure integral values are non-negative
-        # assert (integral_value >= -self.eps).all(), "Integral values must be non-negative."
+        # Compute final integral value
+        integral_value = integral_curr + integral_old - 2 * integral_cross
+
+        # Ensure numerical stability
+        integral_value = torch.clamp(integral_value, min=0)
 
         return integral_value.mean()
 
