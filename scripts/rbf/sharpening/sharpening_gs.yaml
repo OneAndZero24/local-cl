@@ -64,7 +64,7 @@ parameters:
   method._target_: 
     value: method.Composer
   method.criterion: 
-    value: MahalanobisDistanceLoss
+    values: [MahalanobisDistanceLoss, CrossEntropyLoss]
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
