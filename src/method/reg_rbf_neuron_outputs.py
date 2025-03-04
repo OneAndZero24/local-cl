@@ -131,7 +131,9 @@ class RBFNeuronOutReg(MethodPluginABC):
                             # Retrieve old stored parameters
                             _, C_old, Sigma_old = get_old_rbf_layer_params("head")
 
-                            # Add regularization loss
+                            assert self.alpha >= 0.0 and self.alpha <= 1.0, f"Alpha parameter should be within [0,1] interval"
+
+                            loss *= (1-self.alpha)
                             loss += self.alpha * self.compute_head_integral_gaussian(
                                 C_old=C_old, C_curr=C_curr,
                                 Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
@@ -224,6 +226,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         # torch.exp(F_integrals_max) is a constant and has to be included to
         # prevent overflow. It does not change the final minimum.
         final_integral = torch.exp(integrals_max - F_integrals_max) * final_integral
+
         final_integral = final_integral.mean()
 
         return final_integral
