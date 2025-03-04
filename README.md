@@ -38,6 +38,16 @@
 | MLP | ✅ |
 | LeNet | ⭕️ |
 
+## Results
+| Method | Normal | Normal + RBF Head | RBF | RBF + Regularization |
+| ------ | ------ | ------------------ | --- | --------------------- |
+| Naive | 19.97 | | | |
+| LwF | *23.23* | | | |
+| EWC | 19.95 | | | |
+| SI | 20.19 | | | |
+| MAS | 20.63 | | | |
+| Sharpening | 19.95 | | | |
+
 ## Commands
 **Setup**
 ```
