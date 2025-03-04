@@ -295,7 +295,7 @@ class RBFLayer(LocalModule):
         sigma = self.log_shapes.exp().expand(batch_size, self.num_kernels,
                                              self.in_features)
 
-        diff = sigma * (input.view(batch_size, 1, self.in_features) - c)
+        diff = (input.view(batch_size, 1, self.in_features) - c) / sigma
         diff *= self.mask
 
         # Apply norm function; c has size B x num_kernels

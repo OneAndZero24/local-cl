@@ -1,0 +1,10 @@
+_partial_: True
+_target_: method.Composer
+criterion: MahalanobisDistanceLoss
+first_lr: 0.01
+lr: 0.01
+plugins:
+  - _target_: method.RBFNeuronOutReg
+    alpha: 0.9999999999999999999999
+  - _target_: method.PenultimateLayerReg
+    alpha: 0.01

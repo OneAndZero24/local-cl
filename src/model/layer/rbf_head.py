@@ -118,7 +118,7 @@ class RBFHeadLayer(LocalModule):
         sigma = self.log_shapes.exp().expand(batch_size, self.out_features,
                                              self.in_features)
 
-        diff = sigma * (input.view(batch_size, 1, self.in_features) - c)
+        diff = (input.view(batch_size, 1, self.in_features) - c) / sigma
 
         # Apply norm function; c has size B x out_features
         r = self.norm_function(diff)
