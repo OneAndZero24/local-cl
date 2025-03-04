@@ -39,8 +39,8 @@
 | LeNet | ⭕️ |
 
 ## Results
-| Method | Normal | Normal + RBF Head | RBF | RBF + Regularization |
-| ------ | ------ | ------------------ | --- | --------------------- |
+| Method | Normal | RBF | Normal + RBF Head + Regularizaiton | RBF + Regularization |
+| ------ | ------ | --- | ---------------------------------- | --------------------- |
 | Naive | 19.97 | | | |
 | LwF | *23.23* | | | |
 | EWC | 19.95 | | | |
