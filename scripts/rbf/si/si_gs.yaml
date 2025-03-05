@@ -52,7 +52,9 @@ parameters:
   model.growing_mask:
     values: [True, False] 
   model.no_mask_update_iterations:
-    value: 1500
+    distribution: int_uniform
+    min: 100
+    max: 3000
   model.local_linear:
     values: [True, False]
   model.normalization:
