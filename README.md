@@ -39,14 +39,16 @@
 | LeNet | ⭕️ |
 
 ## Results
-| Method | Normal | RBF | Normal + RBF Head + Regularizaiton | RBF + Regularization |
-| ------ | ------ | --- | ---------------------------------- | --------------------- |
-| Naive | 19.97 | | | |
-| LwF | *23.23* | | | |
-| EWC | 19.95 | | | |
-| SI | 20.19 | | | |
-| MAS | 20.63 | | | |
-| Sharpening | 19.95 | | | |
+**SplitMNIST**
+| Method | Normal | RBF | RBF Head |
+| ------ | ------ | --- | -------- |
+| Naive | *19.97* | 19.95 | |
+| LwF | **23.23** | 20.38 | |
+| EWC | 19.95 | | |
+| SI | 20.19 | | |
+| MAS | 20.63 | | |
+| Sharpening | 19.95 | | |
+| Regularization | NA | | |
 
 ## Commands
 **Setup**
