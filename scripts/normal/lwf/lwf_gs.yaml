@@ -49,12 +49,6 @@ parameters:
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
-  method.reg_type:
-    values: ["entropy", "l1", "l0"]
-  method.gamma:
-    distribution: uniform
-    min: 0.1
-    max: 0.9
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
