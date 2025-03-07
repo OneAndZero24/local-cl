@@ -40,7 +40,7 @@ parameters:
   model.head_type: 
     value: RBFHead
   model.layers: 
-    value: ["RBF", "RBF"]
+    value: ["Normal", "Normal"]
   model.num_kernels:
     distribution: int_uniform
     min: 50
@@ -54,7 +54,7 @@ parameters:
   model.no_mask_update_iterations:
     value: 1500
   model.local_linear:
-    values: [True, False]
+    values: [False]
   model.normalization:
     values: [True, False]
 
@@ -77,7 +77,7 @@ parameters:
     value: method.RBFNeuronOutReg
   method.plugins.0.alpha: 
     distribution: uniform      
-    min: 0.1
+    min: 0.999
     max: 1.0
 
 
