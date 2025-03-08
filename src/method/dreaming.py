@@ -2,8 +2,11 @@ import logging
 import torch
 import torch.nn.functional as F
 from src.method.method_plugin_abc import MethodPluginABC
+import matplotlib.pyplot as plt
 
 from copy import deepcopy
+from typing import Tuple
+import ast
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -19,7 +22,9 @@ class Dreaming(MethodPluginABC):
         old_nclasses (int): Indices of all classes seen up to the current task (exclusively)
     """
 
-    def __init__(self, alpha: float):
+    def __init__(self, alpha: float, no_samples_per_class: int = 32, steps: int = 500,
+                 dreaming_lr: float = 0.1, lambda_l2: float = 0.01, lambda_tv: float = 0.001,
+                 in_shape: Tuple[int] = (1,32,32)):
         """
         Initializes the dreaming method.
 
@@ -30,6 +35,13 @@ class Dreaming(MethodPluginABC):
         self.params_buffer = {}
         self.dreamed_data_buffer = {}
         self.old_nclasses = None
+
+        self.no_samples_per_class = no_samples_per_class
+        self.steps = steps
+        self.dreaming_lr = dreaming_lr
+        self.lambda_l2 = lambda_l2
+        self.lambda_tv = lambda_tv
+        self.in_shape = ast.literal_eval(in_shape)
 
         self.alpha = alpha
         log.info(f"Dreaming initialized with alpha={alpha}")
@@ -63,7 +75,7 @@ class Dreaming(MethodPluginABC):
                     layer = module.classifier
                     self.old_nclasses = module.old_nclasses
                     if type(layer).__name__ == "RBFHeadLayer":
-                        self.params_buffer.update(extract_RBFHead_params(layer, "head",self. old_nclasses))
+                        self.params_buffer.update(extract_RBFHead_params(layer, "head", self.old_nclasses))
 
             with torch.no_grad():   
                 self.old_module = deepcopy(self.module)
@@ -71,9 +83,10 @@ class Dreaming(MethodPluginABC):
                     p.requires_grad = False
                 self.old_module.eval()
 
-    def generate_dreamed_data(self, no_samples_per_class: int, steps: int = 500, lr: float = 0.1, 
-                          lambda_l2: float = 0.01, 
-                          lambda_tv: float = 0.001):
+            self.generate_dreamed_data()
+            # self.visualize_dreamed_data()
+
+    def generate_dreamed_data(self):
         """
         Generate dreamed images such that their activations match stored Gaussian statistics 
         in the last classification layer while also ensuring realism with L2 and TV losses.
@@ -92,16 +105,16 @@ class Dreaming(MethodPluginABC):
 
         self.dreamed_data_buffer = {}
 
-        in_shape = kernels_centers.shape[0]
+        in_shape = self.in_shape
+        batch_size = self.no_samples_per_class
+        steps = self.steps
+        lambda_l2 = self.lambda_l2
+        lambda_tv = self.lambda_tv
+        dreaming_lr = self.dreaming_lr
 
         for class_idx, (mean, cov) in enumerate(zip(kernels_centers, sigmas)):
-            mean = mean.to(dtype=torch.float32)
-            cov = cov.to(dtype=torch.float32)
-
-            batch_size = no_samples_per_class
             dreamed_images = torch.randn((batch_size, *in_shape), requires_grad=True)
-
-            optimizer = torch.optim.Adam([dreamed_images], lr=lr)
+            optimizer = torch.optim.Adam([dreamed_images], lr=dreaming_lr)
 
             for _ in range(steps):
                 optimizer.zero_grad()
@@ -134,6 +147,31 @@ class Dreaming(MethodPluginABC):
             dreamed_images = dreamed_images.detach()
 
             self.dreamed_data_buffer[class_idx] = dreamed_images
+
+    def visualize_dreamed_data(self, num_classes=2, num_samples=5):
+        """
+        Visualizes a few samples of dreamed data from the first two classes.
+        
+        Args:
+            num_classes (int): Number of classes to visualize (default: 2).
+            num_samples (int): Number of samples per class to visualize (default: 5).
+        """
+        # Select only the first `num_classes` entries
+        selected_classes = list(self.dreamed_data_buffer.keys())[:num_classes]
+
+        fig, axes = plt.subplots(num_classes, num_samples, figsize=(num_samples * 2, num_classes * 2))
+
+        for row, class_idx in enumerate(selected_classes):
+            dreamed_images = self.dreamed_data_buffer[class_idx]
+            for col in range(num_samples):
+                img = dreamed_images[col].squeeze(0).numpy()  # Remove channel dim for grayscale
+                axes[row, col].imshow(img, cmap='gray')
+                axes[row, col].axis('off')
+                if col == 0:
+                    axes[row, col].set_title(f"Class {class_idx}")
+
+        plt.suptitle("Dreamed Data Visualization (First 2 Classes)")
+        plt.show()
     
 
     def forward(self, x, y, loss, preds):
@@ -145,29 +183,22 @@ class Dreaming(MethodPluginABC):
             y (torch.Tensor): Target tensor.
             loss (torch.Tensor): Initial loss.
             preds (torch.Tensor): Model predictions.
-        
+
         Returns:
             tuple: Updated loss and predictions.
         """
         if self.task_id > 0:
-            penultimate_activations_current = self.module.activations[-1]
-            _ = self.old_module(x)
-            penultimate_activations_old = self.old_module.activations[-1].clone().detach()
+            for class_idx in self.dreamed_data_buffer.keys():
+                
+                dreamed_images = self.dreamed_data_buffer[class_idx]
 
-            kernels_centers = self.params_buffer["kernels_centers_head"]
-            sigma = self.params_buffer["log_shapes_head"].exp()
+                _ = self.old_module(dreamed_images)
+                penultimate_activations_old = self.old_module.activations[-1].detach()
 
-            batch_size = x.size(0)
-            out_features, in_features = kernels_centers.shape
-           
-            c = kernels_centers.expand(batch_size, out_features, in_features)
-            sigma = sigma.expand(batch_size, out_features, in_features)
-            penultimate_activations_old = penultimate_activations_old.view(batch_size, 1, in_features)
-            penultimate_activations_current = penultimate_activations_current.view(batch_size, 1, in_features)
+                _ = self.module(dreamed_images)
+                penultimate_activations_curr = self.module.activations[-1]
 
-            weight_factor = torch.exp(-((penultimate_activations_old - c) / sigma) ** 2)
-            weighted_diff = weight_factor * (penultimate_activations_old - penultimate_activations_current)
-            reg_loss = self.alpha * torch.norm(weighted_diff, p=2)
-            loss += reg_loss
-        
+                reg_loss = torch.norm(penultimate_activations_curr - penultimate_activations_old, p=2, dim=1).mean()
+                loss += self.alpha * reg_loss
+
         return loss, preds
