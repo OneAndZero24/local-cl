@@ -12,3 +12,4 @@ plugins:
     lambda_l2: 0.01
     lambda_tv: 0.001
     in_shape: (1,32,32)
+    diversity_weight: 0.05

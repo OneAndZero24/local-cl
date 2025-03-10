@@ -24,7 +24,7 @@ class Dreaming(MethodPluginABC):
 
     def __init__(self, alpha: float, no_samples_per_class: int = 32, steps: int = 500,
                  dreaming_lr: float = 0.1, lambda_l2: float = 0.01, lambda_tv: float = 0.001,
-                 in_shape: Tuple[int] = (1,32,32)):
+                 in_shape: Tuple[int] = (1,32,32), diversity_weight: float = 0.05):
         """
         Initializes the dreaming method.
 
@@ -41,6 +41,7 @@ class Dreaming(MethodPluginABC):
         self.dreaming_lr = dreaming_lr
         self.lambda_l2 = lambda_l2
         self.lambda_tv = lambda_tv
+        self.diversity_weight = diversity_weight
         self.in_shape = ast.literal_eval(in_shape)
 
         self.alpha = alpha
@@ -88,20 +89,15 @@ class Dreaming(MethodPluginABC):
 
     def generate_dreamed_data(self):
         """
-        Generate dreamed images such that their activations match stored Gaussian statistics 
-        in the last classification layer while also ensuring realism with L2 and TV losses.
-
-        Args:
-            no_samples_per_class (int): Number of synthesized samples per class.
-            steps (int): Number of optimization steps.
-            lr (float): Learning rate for optimization.
-            lambda_l2 (float): Weight for L2 prior loss.
-            lambda_tv (float): Weight for total variation loss.
+        Generate diverse and realistic dreamed images by ensuring:
+        - Activation alignment with Gaussian centers.
+        - Sufficient intra-class diversity.
+        - Proper class separation.
         """
 
         self.old_module.eval()
         kernels_centers = self.params_buffer["kernels_centers_head"]
-        sigmas = self.params_buffer["log_shapes_head"].exp()
+        sigmas = self.params_buffer["log_shapes_head"].exp()  
 
         self.dreamed_data_buffer = {}
 
@@ -111,9 +107,11 @@ class Dreaming(MethodPluginABC):
         lambda_l2 = self.lambda_l2
         lambda_tv = self.lambda_tv
         dreaming_lr = self.dreaming_lr
+        diversity_weight = self.diversity_weight
 
         for class_idx, (mean, cov) in enumerate(zip(kernels_centers, sigmas)):
             dreamed_images = torch.randn((batch_size, *in_shape), requires_grad=True)
+
             optimizer = torch.optim.Adam([dreamed_images], lr=dreaming_lr)
 
             for _ in range(steps):
@@ -129,23 +127,30 @@ class Dreaming(MethodPluginABC):
                 mean_loss = F.mse_loss(act_mean, mean)
                 cov_loss = F.mse_loss(act_var, cov)
 
-                # L2 prior loss (keeps images from drifting too far)
+                # Mahalanobis Distance (Relaxed)
+                diff = stored_activations - mean
+                mahalanobis_loss = torch.mean((diff / (cov + 1e-6)) ** 2)  # Add small value to prevent collapse
+
+                # L2 Prior (Keeps values reasonable)
                 l2_loss = torch.norm(dreamed_images, p=2) / batch_size
 
-                # Total variation loss (removes noise & artifacts)
+                # Total Variation Loss (Smoothness)
                 tv_loss = torch.mean(torch.abs(dreamed_images[:, :, :-1, :] - dreamed_images[:, :, 1:, :])) + \
                         torch.mean(torch.abs(dreamed_images[:, :, :, :-1] - dreamed_images[:, :, :, 1:]))
 
-                # Total loss: Activation match + Regularization
-                total_loss = mean_loss + cov_loss + lambda_l2 * l2_loss + lambda_tv * tv_loss
+                # Contrastive Diversity Loss
+                diversity_loss = -torch.mean(torch.norm(stored_activations.unsqueeze(1) - stored_activations.unsqueeze(0), dim=-1))
+
+                # Final Loss
+                total_loss = mean_loss + cov_loss + mahalanobis_loss + lambda_l2 * l2_loss + lambda_tv * tv_loss + \
+                    diversity_weight * diversity_loss
 
                 # Backpropagate
                 total_loss.backward()
                 optimizer.step()
 
-            # Store the dreamed data in buffer
+            # Store dreamed samples
             dreamed_images = dreamed_images.detach()
-
             self.dreamed_data_buffer[class_idx] = dreamed_images
 
     def visualize_dreamed_data(self, num_classes=2, num_samples=5):
@@ -158,7 +163,7 @@ class Dreaming(MethodPluginABC):
         """
         # Select only the first `num_classes` entries
         selected_classes = list(self.dreamed_data_buffer.keys())[:num_classes]
-
+        
         fig, axes = plt.subplots(num_classes, num_samples, figsize=(num_samples * 2, num_classes * 2))
 
         for row, class_idx in enumerate(selected_classes):
@@ -170,7 +175,7 @@ class Dreaming(MethodPluginABC):
                 if col == 0:
                     axes[row, col].set_title(f"Class {class_idx}")
 
-        plt.suptitle("Dreamed Data Visualization (First 2 Classes)")
+        plt.suptitle("Dreamed Data Visualization")
         plt.show()
     
 
@@ -188,17 +193,23 @@ class Dreaming(MethodPluginABC):
             tuple: Updated loss and predictions.
         """
         if self.task_id > 0:
+            feature_distillation_loss = 0.0
+            num_layers = len(self.old_module.activations)
+
             for class_idx in self.dreamed_data_buffer.keys():
-                
                 dreamed_images = self.dreamed_data_buffer[class_idx]
 
                 _ = self.old_module(dreamed_images)
-                penultimate_activations_old = self.old_module.activations[-1].detach()
+                old_activations = [act.detach() for act in self.old_module.activations]
 
                 _ = self.module(dreamed_images)
-                penultimate_activations_curr = self.module.activations[-1]
+                curr_activations = self.module.activations
 
-                reg_loss = torch.norm(penultimate_activations_curr - penultimate_activations_old, p=2, dim=1).mean()
-                loss += self.alpha * reg_loss
+                for old_act, curr_act in zip(old_activations, curr_activations):
+                    feature_distillation_loss += torch.norm(old_act - curr_act, p=2)
+
+            feature_distillation_loss = feature_distillation_loss / (num_layers * len(self.dreamed_data_buffer))
+
+            loss = loss + self.alpha * feature_distillation_loss
 
         return loss, preds

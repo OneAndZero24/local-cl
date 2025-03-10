@@ -5,12 +5,13 @@ first_lr: 0.01
 lr: 0.01
 plugins:
   - _target_: method.RBFNeuronOutReg
-    alpha: 0.8
+    alpha: 0.99999999
   - _target_: method.Dreaming
-    alpha: 0.01
-    no_samples_per_class: 32
-    steps: 500
+    alpha: 100.0
+    no_samples_per_class: 256
+    steps: 1000
     dreaming_lr: 0.1
     lambda_l2: 0.01
     lambda_tv: 0.001
     in_shape: (1,32,32)
+    diversity_weight: 0.05
