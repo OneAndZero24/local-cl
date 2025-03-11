@@ -108,7 +108,7 @@ class PenultimateLayerReg(MethodPluginABC):
             penultimate_activations_current = penultimate_activations_current.view(batch_size, 1, in_features)
 
             weight_factor = torch.exp(-((penultimate_activations_old - c) / sigma) ** 2)
-            weighted_diff = weight_factor * (penultimate_activations_old - penultimate_activations_current)
+            weighted_diff = weight_factor * (penultimate_activations_old - penultimate_activations_current)**2
             reg_loss = self.alpha * torch.norm(weighted_diff, p=2)
             loss += reg_loss
         
