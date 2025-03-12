@@ -90,8 +90,7 @@ class EWC(MethodPluginABC):
         self.data_buffer.add((x, y))
 
         if self.task_id > 0:
-            loss *= self.alpha
-            loss += (1-self.alpha)*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
+            loss += self.alpha*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
         return loss, preds
 
 
