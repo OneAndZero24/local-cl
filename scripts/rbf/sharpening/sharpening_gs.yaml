@@ -75,6 +75,10 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
+  method.criterion_scale:
+    distribution: uniform
+    min: 1e-8
+    max: 1.0
   method.plugins.0._target_:
     value: method.Sharpening
   method.plugins.0.alpha: 

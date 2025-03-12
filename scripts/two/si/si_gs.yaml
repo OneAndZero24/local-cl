@@ -67,6 +67,10 @@ parameters:
     value: method.Composer
   method.criterion: 
     value: MahalanobisDistanceLoss
+  method.criterion_scale:
+    distribution: uniform
+    min: 1e-8
+    max: 1.0
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
