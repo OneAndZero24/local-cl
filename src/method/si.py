@@ -107,8 +107,7 @@ class SI(MethodPluginABC):
                     self.omega[name] += p.grad * (-delta_param) / (delta_param ** 2 + self.eps)
                     self.prev_param[name] = p.data.clone().detach()
 
-        loss *= self.alpha
-        loss += (1-self.alpha)*param_change_loss(self.module, self.importance, params_buffer)
+        loss += self.alpha*param_change_loss(self.module, self.importance, params_buffer)
         return loss, preds
     
 

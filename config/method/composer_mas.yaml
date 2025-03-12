@@ -3,6 +3,8 @@ _target_: method.Composer
 criterion: CrossEntropyLoss
 first_lr: 0.001
 lr: 0.001
+criterion_scale: 1e-5
 plugins:
   - _target_: method.MAS
     alpha: 0.4
+    lamb: 0.5

@@ -18,13 +18,15 @@ class EWC(MethodPluginABC):
     penalizing changes to important parameters for previously learned tasks.
 
     Attributes:
+        alpha (float): The regularization strength.
+        lamb (float): The scaling factor that balances the importance between the old and current tasks.
         task_id (int or None): The ID of the current task.
         data_buffer (list): A buffer to store data samples.
         params_buffer (dict): A buffer to store model parameters.
         fisher_diag (dict): A dictionary to store the Fisher Information diagonal values.
 
     Methods:
-        __init__(alpha: float): Initializes the EWC method.
+        __init__(alpha: float, lamb: float): Initializes the EWC method.
         setup_task(task_id: int): Sets up the task with the given task ID. 
         forward(x, y, loss, preds): Forward.
         _get_fisher_diag(): Compute the diagonal of the Fisher Information Matrix for the model parameters.
@@ -32,18 +34,21 @@ class EWC(MethodPluginABC):
 
 
     def __init__(self, 
-        alpha: float
+        alpha: float,
+        lamb: float = 0.5
     ):
         """
         Initializes the EWC (Elastic Weight Consolidation) method.
 
         Args:
             alpha (float): The regularization strength.
+            lamb (float): The scaling factor that balances the importance between the old and current tasks. 
         """
 
         super().__init__()
         self.task_id = None
         self.alpha = alpha
+        self.lamb = lamb
         log.info(f"Initialized EWC with alpha={alpha}")
 
         self.data_buffer = set()
@@ -91,8 +96,7 @@ class EWC(MethodPluginABC):
         self.data_buffer.add((x, y))
 
         if self.task_id > 0:
-            loss *= self.alpha
-            loss += (1-self.alpha)*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
+            loss += self.alpha*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
         return loss, preds
 
 
@@ -125,7 +129,8 @@ class EWC(MethodPluginABC):
 
             for n, p in self.module.named_parameters():
                 if p.requires_grad:
-                    fisher[n].data += p.grad.data ** 2 / len(self.data_buffer)
+                    fisher[n].data *= self.lamb
+                    fisher[n].data += (1-self.lamb)*(p.grad.data ** 2 / len(self.data_buffer))
 
         if prev_state:
             self.module.train()
