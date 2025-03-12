@@ -121,7 +121,7 @@ class Composer:
         """
 
         if self.gamma is not None and self.reg_type is not None:
-            loss = (1-self.gamma)*loss+self.gamma*regularization(self.module.activations, self.reg_type)
+            loss += self.gamma*regularization(self.module.activations, self.reg_type)
         return loss
 
 
