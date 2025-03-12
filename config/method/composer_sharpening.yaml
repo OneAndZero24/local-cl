@@ -3,6 +3,7 @@ _target_: method.Composer
 criterion: CrossEntropyLoss
 first_lr: 0.01
 lr: 0.01
+criterion_scale: 1e-5
 plugins:
   - _target_: method.Sharpening
     K: 64
