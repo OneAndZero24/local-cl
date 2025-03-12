@@ -67,8 +67,9 @@ class EWC(MethodPluginABC):
 
         if task_id > 0:
             for name, p in deepcopy(list(self.module.named_parameters())):
-                p.requires_grad = False
-                self.params_buffer[name] = p     
+                if p.requires_grad:
+                    p.requires_grad = False
+                    self.params_buffer[name] = p     
             self.fisher_diag = self._get_fisher_diag()
         self.data_buffer = set()
 
@@ -123,7 +124,8 @@ class EWC(MethodPluginABC):
             negloglikelihood.backward()
 
             for n, p in self.module.named_parameters():
-                fisher[n].data += p.grad.data ** 2 / len(self.data_buffer)
+                if p.requires_grad:
+                    fisher[n].data += p.grad.data ** 2 / len(self.data_buffer)
 
         if prev_state:
             self.module.train()
