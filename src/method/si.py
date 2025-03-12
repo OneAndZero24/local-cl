@@ -100,11 +100,12 @@ class SI(MethodPluginABC):
 
         params_buffer = {}
         for name, p in self.module.named_parameters():
-            params_buffer[name] = pad_zero_dim0(self.prev_param[name], p.shape)
-            if p.requires_grad and p.grad is not None:
-                delta_param = p.data - params_buffer[name]
-                self.omega[name] += p.grad * (-delta_param) / (delta_param ** 2 + self.eps)
-                self.prev_param[name] = p.data.clone().detach()
+            if p.requires_grad:
+                params_buffer[name] = pad_zero_dim0(self.prev_param[name], p.shape)
+                if p.grad is not None:
+                    delta_param = p.data - params_buffer[name]
+                    self.omega[name] += p.grad * (-delta_param) / (delta_param ** 2 + self.eps)
+                    self.prev_param[name] = p.data.clone().detach()
 
         loss *= self.alpha
         loss += (1-self.alpha)*param_change_loss(self.module, self.importance, params_buffer)
