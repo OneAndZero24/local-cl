@@ -7,3 +7,4 @@ criterion_scale: 1e-5
 plugins:
   - _target_: method.MAS
     alpha: 0.4
+    lamb: 0.5

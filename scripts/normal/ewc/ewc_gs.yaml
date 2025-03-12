@@ -67,6 +67,10 @@ parameters:
     distribution: uniform      
     min: 1000
     max: 3000
+  method.plugins.0.lamb:
+    distribution: uniform
+    min: 0.1
+    max: 0.9
 
 
 command:
