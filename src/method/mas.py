@@ -19,13 +19,14 @@ class MAS(MethodPluginABC):
 
     Attributes:
         alpha (float): A hyperparameter that balances the importance of the new task loss and the parameter change loss.
+        lamb (float): The scaling factor that balances the importance between the old and current tasks. 
         task_id (int): The identifier for the current task.
         data_buffer (list): A buffer to store data samples.
         params_buffer (dict): A buffer to store the parameters of the model.
         importance (dict): A dictionary to store the importance of each parameter.
 
     Methods:
-        __init__(alpha: float):
+        __init__(alpha: float, lamb: float):
             Initializes the MAS plugin with the given alpha value.
         setup_task(task_id: int):
             Sets up the task by storing the task ID, freezing the parameters, and computing their importance.
@@ -36,17 +37,20 @@ class MAS(MethodPluginABC):
     """
 
     def __init__(self, 
-        alpha: float
+        alpha: float,
+        lamb: float = 0.5
     ):
         """
         Initializes the instance of the class.
 
         Args:
             alpha (float): A floating-point value representing the alpha parameter.
+            lamb (float): The scaling factor that balances the importance between the old and current tasks. 
 
         Attributes:
             task_id (None): An attribute to store the task ID, initialized to None.
             alpha (float): Stores the value of the alpha parameter.
+            lamb (float): The scaling factor that balances the importance between the old and current tasks. 
             data_buffer (list): A list to buffer data, initialized as an empty list.
             params_buffer (dict): A dictionary to buffer parameters, initialized as an empty dictionary.
             importance (dict): A dictionary to store importance values, initialized as an empty dictionary.
@@ -55,6 +59,7 @@ class MAS(MethodPluginABC):
         super().__init__()
         self.task_id = None
         self.alpha = alpha
+        self.lamb = lamb
         log.info(f"Initialized MAS with alpha={alpha}")
 
         self.data_buffer = set()
@@ -133,7 +138,8 @@ class MAS(MethodPluginABC):
             
             for name, param in self.module.named_parameters():
                 if param.requires_grad and param.grad is not None:
-                    importance[name] += param.grad.abs() * len(inputs)
+                    importance[name] *= self.lamb
+                    importance[name] += (1-self.lamb) * param.grad.abs() * len(inputs)
 
         for name in importance:
             importance[name] /= len(self.data_buffer)
