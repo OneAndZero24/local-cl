@@ -79,8 +79,8 @@ parameters:
     value: method.EWC
   method.plugins.0.alpha: 
     distribution: uniform      
-    min: 0.1
-    max: 1.0
+    min: 1000
+    max: 3000
 
 
 command:

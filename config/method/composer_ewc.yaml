@@ -5,4 +5,4 @@ first_lr: 0.001
 lr: 0.001
 plugins:
   - _target_: method.EWC
-    alpha: 0.4
+    alpha: 2000
