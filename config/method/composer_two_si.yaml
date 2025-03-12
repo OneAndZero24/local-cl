@@ -7,4 +7,4 @@ plugins:
   - _target_: method.RBFNeuronOutReg
     alpha: 0.4
   - _target_: method.SI
-    alpha: 0.4
+    alpha: 2048
