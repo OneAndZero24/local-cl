@@ -89,6 +89,5 @@ class LwF(MethodPluginABC):
             with torch.no_grad():
                 old_preds = self.old_module(x)
 
-            loss *= self.alpha
-            loss += distillation_loss(preds, old_preds, self.T)*(1-self.alpha)
+            loss += self.alpha*distillation_loss(preds, old_preds, self.T)
         return loss, preds

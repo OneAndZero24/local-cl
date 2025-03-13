@@ -24,6 +24,7 @@ class Composer:
         optimizer (Optional[optim.Optimizer]): The optimizer for training.
         first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
+        criterion_scale (float): The regularization strength of the used criterion loss function.
         reg_type (Optional[str]): The type of regularization to apply.
         gamma (Optional[float]): The regularization strength.
         clipgrad (Optional[float]): The gradient clipping value.
@@ -49,6 +50,7 @@ class Composer:
         criterion: str, 
         first_lr: float, 
         lr: float,
+        criterion_scale: float,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         clipgrad: Optional[float]=None,
@@ -77,6 +79,7 @@ class Composer:
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr
+        self.criterion_scale = criterion_scale
         self.reg_type = reg_type
         self.gamma = gamma
         self.clipgrad = clipgrad
@@ -118,7 +121,7 @@ class Composer:
         """
 
         if self.gamma is not None and self.reg_type is not None:
-            loss = (1-self.gamma)*loss+self.gamma*regularization(self.module.activations, self.reg_type)
+            loss += self.gamma*regularization(self.module.activations, self.reg_type)
         return loss
 
 
@@ -154,6 +157,7 @@ class Composer:
 
         preds = self.module(x)
         loss = self.criterion(preds, y)
+        loss *= self.criterion_scale
         loss = self._add_reg(loss)
 
         old_loss = loss

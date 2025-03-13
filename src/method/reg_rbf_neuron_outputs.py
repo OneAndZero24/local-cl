@@ -131,9 +131,6 @@ class RBFNeuronOutReg(MethodPluginABC):
                             # Retrieve old stored parameters
                             _, C_old, Sigma_old = get_old_rbf_layer_params("head")
 
-                            assert self.alpha >= 0.0 and self.alpha <= 1.0, f"Alpha parameter should be within [0,1] interval"
-
-                            loss *= (1-self.alpha)
                             loss += self.alpha * self.compute_head_integral_gaussian(
                                 C_old=C_old, C_curr=C_curr,
                                 Sigma_old=Sigma_old, Sigma_curr=Sigma_curr

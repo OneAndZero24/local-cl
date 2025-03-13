@@ -3,8 +3,10 @@ _target_: method.Composer
 criterion: MahalanobisDistanceLoss
 first_lr: 0.001
 lr: 0.001
+criterion_scale: 1e-5
 plugins:
   - _target_: method.RBFNeuronOutReg
     alpha: 0.4
   - _target_: method.EWC
-    alpha: 0.4
+    alpha: 2000
+    lamb: 0.5
