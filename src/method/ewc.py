@@ -128,7 +128,7 @@ class EWC(MethodPluginABC):
             negloglikelihood.backward()
 
             for n, p in self.module.named_parameters():
-                if p.requires_grad:
+                if p.requires_grad and (p.grad is not None):
                     fisher[n].data *= self.lamb
                     fisher[n].data += (1-self.lamb)*(p.grad.data ** 2 / len(self.data_buffer))
 
