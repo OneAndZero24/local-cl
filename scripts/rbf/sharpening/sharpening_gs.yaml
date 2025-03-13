@@ -91,8 +91,8 @@ parameters:
     max: 0.4
   method.plugins.0.K: 
     distribution: int_uniform      
-    min: 64
-    max: 1024
+    min: 16
+    max: 108
 
 
 command:
