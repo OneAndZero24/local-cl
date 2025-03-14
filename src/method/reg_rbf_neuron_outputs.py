@@ -116,7 +116,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
                             # Retrieve old stored parameters
                             W_old, C_old, Sigma_old = get_old_rbf_layer_params(idx)
-
+    
                             # Add regularization loss
                             loss += self.alpha * self.compute_hidden_integral_gaussian(
                                 W_old=W_old, W_curr=W_curr,
@@ -126,13 +126,12 @@ class RBFNeuronOutReg(MethodPluginABC):
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFHeadLayer":
+                    if type(layer).__name__ == "SingleRBFHeadLayer":
                             # Get current parameters
                             _, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses)
 
                             # Retrieve old stored parameters
                             _, C_old, Sigma_old = get_old_rbf_layer_params("head")
-
                             loss += self.alpha * self.compute_head_integral_gaussian(
                                 C_old=C_old, C_curr=C_curr,
                                 Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
