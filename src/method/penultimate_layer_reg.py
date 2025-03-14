@@ -1,8 +1,8 @@
 import logging
 import torch
 from src.method.method_plugin_abc import MethodPluginABC
-
 from copy import deepcopy
+import warnings
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -10,7 +10,7 @@ log.setLevel(logging.INFO)
 class PenultimateLayerReg(MethodPluginABC):
     """
     This class applies regularization to the penultimate layer to mitigate feature drift.
-    It is relevant only when RBFHead is used.
+    It is relevant only when SingleRBFHead/MultiRBFHead is used.
     
     Attributes:
         params_buffer (dict): Stores model parameters for regularization.
@@ -24,6 +24,13 @@ class PenultimateLayerReg(MethodPluginABC):
         Args:
             alpha (float): Regularization coefficient.
         """
+        warnings.warn(
+            "PenultimateLayerReg is deprecated and may be removed in future versions. "
+            "Consider using updated methods for regularization.",
+            DeprecationWarning,
+            2
+        )
+        
         super().__init__()
         self.params_buffer = {}
 
@@ -38,7 +45,14 @@ class PenultimateLayerReg(MethodPluginABC):
         Args:
             task_id (int): Unique task identifier.
         """
-        
+        # Warning about deprecation
+        warnings.warn(
+            "PenultimateLayerReg is deprecated and may be removed in future versions. "
+            "Consider using updated methods for regularization.",
+            DeprecationWarning,
+            2
+        )
+
         def extract_layer_params(layer, idx, classes=None):
             if type(layer).__name__ in ["RBFLayer", "RBFHeadLayer"]:
                 weights = layer.weights.detach().clone() if classes is None else None

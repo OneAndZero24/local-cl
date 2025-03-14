@@ -68,8 +68,10 @@ class RBFNeuronOutReg(MethodPluginABC):
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFHeadLayer":
+                    if type(layer).__name__ == "SingleRBFHeadLayer":
                         self.params_buffer.update(get_rbf_layer_params(layer, "head", old_nclasses))
+                    else:
+                        raise ValueError("Not implemented yet!")
 
 
     def forward(self, x, y, loss, preds):

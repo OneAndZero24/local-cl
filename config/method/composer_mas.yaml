@@ -8,3 +8,4 @@ plugins:
   - _target_: method.MAS
     alpha: 0.4
     lamb: 0.5
+    head_opt: True

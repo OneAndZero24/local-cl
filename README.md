@@ -28,7 +28,8 @@
 | ------ | -- |
 | Local | ✅ |
 | RBF | ✅ |
-| RBFHead | ✅ |
+| SingleRBFHead | ✅ |
+| MultiRBFHead | ✅ |
 | KAN | ❌ |
 | LocalHead | ⭕️ |
 | LocalConv2D | ⭕️ |
@@ -40,7 +41,7 @@
 
 ## Results
 **SplitMNIST**
-| Method | Normal | RBF | RBF Head + Reg |
+| Method | Normal | RBF | SingleRBFHead + Reg |
 | ------ | ------ | --- | -------- |
 | Naive | *19.97* | 19.95 | |
 | LwF | ***23.23*** | NA | NA |
