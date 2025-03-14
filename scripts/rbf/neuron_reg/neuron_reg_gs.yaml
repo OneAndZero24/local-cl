@@ -40,7 +40,7 @@ parameters:
   model.head_type: 
     value: RBFHead
   model.layers: 
-    value: ["RBF", "RBF"]
+    value: ["Normal", "Normal"]
   model.num_kernels:
     distribution: int_uniform
     min: 50
@@ -56,7 +56,7 @@ parameters:
     min: 100
     max: 3000
   model.local_linear:
-    values: [True, False]
+    values: [False]
   model.normalization:
     values: [True, False]
 

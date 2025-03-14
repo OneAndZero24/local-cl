@@ -1,0 +1,15 @@
+_partial_: True
+_target_: method.Composer
+criterion: MahalanobisDistanceLoss
+first_lr: 0.01
+lr: 0.01
+plugins:
+  - _target_: method.Dreaming
+    alpha: 0.4
+    no_samples_per_class: 16
+    steps: 10000
+    dreaming_lr: 0.1
+    lambda_l2: 0.01
+    lambda_tv: 0.001
+    in_shape: (1,32,32)
+    diversity_weight: 0.05
