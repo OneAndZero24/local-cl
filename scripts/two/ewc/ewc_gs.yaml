@@ -91,10 +91,6 @@ parameters:
     distribution: uniform      
     min: 1000
     max: 3000
-  method.plugins.1.lamb:
-    distribution: uniform
-    min: 0.1
-    max: 0.9
   method.plugins.1.head_opt:
     value: True
 

@@ -7,5 +7,4 @@ criterion_scale: 1.0
 plugins:
   - _target_: method.EWC
     alpha: 2000
-    lamb: 0.5
     head_opt: True

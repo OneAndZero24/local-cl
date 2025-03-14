@@ -1,11 +1,10 @@
 _partial_: True
 _target_: method.Composer
-criterion: CrossEntropyLoss
+criterion: MahalanobisDistanceLoss
 first_lr: 0.001
 lr: 0.001
-criterion_scale: 1e-5
+criterion_scale: 0.1
 plugins:
   - _target_: method.MAS
-    alpha: 0.4
-    lamb: 0.5
+    alpha: 0.9
     head_opt: True
