@@ -24,9 +24,10 @@ class MAS(MethodPluginABC):
         data_buffer (list): A buffer to store data samples.
         params_buffer (dict): A buffer to store the parameters of the model.
         importance (dict): A dictionary to store the importance of each parameter.
+        head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
 
     Methods:
-        __init__(alpha: float, lamb: float):
+        __init__(alpha: float, lamb: float, head_opt: bool):
             Initializes the MAS plugin with the given alpha value.
         setup_task(task_id: int):
             Sets up the task by storing the task ID, freezing the parameters, and computing their importance.
@@ -38,7 +39,8 @@ class MAS(MethodPluginABC):
 
     def __init__(self, 
         alpha: float,
-        lamb: float = 0.5
+        lamb: float = 0.5,
+        head_opt: bool = True
     ):
         """
         Initializes the instance of the class.
@@ -46,6 +48,7 @@ class MAS(MethodPluginABC):
         Args:
             alpha (float): A floating-point value representing the alpha parameter.
             lamb (float): The scaling factor that balances the importance between the old and current tasks. 
+            head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
 
         Attributes:
             task_id (None): An attribute to store the task ID, initialized to None.
@@ -60,6 +63,7 @@ class MAS(MethodPluginABC):
         self.task_id = None
         self.alpha = alpha
         self.lamb = lamb
+        self.head_opt = head_opt
         log.info(f"Initialized MAS with alpha={alpha}")
 
         self.data_buffer = set()
@@ -86,6 +90,8 @@ class MAS(MethodPluginABC):
         self.task_id = task_id
         if task_id > 0:
             for name, p in deepcopy(list(self.module.named_parameters())):
+                if not self.head_opt and "head" in name:
+                    continue
                 if p.requires_grad:
                     p.requires_grad = False
                     self.params_buffer[name] = p    
@@ -110,7 +116,7 @@ class MAS(MethodPluginABC):
         self.data_buffer.add((x, y))
 
         if self.task_id > 0:
-            loss += self.alpha*param_change_loss(self.module, self.importance, self.params_buffer)
+            loss += self.alpha*param_change_loss(self.module, self.importance, self.params_buffer, self.head_opt)
         return loss, preds
     
 
@@ -137,6 +143,8 @@ class MAS(MethodPluginABC):
             loss.backward()
             
             for name, param in self.module.named_parameters():
+                if not self.head_opt and "head" in name:
+                    continue
                 if param.requires_grad and param.grad is not None:
                     importance[name] *= self.lamb
                     importance[name] += (1-self.lamb) * param.grad.abs() * len(inputs)

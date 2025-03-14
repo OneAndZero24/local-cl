@@ -24,9 +24,10 @@ class EWC(MethodPluginABC):
         data_buffer (list): A buffer to store data samples.
         params_buffer (dict): A buffer to store model parameters.
         fisher_diag (dict): A dictionary to store the Fisher Information diagonal values.
+        head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
 
     Methods:
-        __init__(alpha: float, lamb: float): Initializes the EWC method.
+        __init__(alpha: float, lamb: float, head_opt: bool): Initializes the EWC method.
         setup_task(task_id: int): Sets up the task with the given task ID. 
         forward(x, y, loss, preds): Forward.
         _get_fisher_diag(): Compute the diagonal of the Fisher Information Matrix for the model parameters.
@@ -35,20 +36,23 @@ class EWC(MethodPluginABC):
 
     def __init__(self, 
         alpha: float,
-        lamb: float = 0.5
+        lamb: float = 0.5,
+        head_opt: bool = True
     ):
         """
         Initializes the EWC (Elastic Weight Consolidation) method.
 
         Args:
             alpha (float): The regularization strength.
-            lamb (float): The scaling factor that balances the importance between the old and current tasks. 
+            lamb (float): The scaling factor that balances the importance between the old and current tasks.
+            head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
         """
 
         super().__init__()
         self.task_id = None
         self.alpha = alpha
         self.lamb = lamb
+        self.head_opt = head_opt
         log.info(f"Initialized EWC with alpha={alpha}")
 
         self.data_buffer = set()
@@ -72,6 +76,8 @@ class EWC(MethodPluginABC):
 
         if task_id > 0:
             for name, p in deepcopy(list(self.module.named_parameters())):
+                if not self.head_opt and "head" in name:
+                    continue
                 if p.requires_grad:
                     p.requires_grad = False
                     self.params_buffer[name] = p     
@@ -96,7 +102,7 @@ class EWC(MethodPluginABC):
         self.data_buffer.add((x, y))
 
         if self.task_id > 0:
-            loss += self.alpha*param_change_loss(self.module, self.fisher_diag, self.params_buffer)
+            loss += self.alpha*param_change_loss(self.module, self.fisher_diag, self.params_buffer, self.head_opt)
         return loss, preds
 
 
@@ -115,6 +121,8 @@ class EWC(MethodPluginABC):
         params = {name: p for name, p in self.module.named_parameters() if p.requires_grad}
         fisher = {}
         for n, p in deepcopy(params).items():
+            if not self.head_opt and "head" in n:
+                    continue
             p.data.zero_()
             fisher[n] = torch.autograd.Variable(p.data)
 
@@ -129,6 +137,8 @@ class EWC(MethodPluginABC):
 
             for n, p in self.module.named_parameters():
                 if p.requires_grad and (p.grad is not None):
+                    if not self.head_opt and "head" in n:
+                        continue
                     fisher[n].data *= self.lamb
                     fisher[n].data += (1-self.lamb)*(p.grad.data ** 2 / len(self.data_buffer))
 

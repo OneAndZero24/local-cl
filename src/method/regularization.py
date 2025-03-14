@@ -23,7 +23,7 @@ def distillation_loss(outputs_new, outputs_old, T=2):
     return prob_old.mul(-1*torch.log(prob_new)).sum(1).mean()*T*T
 
 
-def param_change_loss(model, multiplier, params_buffer):
+def param_change_loss(model, multiplier, params_buffer, head_opt):
     """
     Computes the parameter change loss for a given model.
     This function calculates the loss based on the difference between the current 
@@ -35,7 +35,8 @@ def param_change_loss(model, multiplier, params_buffer):
         multiplier (dict): A dictionary where keys are parameter names and values 
                            are the corresponding multipliers for the loss calculation.
         params_buffer (dict): A dictionary where keys are parameter names and values 
-                              are the previous parameter values to compare against.
+                              are the previous parameter values to compare against.z
+        head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
                               
     Returns:
         torch.Tensor: The computed parameter change loss.
@@ -43,6 +44,8 @@ def param_change_loss(model, multiplier, params_buffer):
 
     loss = 0
     for name, p in model.named_parameters():
+        if not head_opt and "head" in name:
+            continue
         if p.requires_grad:
             loss += (multiplier[name] * (p - params_buffer[name]) ** 2).sum()
     return loss

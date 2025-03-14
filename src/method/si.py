@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 
 import torch
 
@@ -23,9 +22,10 @@ class SI(MethodPluginABC):
         prev_param (dict): A dictionary to store the previous parameters of the model.
         omega (dict): A dictionary to store the importance weights of the parameters.
         importance (dict): A dictionary to store the accumulated importance of the parameters.
+        head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
 
     Methods:
-        __init__(alpha: float, eps: float = 1e-6):
+        __init__(alpha: float, eps: float = 1e-6, head_opt: bool = True):
             Initializes the SI method with the given regularization strength and epsilon value.
         setup_task(task_id: int):
             Sets up the task by initializing or updating the importance weights and previous parameters.
@@ -37,7 +37,8 @@ class SI(MethodPluginABC):
 
     def __init__(self,
         alpha: float,
-        eps: float = 1e-6
+        eps: float = 1e-6,
+        head_opt: bool = True
     ):
         """
         Initialize the instance with the given parameters.
@@ -45,12 +46,14 @@ class SI(MethodPluginABC):
         Args:
             alpha (float): A parameter for the method.
             eps (float, optional): A small value to avoid division by zero. Defaults to 1e-6.
+            head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
         """
     
         super().__init__()
         self.task_id = None
         self.alpha = alpha
         self.eps = eps
+        self.head_opt = head_opt
         log.info(f"Initialized SI with alpha={alpha}")
 
         self.prev_param = {}
@@ -76,6 +79,8 @@ class SI(MethodPluginABC):
         self.task_id = task_id
         if task_id == 0:
             for name, p in self.module.named_parameters():
+                if not self.head_opt and "head" in name:
+                    continue
                 if p.requires_grad:
                     self.prev_param[name] = p.data.clone().detach()
                     self.omega[name] = torch.zeros_like(p)
@@ -100,6 +105,8 @@ class SI(MethodPluginABC):
 
         params_buffer = {}
         for name, p in self.module.named_parameters():
+            if not self.head_opt and "head" in name:
+                continue
             if p.requires_grad:
                 params_buffer[name] = pad_zero_dim0(self.prev_param[name], p.shape)
                 if p.grad is not None:
@@ -107,7 +114,7 @@ class SI(MethodPluginABC):
                     self.omega[name] += p.grad * (-delta_param) / (delta_param ** 2 + self.eps)
                     self.prev_param[name] = p.data.clone().detach()
 
-        loss += self.alpha*param_change_loss(self.module, self.importance, params_buffer)
+        loss += self.alpha*param_change_loss(self.module, self.importance, params_buffer, self.head_opt)
         return loss, preds
     
 
@@ -128,6 +135,8 @@ class SI(MethodPluginABC):
         """
 
         for name, p in self.module.named_parameters():
+            if not self.head_opt and "head" in name:
+                continue
             if p.requires_grad:
                 tmp_omega = pad_zero_dim0(self.omega[name], p.shape)
                 tmp_prev = pad_zero_dim0(self.prev_param[name], p.shape)
