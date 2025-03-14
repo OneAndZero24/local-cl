@@ -157,7 +157,8 @@ class Composer:
 
         preds = self.module(x)
         loss = self.criterion(preds, y)
-        loss *= self.criterion_scale
+        if task_id > 0:
+            loss *= self.criterion_scale
         loss = self._add_reg(loss)
 
         old_loss = loss
