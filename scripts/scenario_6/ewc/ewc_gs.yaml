@@ -12,7 +12,7 @@ parameters:
   model:
     value: mlp_rbf
   method:
-    value: composer_mas
+    value: composer_two_ewc
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -36,29 +36,29 @@ parameters:
   model.initial_out_features:
     value: 2          
   model.sizes:
-    values: [[1024, 100, 8], [1024, 400, 32]]
+    value: [1024, 100, 8]
   model.head_type: 
-    value: MultiRBFHead
+    value: SingleRBFHead
   model.layers: 
-    value: ["Normal", "Normal"]
-  # model.num_kernels:
-  #   distribution: int_uniform
-  #   min: 50
-  #   max: 100
-  # model.no_groups: 
-  #   distribution: int_uniform
-  #   min: 15
-  #   max: 50
-  # model.growing_mask:
-  #   values: [True, False] 
-  # model.no_mask_update_iterations:
-  #   distribution: int_uniform
-  #   min: 100
-  #   max: 3000
-  # model.local_linear:
-  #   value: False
-  # model.normalization:
-  #   values: [True, False]
+    value: ["RBF", "RBF"]
+  model.num_kernels:
+    distribution: int_uniform
+    min: 50
+    max: 100
+  model.no_groups: 
+    distribution: int_uniform
+    min: 15
+    max: 50
+  model.growing_mask:
+    values: [True, False] 
+  model.no_mask_update_iterations:
+    distribution: int_uniform
+    min: 100
+    max: 3000
+  model.local_linear:
+    values: [False]
+  model.normalization:
+    values: [True, False]  
 
   # Method configuration
   method._partial_: 
@@ -66,27 +66,35 @@ parameters:
   method._target_: 
     value: method.Composer
   method.criterion: 
-    value: CrossEntropyLoss
-  method.first_lr: 
-    distribution: log_uniform_values
-    min: 0.0001
-    max: 0.01
+    value: MahalanobisDistanceLoss
   method.criterion_scale:
     distribution: uniform
     min: 1e-8
     max: 1.0
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
   method.lr: 
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
   method.plugins.0._target_:
-    value: method.MAS
+    value: method.RBFNeuronOutReg
   method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.1
     max: 1000
-  method.plugins.0.head_opt:
-    value: True
+  method.plugins.0.hidden_layers_reg:
+    value: False
+  method.plugins.1._target_:
+    value: method.EWC
+  method.plugins.1.alpha: 
+    distribution: uniform      
+    min: 0.1
+    max: 1000
+  method.plugins.1.head_opt:
+    value: False
 
 
 command:
@@ -94,5 +102,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - mas_split_mnist_mlp.yaml
+  - two_split_mnist_mlp.yaml
   - ${args_no_hyphens}

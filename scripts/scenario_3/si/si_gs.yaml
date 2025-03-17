@@ -36,7 +36,7 @@ parameters:
   model.initial_out_features:
     value: 2          
   model.sizes:
-    value: [[1024, 100, 8], [1024, 400, 32]]
+    values: [[1024, 100, 8], [1024, 400, 32]]
   model.head_type: 
     values: SingleRBFHead
   model.layers: 
