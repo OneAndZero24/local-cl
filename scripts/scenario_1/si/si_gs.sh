@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/rbf/si/si_gs"
+run_sweep_and_agent "scripts/scenario_1/si/si_gs"

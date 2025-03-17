@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/rbf/lwf/lwf_gs"
+run_sweep_and_agent "scripts/scenario_1/lwf/lwf_gs"

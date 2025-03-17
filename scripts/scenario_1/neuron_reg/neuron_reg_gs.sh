@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/rbf/neuron_reg/neuron_reg_gs"
+run_sweep_and_agent "scripts/scenario_1/neuron_reg/neuron_reg_gs"

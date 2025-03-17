@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/rbf/ewc/ewc_gs"
+run_sweep_and_agent "scripts/scenario_1/ewc/ewc_gs"

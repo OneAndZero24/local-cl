@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_mnist_sharpening_scenario_1
+#SBATCH --job-name=local_cl_split_mnist_si_scenario_2
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/scenario_1/sharpening/sharpening_gs"
+run_sweep_and_agent "scripts/scenario_2/si/si_gs"
