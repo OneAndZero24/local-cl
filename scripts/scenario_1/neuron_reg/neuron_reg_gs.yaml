@@ -40,7 +40,7 @@ parameters:
   model.head_type: 
     value: MultiRBFHead
   model.layers: 
-    value: ["Normal", "Normal"]
+    value: ["RBF", "RBF"]
   model.num_kernels:
     distribution: int_uniform
     min: 50
