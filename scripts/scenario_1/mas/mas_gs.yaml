@@ -38,7 +38,7 @@ parameters:
   model.sizes:
     value: [1024, 100, 8]
   model.head_type: 
-    values: MultiRBFHead
+    value: MultiRBFHead
   model.layers: 
     value: ["RBF", "RBF"]
   model.num_kernels:
