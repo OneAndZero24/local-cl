@@ -15,21 +15,24 @@ class RBFNeuronOutReg(MethodPluginABC):
     Attributes:
         params_buffer (dict): Stores model parameters for regularization.
         alpha (float): Regularization strength.
+        hidden_layers_reg (bool): If True, then hidden RBF layers are regularized.
         eps (float): Safety net value.
     """
 
 
-    def __init__(self, alpha: float):
+    def __init__(self, alpha: float, hidden_layers_reg: bool):
         """
         Initializes the RBF neuron output regularization method.
 
         Args:
             alpha (float): Regularization coefficient.
+            hidden_layers_reg (bool): If True, then hidden RBF layers are regularized.
         """
 
         super().__init__()
         self.params_buffer = {}
         self.alpha = alpha
+        self.hidden_layers_reg = hidden_layers_reg
         log.info(f"Initialized RBFNeuronOutReg with alpha={alpha}")
 
 
@@ -68,7 +71,7 @@ class RBFNeuronOutReg(MethodPluginABC):
         if task_id > 0:
             model = self.module.module
             for module in model.children():
-                if isinstance(module, torch.nn.ModuleList):
+                if self.hidden_layers_reg and isinstance(module, torch.nn.ModuleList):
                     for idx, layer in enumerate(module):
                         if type(layer).__name__ == "RBFLayer":
                             self.params_buffer.update(get_rbf_layer_params(layer, idx))
@@ -121,7 +124,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         if self.task_id > 0:
             for module in self.module.module.children():
-                if isinstance(module, torch.nn.ModuleList):
+                if self.hidden_layers_reg and isinstance(module, torch.nn.ModuleList):
                     for idx, layer in enumerate(module):
                         if type(layer).__name__ == "RBFLayer":
                             # Get current parameters
