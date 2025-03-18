@@ -121,11 +121,7 @@ def experiment(config: DictConfig):
             break
     
     if calc_bwt:
-        bwt = 0.0
-        for i in range(task_id):
-            bwt += R[task_id, i] - R[i, i]
-        bwt /= task_id-1
-        wandb.log({'bwt': bwt})
+        wandb.log({'bwt': (R[task_id, :task_id]-R.diagonal()[:-1]).mean()})
 
     if save_model:
         log.info(f'Saving model')
