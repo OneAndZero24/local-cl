@@ -15,21 +15,24 @@ class RBFNeuronOutReg(MethodPluginABC):
     Attributes:
         params_buffer (dict): Stores model parameters for regularization.
         alpha (float): Regularization strength.
+        hidden_layers_reg (bool): If True, then hidden RBF layers are regularized.
         eps (float): Safety net value.
     """
 
 
-    def __init__(self, alpha: float):
+    def __init__(self, alpha: float, hidden_layers_reg: bool):
         """
         Initializes the RBF neuron output regularization method.
 
         Args:
             alpha (float): Regularization coefficient.
+            hidden_layers_reg (bool): If True, then hidden RBF layers are regularized.
         """
 
         super().__init__()
         self.params_buffer = {}
         self.alpha = alpha
+        self.hidden_layers_reg = hidden_layers_reg
         log.info(f"Initialized RBFNeuronOutReg with alpha={alpha}")
 
 
@@ -41,11 +44,18 @@ class RBFNeuronOutReg(MethodPluginABC):
             task_id (int): Unique task identifier.
         """
 
-        def get_rbf_layer_params(layer, idx, classes=None):
+        def get_rbf_layer_params(layer, idx, classes=None, head_mode=None):
             if classes is not None:
-                weights = None
-                kernels_centers = layer.kernels_centers[:classes, :].detach().clone()
-                log_shapes = layer.log_shapes[:classes, :].detach().clone()
+                assert head_mode in ["single", "multi"], "Please provide correct head mode."
+
+                if head_mode == "single":
+                    weights = None
+                    kernels_centers = layer.kernels_centers[:classes, :].detach().clone()
+                    log_shapes = layer.log_shapes[:classes, :].detach().clone()
+                elif head_mode == "multi":
+                    weights = layer.weights[:classes, :].detach().clone()
+                    kernels_centers = layer.kernels_centers.detach().clone()
+                    log_shapes = layer.log_shapes.detach().clone()
             else:
                 weights = layer.weights.detach().clone()
                 kernels_centers = layer.kernels_centers.detach().clone()
@@ -61,15 +71,17 @@ class RBFNeuronOutReg(MethodPluginABC):
         if task_id > 0:
             model = self.module.module
             for module in model.children():
-                if isinstance(module, torch.nn.ModuleList):
+                if self.hidden_layers_reg and isinstance(module, torch.nn.ModuleList):
                     for idx, layer in enumerate(module):
                         if type(layer).__name__ == "RBFLayer":
                             self.params_buffer.update(get_rbf_layer_params(layer, idx))
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFHeadLayer":
-                        self.params_buffer.update(get_rbf_layer_params(layer, "head", old_nclasses))
+                    if type(layer).__name__ == "SingleRBFHeadLayer":
+                        self.params_buffer.update(get_rbf_layer_params(layer, "head", old_nclasses, "single"))
+                    elif type(layer).__name__ == "RBFLayer":
+                        self.params_buffer.update(get_rbf_layer_params(layer, "head", old_nclasses, "multi"))
 
 
     def forward(self, x, y, loss, preds):
@@ -86,11 +98,17 @@ class RBFNeuronOutReg(MethodPluginABC):
             tuple: Updated loss and predictions.
         """
 
-        def get_rbf_layer_params(layer, classes=None):
+        def get_rbf_layer_params(layer, classes=None, head_mode=None):
             if classes is not None:
-                W_curr = None
-                C_curr = layer.kernels_centers[:classes,:]
-                Sigma_curr = layer.log_shapes[:classes,:].exp()
+                assert head_mode in ["single", "multi"], "Please provide correct head mode"
+                if head_mode == "single":
+                    W_curr = None
+                    C_curr = layer.kernels_centers[:classes,:]
+                    Sigma_curr = layer.log_shapes[:classes,:].exp()
+                elif head_mode == "multi":
+                    W_curr = layer.weights[:classes,:].T
+                    C_curr = layer.kernels_centers
+                    Sigma_curr = layer.log_shapes.exp()
             else:
                 W_curr = layer.weights.T
                 C_curr = layer.kernels_centers
@@ -106,7 +124,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
         if self.task_id > 0:
             for module in self.module.module.children():
-                if isinstance(module, torch.nn.ModuleList):
+                if self.hidden_layers_reg and isinstance(module, torch.nn.ModuleList):
                     for idx, layer in enumerate(module):
                         if type(layer).__name__ == "RBFLayer":
                             # Get current parameters
@@ -114,7 +132,7 @@ class RBFNeuronOutReg(MethodPluginABC):
 
                             # Retrieve old stored parameters
                             W_old, C_old, Sigma_old = get_old_rbf_layer_params(idx)
-
+    
                             # Add regularization loss
                             loss += self.alpha * self.compute_hidden_integral_gaussian(
                                 W_old=W_old, W_curr=W_curr,
@@ -124,17 +142,31 @@ class RBFNeuronOutReg(MethodPluginABC):
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFHeadLayer":
-                            # Get current parameters
-                            _, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses)
+                    if type(layer).__name__ == "SingleRBFHeadLayer":
+                        # Get current parameters
+                        _, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses, "single")
 
-                            # Retrieve old stored parameters
-                            _, C_old, Sigma_old = get_old_rbf_layer_params("head")
+                        # Retrieve old stored parameters
+                        _, C_old, Sigma_old = get_old_rbf_layer_params("head")
+                        loss += self.alpha * self.compute_head_integral_gaussian(
+                            C_old=C_old, C_curr=C_curr,
+                            Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
+                        )
 
-                            loss += self.alpha * self.compute_head_integral_gaussian(
-                                C_old=C_old, C_curr=C_curr,
-                                Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
-                            )
+                    elif type(layer).__name__ == "RBFLayer":
+                        # Get current parameters
+                        W_curr, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses, "multi")
+
+                        # Retrieve old stored parameters
+                        W_old, C_old, Sigma_old = get_old_rbf_layer_params("head")
+
+                        # Add regularization loss
+                        loss += self.alpha * self.compute_hidden_integral_gaussian(
+                            W_old=W_old, W_curr=W_curr,
+                            C_old=C_old, C_curr=C_curr,
+                            Sigma_old=Sigma_old, Sigma_curr=Sigma_curr
+                        )
+
 
         return loss, preds
 

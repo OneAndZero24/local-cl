@@ -9,3 +9,4 @@ plugins:
     alpha: 0.4
   - _target_: method.SI
     alpha: 2048
+    head_opt: True

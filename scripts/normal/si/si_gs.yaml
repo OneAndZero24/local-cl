@@ -67,6 +67,8 @@ parameters:
     distribution: uniform      
     min: 1000
     max: 3000
+  method.plugins.0.head_opt:
+    value: True
 
 
 command:

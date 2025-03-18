@@ -29,7 +29,7 @@ from .local_module import LocalModule
 from .rbf import l_norm, rbf_gaussian
 
 
-class RBFHeadLayer(LocalModule):
+class SingleRBFHeadLayer(LocalModule):
     """
     A Radial Basis Function (RBF) Layer as incremental head layer.
 
@@ -55,7 +55,7 @@ class RBFHeadLayer(LocalModule):
                  in_features: int,
                  out_features: int,
                  ):
-        super(RBFHeadLayer, self).__init__()
+        super(SingleRBFHeadLayer, self).__init__()
 
         self.in_features = in_features
         self.out_features = out_features

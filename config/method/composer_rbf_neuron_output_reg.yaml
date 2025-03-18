@@ -7,3 +7,4 @@ criterion_scale: 1e-5
 plugins:
   - _target_: method.RBFNeuronOutReg
     alpha: 0.4
+    hidden_layers_reg: False

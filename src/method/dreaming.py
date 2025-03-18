@@ -49,7 +49,7 @@ class Dreaming(MethodPluginABC):
 
     def setup_task(self, task_id: int):
         """
-        Sets up a new task and stores parameters from the incremental classification head (RBFHead).
+        Sets up a new task and stores parameters from the incremental classification head.
 
         Args:
             task_id (int): Unique task identifier.
@@ -59,7 +59,7 @@ class Dreaming(MethodPluginABC):
         self.dreamed_data_buffer = {}
         
         def extract_RBFHead_params(layer, idx, classes):
-            if type(layer).__name__ == "RBFHeadLayer":
+            if type(layer).__name__ == "SingleRBFHeadLayer":
                 kernels_centers = layer.kernels_centers[:classes, :].detach().clone()
                 log_shapes = layer.log_shapes[:classes, :].detach().clone()
                 return {
@@ -75,8 +75,11 @@ class Dreaming(MethodPluginABC):
                 if type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     self.old_nclasses = module.old_nclasses
-                    if type(layer).__name__ == "RBFHeadLayer":
+                    if type(layer).__name__ == "SingleRBFHeadLayer":
                         self.params_buffer.update(extract_RBFHead_params(layer, "head", self.old_nclasses))
+                    else:
+                        # TODO Extend to other classifiers
+                        raise ValueError("Deprecation: The classifier head must be SingleRBFHeadLayer.")
 
             with torch.no_grad():   
                 self.old_module = deepcopy(self.module)

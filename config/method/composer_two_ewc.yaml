@@ -9,4 +9,4 @@ plugins:
     alpha: 0.4
   - _target_: method.EWC
     alpha: 2000
-    lamb: 0.5
+    head_opt: True

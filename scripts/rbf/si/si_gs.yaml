@@ -38,7 +38,7 @@ parameters:
   model.sizes:
     value: [1024, 100, 8]
   model.head_type: 
-    value: RBFHead
+    values: [SingleRBFHead, MultiRBFHead]
   model.layers: 
     value: ["RBF", "RBF"]
   model.num_kernels:
@@ -85,6 +85,8 @@ parameters:
     distribution: uniform      
     min: 1000
     max: 3000
+  method.plugins.0.head_opt:
+    value: True
 
 command:
   - ${env}
