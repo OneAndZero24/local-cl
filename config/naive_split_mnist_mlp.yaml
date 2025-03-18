@@ -16,6 +16,8 @@ exp:
   log_per_batch: False
   detect_anomaly: False
   cleanup: True
+  calc_bwt: True
+  calc_fwt: True
 
 fabric:
   _target_: lightning.Fabric

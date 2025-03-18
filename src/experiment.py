@@ -123,6 +123,12 @@ def experiment(config: DictConfig):
     if calc_bwt:
         wandb.log({'bwt': (R[task_id, :task_id]-R.diagonal()[:-1]).mean()})
 
+    if calc_fwt:
+        fwt = 0.0
+        for i in range(1, task_id+1):
+            fwt += R[i-1, i]-R[i, i]
+        wandb.log({'fwt': fwt.mean()})
+
     if save_model:
         log.info(f'Saving model')
         torch.save(model.state_dict(), config.exp.model_path)
