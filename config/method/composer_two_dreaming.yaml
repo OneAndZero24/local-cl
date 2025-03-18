@@ -6,6 +6,7 @@ lr: 0.01
 plugins:
   - _target_: method.RBFNeuronOutReg
     alpha: 0.99999999
+    hidden_layers_reg: False
   - _target_: method.Dreaming
     alpha: 100.0
     no_samples_per_class: 256
