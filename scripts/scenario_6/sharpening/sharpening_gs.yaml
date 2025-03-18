@@ -96,7 +96,7 @@ parameters:
     min: 0.1
     max: 0.4
   method.plugins.1.K: 
-    distribution: uniform      
+    distribution: int_uniform      
     min: 64
     max: 1024
 
