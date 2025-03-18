@@ -1,5 +1,7 @@
 import logging
 
+import numpy as np
+
 from omegaconf import DictConfig
 from hydra.utils import instantiate
 
@@ -38,6 +40,14 @@ def experiment(config: DictConfig):
 
     if config.exp.detect_anomaly:
         torch.autograd.set_detect_anomaly(True)
+
+    calc_bwt = False
+    if 'calc_bwt' in config.exp:
+        calc_bwt = config.exp
+
+    calc_fwt = False
+    if 'calc_fwt' in config.exp:
+        calc_fwt = config.exp
 
     stop_task = None
     if 'stop_after_task' in config.exp:
@@ -80,9 +90,10 @@ def experiment(config: DictConfig):
             generator=torch.Generator(device=fabric.device)
         )))
 
-    avg_acc = 0.0
+    N = len(train_scenario)
+    R = np.zeros((N, N))
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
-        log.info(f'Task {task_id + 1}/{len(train_scenario)}')
+        log.info(f'Task {task_id + 1}/{N}')
 
         if isinstance(method.module.head, IncrementalClassifier):
             log.info(f'Incrementing model head')
@@ -98,19 +109,24 @@ def experiment(config: DictConfig):
                 train(method, train_task, task_id, log_per_batch)
                 acc = test(method, test_task, task_id, gen_cm, log_per_batch)
                 if lastepoch:
-                    avg_acc = 0.0
-                    avg_acc += acc
+                    R[task_id, task_id] = acc
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
                         acc = test(method, test_tasks[j], j, gen_cm, log_per_batch, cm_suffix=f' after {task_id}')
                         if lastepoch:
-                            avg_acc += acc
-        avg_acc /= task_id+1
-        wandb.log({f'avg_acc': avg_acc})
+                            R[task_id, j] = acc
+        wandb.log({f'avg_acc': R[task_id, :task_id+1].mean()})
 
         if stop_task is not None and task_id == stop_task:
             break
     
+    if calc_bwt:
+        bwt = 0.0
+        for i in range(task_id):
+            bwt += R[task_id, i] - R[i, i]
+        bwt /= task_id-1
+        wandb.log({'bwt': bwt})
+
     if save_model:
         log.info(f'Saving model')
         torch.save(model.state_dict(), config.exp.model_path)
