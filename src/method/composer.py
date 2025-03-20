@@ -66,6 +66,7 @@ class Composer:
             criterion (str): The criterion (loss function) to be used.
             first_lr (float): The initial learning rate.
             lr (float): The learning rate.
+            criterion_scale (float): The scale of the criterion loss.
             reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
             gamma (Optional[float], optional): The gamma value for learning rate decay. Defaults to None.
             clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.

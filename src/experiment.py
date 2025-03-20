@@ -1,5 +1,8 @@
 import logging
 
+from copy import deepcopy
+import numpy as np
+
 from omegaconf import DictConfig
 from hydra.utils import instantiate
 
@@ -12,6 +15,7 @@ from tqdm import tqdm
 
 from util.fabric import setup_fabric
 from model import IncrementalClassifier
+from src.method.composer import Composer
 from src.method.method_plugin_abc import MethodPluginABC
  
 
@@ -38,6 +42,14 @@ def experiment(config: DictConfig):
 
     if config.exp.detect_anomaly:
         torch.autograd.set_detect_anomaly(True)
+
+    calc_bwt = False
+    if 'calc_bwt' in config.exp:
+        calc_bwt = config.exp
+
+    calc_fwt = False
+    if 'calc_fwt' in config.exp:
+        calc_fwt = config.exp
 
     stop_task = None
     if 'stop_after_task' in config.exp:
@@ -80,9 +92,12 @@ def experiment(config: DictConfig):
             generator=torch.Generator(device=fabric.device)
         )))
 
-    avg_acc = 0.0
+    N = len(train_scenario)
+    R = np.zeros((N, N))
+    if calc_fwt:
+        b = np.zeros(N)
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
-        log.info(f'Task {task_id + 1}/{len(train_scenario)}')
+        log.info(f'Task {task_id + 1}/{N}')
 
         if isinstance(method.module.head, IncrementalClassifier):
             log.info(f'Incrementing model head')
@@ -97,26 +112,50 @@ def experiment(config: DictConfig):
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
                 train(method, train_task, task_id, log_per_batch)
                 acc = test(method, test_task, task_id, gen_cm, log_per_batch)
+                if calc_fwt:
+                    method_tmp = Composer(
+                        deepcopy(method.module), 
+                        config.method.criterion, 
+                        method.first_lr,
+                        method.lr,
+                        method.criterion_scale,
+                        method.reg_type,
+                        method.gamma,
+                        method.clipgrad,
+                        method.retaingraph,
+                        method.log_reg
+                    )
+                    log.info('FWT training pass')
+                    method_tmp.setup_task(task_id)
+                    train(method_tmp, train_task, task_id, log_per_batch, quiet=True)
+                    b[task_id] = test(method_tmp, test_task, task_id, gen_cm, log_per_batch, quiet=True)
                 if lastepoch:
-                    avg_acc = 0.0
-                    avg_acc += acc
+                    R[task_id, task_id] = acc
                 if task_id > 0:
                     for j in range(task_id-1, -1, -1):
                         acc = test(method, test_tasks[j], j, gen_cm, log_per_batch, cm_suffix=f' after {task_id}')
                         if lastepoch:
-                            avg_acc += acc
-        avg_acc /= task_id+1
-        wandb.log({f'avg_acc': avg_acc})
+                            R[task_id, j] = acc
+        wandb.log({f'avg_acc': R[task_id, :task_id+1].mean()})
 
         if stop_task is not None and task_id == stop_task:
             break
     
+    if calc_bwt:
+        wandb.log({'bwt': (R[task_id, :task_id]-R.diagonal()[:-1]).mean()})
+
+    if calc_fwt:
+        fwt = []
+        for i in range(1, task_id+1):
+            fwt.append(R[i-1, i]-b[i])
+        wandb.log({'fwt': np.array(fwt).mean()})
+
     if save_model:
         log.info(f'Saving model')
         torch.save(model.state_dict(), config.exp.model_path)
 
 
-def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool):
+def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool, quiet: bool = False):
     """
     Train one epoch.
     """
@@ -129,14 +168,15 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
         method.backward(loss)
 
         avg_loss += loss
-        if log_per_batch:
+        if log_per_batch and not quiet:
             wandb.log({f'Loss/train/{task_id}/per_batch': loss})
 
     avg_loss /= len(dataloader)
-    wandb.log({f'Loss/train/{task_id}': avg_loss})
+    if not quiet:
+        wandb.log({f'Loss/train/{task_id}': avg_loss})
 
 
-def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, log_per_batch: bool, cm_suffix: str = '') -> float:
+def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, log_per_batch: bool, quiet: bool = False, cm_suffix: str = '') -> float:
     """
     Test one epoch.
     """
@@ -156,7 +196,7 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             _, preds = torch.max(preds.data, 1)
             total += y.size(0)
             correct += (preds == y).sum().item()
-            if log_per_batch:
+            if log_per_batch and not quiet:
                 wandb.log({f'Loss/test/{task_id}/per_batch': loss})
 
             if gen_cm:
@@ -164,12 +204,13 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
                 preds_total.extend(preds.cpu().numpy())
 
         avg_loss /= len(dataloader)
-        log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')
-        wandb.log({f'Loss/test/{task_id}': avg_loss})
-        wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
-        if gen_cm:
-            title = f'Confusion matrix {str(task_id)+cm_suffix}'
-            wandb.log({title: 
-                wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
-            )
+        if not quiet:
+            log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')
+            wandb.log({f'Loss/test/{task_id}': avg_loss})
+            wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
+            if gen_cm:
+                title = f'Confusion matrix {str(task_id)+cm_suffix}'
+                wandb.log({title: 
+                    wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
+                )
         return 100 * correct / total
