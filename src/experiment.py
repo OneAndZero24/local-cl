@@ -1,5 +1,6 @@
 import logging
 
+from copy import deepcopy
 import numpy as np
 
 from omegaconf import DictConfig
@@ -14,6 +15,7 @@ from tqdm import tqdm
 
 from util.fabric import setup_fabric
 from model import IncrementalClassifier
+from src.method.composer import Composer
 from src.method.method_plugin_abc import MethodPluginABC
  
 
@@ -92,6 +94,8 @@ def experiment(config: DictConfig):
 
     N = len(train_scenario)
     R = np.zeros((N, N))
+    if calc_fwt:
+        b = np.zeros(N)
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{N}')
 
@@ -108,6 +112,23 @@ def experiment(config: DictConfig):
                 log.info(f'Epoch {epoch + 1}/{config.exp.epochs}')
                 train(method, train_task, task_id, log_per_batch)
                 acc = test(method, test_task, task_id, gen_cm, log_per_batch)
+                if calc_fwt:
+                    method_tmp = Composer(
+                        deepcopy(method.module), 
+                        config.method.criterion, 
+                        method.first_lr,
+                        method.lr,
+                        method.criterion_scale,
+                        method.reg_type,
+                        method.gamma,
+                        method.clipgrad,
+                        method.retaingraph,
+                        method.log_reg
+                    )
+                    log.info('FWT training pass')
+                    method_tmp.setup_task(task_id)
+                    train(method_tmp, train_task, task_id, log_per_batch, quiet=True)
+                    b[task_id] = test(method_tmp, test_task, task_id, gen_cm, log_per_batch, quiet=True)
                 if lastepoch:
                     R[task_id, task_id] = acc
                 if task_id > 0:
@@ -126,7 +147,7 @@ def experiment(config: DictConfig):
     if calc_fwt:
         fwt = 0.0
         for i in range(1, task_id+1):
-            fwt += R[i-1, i]-R[i, i]
+            fwt += R[i-1, i]-b[i]
         wandb.log({'fwt': fwt.mean()})
 
     if save_model:
@@ -134,7 +155,7 @@ def experiment(config: DictConfig):
         torch.save(model.state_dict(), config.exp.model_path)
 
 
-def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool):
+def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool, quiet: bool = False):
     """
     Train one epoch.
     """
@@ -147,14 +168,15 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
         method.backward(loss)
 
         avg_loss += loss
-        if log_per_batch:
+        if log_per_batch and not quiet:
             wandb.log({f'Loss/train/{task_id}/per_batch': loss})
 
     avg_loss /= len(dataloader)
-    wandb.log({f'Loss/train/{task_id}': avg_loss})
+    if not quiet:
+        wandb.log({f'Loss/train/{task_id}': avg_loss})
 
 
-def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, log_per_batch: bool, cm_suffix: str = '') -> float:
+def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: bool, log_per_batch: bool, quiet: bool = False, cm_suffix: str = '') -> float:
     """
     Test one epoch.
     """
@@ -174,7 +196,7 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             _, preds = torch.max(preds.data, 1)
             total += y.size(0)
             correct += (preds == y).sum().item()
-            if log_per_batch:
+            if log_per_batch and not quiet:
                 wandb.log({f'Loss/test/{task_id}/per_batch': loss})
 
             if gen_cm:
@@ -182,12 +204,13 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
                 preds_total.extend(preds.cpu().numpy())
 
         avg_loss /= len(dataloader)
-        log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')
-        wandb.log({f'Loss/test/{task_id}': avg_loss})
-        wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
-        if gen_cm:
-            title = f'Confusion matrix {str(task_id)+cm_suffix}'
-            wandb.log({title: 
-                wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
-            )
+        if not quiet:
+            log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')
+            wandb.log({f'Loss/test/{task_id}': avg_loss})
+            wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
+            if gen_cm:
+                title = f'Confusion matrix {str(task_id)+cm_suffix}'
+                wandb.log({title: 
+                    wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
+                )
         return 100 * correct / total
