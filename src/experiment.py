@@ -145,10 +145,10 @@ def experiment(config: DictConfig):
         wandb.log({'bwt': (R[task_id, :task_id]-R.diagonal()[:-1]).mean()})
 
     if calc_fwt:
-        fwt = 0.0
+        fwt = []
         for i in range(1, task_id+1):
-            fwt += R[i-1, i]-b[i]
-        wandb.log({'fwt': fwt.mean()})
+            fwt.append(R[i-1, i]-b[i])
+        wandb.log({'fwt': np.array(fwt).mean()})
 
     if save_model:
         log.info(f'Saving model')
