@@ -1,4 +1,5 @@
 # Local Continual Learning
+<p align="right"><img style="float: right;" src="gmum.png" alt="logo" width="200"/></p>
 **Patryk Krukowski, Jan Miksa** @ *GMUM JU*
 
 🚀 *Let's forget about catastrophic forgetting!* 🚀
@@ -47,7 +48,7 @@
 | LwF | ***23.23*** | NA | NA |
 | EWC | 19.95 | 19.90 | ***50.21*** |
 | SI | 20.19 | ***32.28*** | 27.26 |
-| MAS | 20.63 | 28.42 |  *35.20* |
+| MAS | 20.63 | 28.42 |  *37.69* |
 | Sharpening | 19.95 | *20.65* | |
 | Regularization | NA | *19.88* | - |
 

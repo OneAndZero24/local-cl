@@ -2,6 +2,7 @@ import logging
 
 import torch
 
+from src.util.tensor import get_2D_classes_slice
 from src.method.method_plugin_abc import MethodPluginABC
 
 
@@ -45,21 +46,14 @@ class RBFNeuronOutReg(MethodPluginABC):
         """
 
         def get_rbf_layer_params(layer, idx, classes=None, head_mode=None):
-            if classes is not None:
-                assert head_mode in ["single", "multi"], "Please provide correct head mode."
-
-                if head_mode == "single":
-                    weights = None
-                    kernels_centers = layer.kernels_centers[:classes, :].detach().clone()
-                    log_shapes = layer.log_shapes[:classes, :].detach().clone()
-                elif head_mode == "multi":
-                    weights = layer.weights[:classes, :].detach().clone()
-                    kernels_centers = layer.kernels_centers.detach().clone()
-                    log_shapes = layer.log_shapes.detach().clone()
+            assert head_mode in ["single", "multi"], "Please provide correct head mode."
+            if head_mode == "single":
+                weights = None
             else:
-                weights = layer.weights.detach().clone()
-                kernels_centers = layer.kernels_centers.detach().clone()
-                log_shapes = layer.log_shapes.detach().clone()
+                 weights = get_2D_classes_slice(layer.weights, classes).detach().clone()
+            kernels_centers = get_2D_classes_slice(layer.kernels_centers, classes).detach().clone()
+            log_shapes = get_2D_classes_slice(layer.log_shapes, classes).detach().clone()
+
             return {
                 f"weights_{idx}": weights,
                 f"kernels_centers_{idx}": kernels_centers,
@@ -99,20 +93,13 @@ class RBFNeuronOutReg(MethodPluginABC):
         """
 
         def get_rbf_layer_params(layer, classes=None, head_mode=None):
-            if classes is not None:
-                assert head_mode in ["single", "multi"], "Please provide correct head mode"
-                if head_mode == "single":
-                    W_curr = None
-                    C_curr = layer.kernels_centers[:classes,:]
-                    Sigma_curr = layer.log_shapes[:classes,:].exp()
-                elif head_mode == "multi":
-                    W_curr = layer.weights[:classes,:].T
-                    C_curr = layer.kernels_centers
-                    Sigma_curr = layer.log_shapes.exp()
+            assert head_mode in ["single", "multi"], "Please provide correct head mode"
+            if head_mode == "single":
+                W_curr = None
             else:
-                W_curr = layer.weights.T
-                C_curr = layer.kernels_centers
-                Sigma_curr = layer.log_shapes.exp()
+                W_curr = get_2D_classes_slice(layer.weights, classes).T
+            C_curr = get_2D_classes_slice(layer.kernels_centers, classes)
+            Sigma_curr = get_2D_classes_slice(layer.log_shapes, classes).exp()
             return W_curr, C_curr, Sigma_curr
         
         def get_old_rbf_layer_params(idx):
