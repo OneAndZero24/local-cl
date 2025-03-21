@@ -1,5 +1,5 @@
 # Local Continual Learning
-<p align="right"><img style="float: right;" src="gmum.png" alt="logo" width="200"/></p>
+<p align="right"><img style="float: right;" src="gmum.png" alt="logo" width="100"/></p>
 
 **Patryk Krukowski, Jan Miksa** @ *GMUM JU*
 
