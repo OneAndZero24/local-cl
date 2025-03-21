@@ -56,7 +56,7 @@ class DomainIncremental(ClassIncremental):
             y,
             t,
             trsf=self.trsf[task_index] if isinstance(self.trsf, list) else self.trsf,
-            target_trsf=(lambda label: label%len(y)),   # changed here
+            target_trsf=(lambda label: label%(self.increments[task_index])),   # changed here
             data_type=self.cl_dataset.data_type,
             bounding_boxes=self.cl_dataset.bounding_boxes,
             data_indexes=data_indexes,
