@@ -1,4 +1,6 @@
 # Local Continual Learning
+<p align="right"><img style="float: right;" src="gmum.png" alt="logo" width="100"/></p>
+
 **Patryk Krukowski, Jan Miksa** @ *GMUM JU*
 
 🚀 *Let's forget about catastrophic forgetting!* 🚀
@@ -14,30 +16,15 @@
 - Custom Plugin System for Methods
 - Incremental Classifier
 
-| Method | Status |
-| ------ | -- |
-| Naive | ✅ |
-| LwF | ✅ |
-| EWC | ✅ |
-| Sharpening | ✅ |
-| SI | ✅ |
-| MAS | ✅ |
-| RBFReg | ✅ |
-
-| Custom Layers | Status |
-| ------ | -- |
-| Local | ✅ |
-| RBF | ✅ |
-| SingleRBFHead | ✅ |
-| MultiRBFHead | ✅ |
-| KAN | ❌ |
-| LocalHead | ⭕️ |
-| LocalConv2D | ⭕️ |
-
-| Model | Status |
-| ------ | -- |
-| MLP | ✅ |
-| LeNet | ⭕️ |
+| Method | Status | Custom Layers | Status | Model | Status | Scenario | Status | Dataset | Status |
+| ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
+| Naive | ✅ | Local | ✅ | MLP | ✅ | CI | ✅ | MNIST | ✅ |
+| LwF | ✅ | RBF | ✅ | LeNet | ⭕️ | DI | ✅ | ImageNet | ✅ |
+| EWC | ✅ | SingleRBFHead | ✅ | | | TI | ✅ | CIFAR100 | ✅ |
+| Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
+| SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
+| MAS | ✅ | LocalHead | ⭕️ |
+| RBFReg | ✅ | LocalConv2D | ⭕️ |
 
 ## Results
 **SplitMNIST**
@@ -47,7 +34,7 @@
 | LwF | ***23.23*** | NA | NA |
 | EWC | 19.95 | 19.90 | ***50.21*** |
 | SI | 20.19 | ***32.28*** | 27.26 |
-| MAS | 20.63 | 28.42 |  *35.20* |
+| MAS | 20.63 | 28.42 |  *37.69* |
 | Sharpening | 19.95 | *20.65* | |
 | Regularization | NA | *19.88* | - |
 
