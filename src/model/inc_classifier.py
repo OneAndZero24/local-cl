@@ -128,10 +128,13 @@ class IncrementalClassifier(nn.Module):
             if isinstance(self.classifier, LocalModule):
                 param_filter = self.classifier.incrementable_params()
                 idx = self.classifier.get_slice(old_nclasses)
+            if isinstance(self.classifier, nn.Linear):
+                param_filter.extend(["weight", "bias"])
             for name, param in self.classifier.named_parameters():
                 if (name in param_filter):
                         param.data[idx] = state_dict[name]
-    
+                else:
+                    param.data = state_dict[name]
 
     def forward(self, x):
         """
