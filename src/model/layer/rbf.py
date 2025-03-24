@@ -280,8 +280,11 @@ class RBFLayer(LocalModule):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, out_features).
         """
-        if self.growing_mask and self.training:
+
+        if self.growing_mask and self.training and not (self.mask == torch.ones_like(self.mask)).all():
             self.update_mask()
+            print(f"No ones in mask {100 * self.mask.sum() / torch.ones_like(self.mask).sum()}%")
+            
         # Input has size B x Fin
         batch_size = input.size(0)
 
