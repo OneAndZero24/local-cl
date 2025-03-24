@@ -6,3 +6,4 @@ Source code for local-cl project.
 - `model/` - Full models and custom layers
 - `method/` - Continual learning methods
 - `util/` - Utilities
+- `scenario/` - Custom CL scenarios missing in Continuum

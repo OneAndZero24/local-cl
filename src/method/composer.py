@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from copy import deepcopy
 
 from torch import nn
 from torch import optim
@@ -27,6 +28,7 @@ class Composer:
         criterion_scale (float): The regularization strength of the used criterion loss function.
         reg_type (Optional[str]): The type of regularization to apply.
         gamma (Optional[float]): The regularization strength.
+        task_heads (bool): Whether to use task-specific heads.
         clipgrad (Optional[float]): The gradient clipping value.
         plugins (Optional[list[MethodPluginABC]]): List of plugins to be used during training.
 
@@ -53,6 +55,7 @@ class Composer:
         criterion_scale: float,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
+        task_heads: bool=False,
         clipgrad: Optional[float]=None,
         retaingraph: Optional[bool]=False,
         log_reg: Optional[bool]=False,
@@ -69,6 +72,7 @@ class Composer:
             criterion_scale (float): The scale of the criterion loss.
             reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
             gamma (Optional[float], optional): The gamma value for learning rate decay. Defaults to None.
+            task_heads (Optional[bool], optional): Whether to use task-specific heads. Defaults to False.
             clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.
             retaingraph (Optional[bool], optional): Whether to retain the computation graph. Defaults to False.
             log_reg (Optional[bool], optional): Whether to log the regularization loss. Defaults to False.
@@ -83,11 +87,15 @@ class Composer:
         self.criterion_scale = criterion_scale
         self.reg_type = reg_type
         self.gamma = gamma
+        self.task_heads = task_heads
         self.clipgrad = clipgrad
         self.retaingraph = retaingraph
         self.plugins = plugins
         self.log_reg = log_reg
         
+        if self.task_heads:
+            self.heads = []
+
         for plugin in self.plugins:
             plugin.set_module(self.module)
             log.info(f'Plugin {plugin.__class__.__name__} added to composer')
@@ -135,6 +143,14 @@ class Composer:
         Args:
             task_id (int): The unique identifier for the task to be set up.
         """
+
+        if self.task_heads:
+            if task_id >= len(self.heads):
+                tmp_head = self.module.head
+                if task_id > 0:
+                   tmp_head = deepcopy(self.module.head)
+                self.heads.append(tmp_head)
+            self.module.head = self.heads[task_id]
 
         self._setup_optim(task_id)
         for plugin in self.plugins:
