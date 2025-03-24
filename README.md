@@ -16,30 +16,15 @@
 - Custom Plugin System for Methods
 - Incremental Classifier
 
-| Method | Status |
-| ------ | -- |
-| Naive | ✅ |
-| LwF | ✅ |
-| EWC | ✅ |
-| Sharpening | ✅ |
-| SI | ✅ |
-| MAS | ✅ |
-| RBFReg | ✅ |
-
-| Custom Layers | Status |
-| ------ | -- |
-| Local | ✅ |
-| RBF | ✅ |
-| SingleRBFHead | ✅ |
-| MultiRBFHead | ✅ |
-| KAN | ❌ |
-| LocalHead | ⭕️ |
-| LocalConv2D | ⭕️ |
-
-| Model | Status |
-| ------ | -- |
-| MLP | ✅ |
-| LeNet | ⭕️ |
+| Method | Status | Custom Layers | Status | Model | Status | Scenario | Status | Dataset | Status |
+| ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
+| Naive | ✅ | Local | ✅ | MLP | ✅ | CI | ✅ | MNIST | ✅ |
+| LwF | ✅ | RBF | ✅ | LeNet | ⭕️ | DI | ✅ | ImageNet | ✅ |
+| EWC | ✅ | SingleRBFHead | ✅ | | | TI | ✅ | CIFAR100 | ✅ |
+| Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
+| SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
+| MAS | ✅ | LocalHead | ⭕️ |
+| RBFReg | ✅ | LocalConv2D | ⭕️ |
 
 ## Results
 **SplitMNIST**
