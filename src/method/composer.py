@@ -159,7 +159,7 @@ class Composer:
 
         if self.reset_rbf_mask and task_id > 0:
             for layer in self.module.layers+[self.module.head]:
-                if isinstance(layer, RBFLayer):
+                if isinstance(layer, RBFLayer) and layer.growing_mask:
                     layer.mask = layer.init_group_mask()
 
         self._setup_optim(task_id)
