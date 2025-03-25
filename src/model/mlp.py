@@ -1,3 +1,6 @@
+from typing import Union
+from omegaconf import ListConfig
+
 import torch
 import torch.nn as nn
 
@@ -36,7 +39,7 @@ class MLP(CLModuleABC):
         layers: list[str],
         head_type: str="Normal",
         activation: nn.Module=nn.Tanh(),
-        **kwargs
+        config: Union[dict, list[dict], ListConfig]={},
     ):
         """
         Initializes the MLP model.
@@ -47,7 +50,9 @@ class MLP(CLModuleABC):
             layers (list[str]): A list of strings representing the types of each layer.
             head_type (str, optional): The type of the head layer. Defaults to "Normal".
             activation (nn.Module, optional): The activation function to use between layers. Defaults to nn.Tanh().
-            **kwargs: Additional keyword arguments for layer instantiation.
+            config (Union[dict, list[dict]]): Additional keyword arguments for layer instantiation. 
+            If dict passed will get applied to each layer, if list of dicts will apply to each layer in order, head=0. 
+            If length of dict shorter than number of layers will use last dict for remaining layers.
 
         Keyword Args:
             train_head_domain (bool, optional): If head_type is LOCAL, specifies whether to train the head domain. Defaults to False.
@@ -60,11 +65,12 @@ class MLP(CLModuleABC):
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
 
-        head_kwargs = kwargs.copy()
-        if head_type == LayerType.LOCAL:
-            head_kwargs["train_domain"] = kwargs.get("train_head_domain", False)
-            head_kwargs.pop("train_head_domain", None)
-        kwargs.pop("train_head_domain", None)
+        list_config = isinstance(config, (list, ListConfig))
+
+        head_kwargs = config
+        if list_config:
+            head_kwargs = config[0]
+            config = config[1:]
 
         super().__init__(
             IncrementalClassifier(
@@ -75,16 +81,13 @@ class MLP(CLModuleABC):
             )
         )
 
-        kwargs.pop("masking", None)
-        kwargs.pop("mask_value", None)
-
         layers = []
         N = len(sizes)-1
         for i in range(N):                    
             in_size = sizes[i]
             out_size = sizes[i+1]
             lt = layer_types[i]
-            layers.append(instantiate(lt, in_size, out_size, **kwargs))
+            layers.append(instantiate(lt, in_size, out_size, **((config[i] if i < len(config) else config[-1]) if list_config else config)))
             if lt == LayerType.NORMAL:
                 layers.append(activation)
         self.layers = nn.ModuleList(layers)

@@ -144,7 +144,6 @@ class RBFLayer(LocalModule):
 
         self.no_mask_update_iterations = no_mask_update_iterations
         self.growing_mask = growing_mask
-        self.iteration = 0
 
         self._make_parameters()
 
@@ -197,7 +196,8 @@ class RBFLayer(LocalModule):
 
     def init_group_mask(self):
         """Initialize masks to define group of neurons within a neural network"""
-        mask = torch.zeros(self.num_kernels, self.in_features)
+
+        self.iteration = 0
         assert self.no_groups > 0, "Number of created groups should be greater than 0."
         group_size_neurons = self.num_kernels // self.no_groups
         group_size_features = self.in_features // self.no_groups
