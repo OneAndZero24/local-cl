@@ -28,15 +28,14 @@
 
 ## Results
 **SplitMNIST**
-| Method | Normal | RBF | SingleRBFHead + Reg |
-| ------ | ------ | --- | -------- |
-| Naive | *19.97* | 19.95 | |
-| LwF | ***23.23*** | NA | NA |
-| EWC | 19.95 | 19.90 | ***50.21*** |
-| SI | 20.19 | ***32.28*** | 27.26 |
-| MAS | 20.63 | 28.42 |  *37.69* |
-| Sharpening | 19.95 | *20.65* | |
-| Regularization | NA | *19.88* | - |
+| Method | Normal | RBF |
+| ------ | ------ | --- |
+| Naive |  | |
+| LwF |  | NA |
+| EWC | ***54.65*** | 50.21 |
+| SI |  | ***32.28*** |
+| MAS | 36.51 | ***37.69*** |
+| Sharpening |  | *20.65* |
 
 ## Commands
 **Setup**
