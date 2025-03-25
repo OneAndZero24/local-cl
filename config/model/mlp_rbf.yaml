@@ -9,6 +9,7 @@ growing_mask: True
 no_mask_update_iterations: 1500
 local_linear: False
 normalization: True
+start_empty: True
 radial_function: 
   _target_: model.layer.rbf.rbf_gaussian
   _partial_: true

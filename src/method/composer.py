@@ -8,6 +8,7 @@ from torch import optim
 import wandb
 
 from model.cl_module_abc import CLModuleABC
+from model.layer.rbf import RBFLayer
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
@@ -29,6 +30,7 @@ class Composer:
         reg_type (Optional[str]): The type of regularization to apply.
         gamma (Optional[float]): The regularization strength.
         task_heads (bool): Whether to use task-specific heads.
+        reset_rbf_mask (bool): Reset RBF mask per task.
         clipgrad (Optional[float]): The gradient clipping value.
         plugins (Optional[list[MethodPluginABC]]): List of plugins to be used during training.
 
@@ -56,6 +58,7 @@ class Composer:
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
+        reset_rbf_mask: bool=False,
         clipgrad: Optional[float]=None,
         retaingraph: Optional[bool]=False,
         log_reg: Optional[bool]=False,
@@ -73,6 +76,7 @@ class Composer:
             reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
             gamma (Optional[float], optional): The gamma value for learning rate decay. Defaults to None.
             task_heads (Optional[bool], optional): Whether to use task-specific heads. Defaults to False.
+            reset_rbf_mask (Optional[bool], optional): Whether to reset the RBF mask per task. Defaults to False. IMPORTANT only works with `RBFLayer` `start_empty=True`
             clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.
             retaingraph (Optional[bool], optional): Whether to retain the computation graph. Defaults to False.
             log_reg (Optional[bool], optional): Whether to log the regularization loss. Defaults to False.
@@ -88,6 +92,7 @@ class Composer:
         self.reg_type = reg_type
         self.gamma = gamma
         self.task_heads = task_heads
+        self.reset_rbf_mask = reset_rbf_mask
         self.clipgrad = clipgrad
         self.retaingraph = retaingraph
         self.plugins = plugins
@@ -151,6 +156,11 @@ class Composer:
                    tmp_head = deepcopy(self.module.head)
                 self.heads.append(tmp_head)
             self.module.head = self.heads[task_id]
+
+        if self.reset_rbf_mask and task_id > 0:
+            for layer in self.module.layers+[self.module.head]:
+                if isinstance(layer, RBFLayer):
+                    layer.mask = layer.init_group_mask()
 
         self._setup_optim(task_id)
         for plugin in self.plugins:

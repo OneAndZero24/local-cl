@@ -4,3 +4,4 @@ criterion: CrossEntropyLoss
 first_lr: 0.01
 lr: 0.01
 criterion_scale: 1e-5
+reset_rbf_mask: True
