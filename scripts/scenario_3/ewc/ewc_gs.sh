@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_mnist_ewc_scenario_3
+#SBATCH --job-name=local_cl_split_mnist_ewc_scenario_4
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/scenario_3/ewc/ewc_gs"
+run_sweep_and_agent "scripts/scenario_4/ewc/ewc_gs"

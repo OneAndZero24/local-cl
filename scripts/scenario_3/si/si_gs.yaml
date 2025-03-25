@@ -12,7 +12,7 @@ parameters:
   model:
     value: mlp_rbf
   method:
-    value: composer_two_si
+    value: composer_si
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -38,7 +38,7 @@ parameters:
   model.sizes:
     values: [[1024, 100, 8], [1024, 400, 32]]
   model.head_type: 
-    values: SingleRBFHead
+    value: MultiRBFHead
   model.layers: 
     value: ["Normal", "Normal"]
   # model.num_kernels:
@@ -56,9 +56,9 @@ parameters:
   #   min: 100
   #   max: 3000
   # model.local_linear:
-  #   values: [False]
+  #   value: False
   # model.normalization:
-  #   values: [True, False]       
+  #   values: [True, False]     
 
   # Method configuration
   method._partial_: 
@@ -66,11 +66,7 @@ parameters:
   method._target_: 
     value: method.Composer
   method.criterion: 
-    value: MahalanobisDistanceLoss
-  method.criterion_scale:
-    distribution: uniform
-    min: 1e-8
-    max: 1.0
+    value: CrossEntropyLoss
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
@@ -79,25 +75,23 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
+  method.criterion_scale:
+    distribution: uniform
+    min: 1e-8
+    max: 1.0
   method.plugins.0._target_:
-    value: method.RBFNeuronOutReg
+    value: method.SI
   method.plugins.0.alpha: 
     distribution: uniform      
     min: 0.1
     max: 1000
-  method.plugins.1._target_:
-    value: method.SI
-  method.plugins.1.alpha: 
-    distribution: uniform      
-    min: 0.1
-    max: 1000
-  method.plugins.1.head_opt:
-    value: False
+  method.plugins.0.head_opt:
+    value: True
 
 command:
   - ${env}
   - python
   - ${program}
   - --config-name
-  - two_split_mnist_mlp.yaml
+  - si_split_mnist_mlp.yaml
   - ${args_no_hyphens}
