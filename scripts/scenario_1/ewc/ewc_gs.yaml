@@ -42,57 +42,58 @@ parameters:
   model.layers: 
     value: ["RBF", "RBF"]
   
-  model.config.0.num_kernels:
-    distribution: int_uniform
-    min: 1
-    max: 100
-  model.config.0.no_groups:
-    distribution: int_uniform
-    min: 1
-    max: 50
-  model.config.0.growing_mask: 
-    value: False
-  model.config.0.no_mask_update_iterations:
-    distribution: int_uniform
-    min: 100
-    max: 3000
-  model.config.0.local_linear:
-    values: [True, False]
-  model.config.0.normalization:
-    values: [True, False]
-  model.config.0.radial_function: 
-    _target_: model.layer.rbf.rbf_gaussian
-    _partial_: True
-  model.config.0.norm_function: 
-    _target_: model.layer.rbf.l_norm
-    _partial_: True
+  model.config:
+    - num_kernels:
+        distribution: int_uniform
+        min: 1
+        max: 100
+      no_groups:
+        distribution: int_uniform
+        min: 1
+        max: 50
+      growing_mask: 
+        value: False
+      no_mask_update_iterations:
+        distribution: int_uniform
+        min: 100
+        max: 3000
+      local_linear:
+        values: [True, False]
+      normalization:
+        values: [True, False]
+      radial_function: 
+        _target_: model.layer.rbf.rbf_gaussian
+        _partial_: True
+      norm_function: 
+        _target_: model.layer.rbf.l_norm
+        _partial_: True
 
-  model.config.1.num_kernels:
-    distribution: int_uniform
-    min: 1
-    max: 100
-  model.config.1.no_groups:
-    distribution: int_uniform
-    min: 1
-    max: 50
-  model.config.1.growing_mask: 
-    value: True
-  model.config.1.start_empty:
-    value: True
-  model.config.1.no_mask_update_iterations:
-    distribution: int_uniform
-    min: 100
-    max: 3000
-  model.config.1.local_linear:
-    values: [True, False]
-  model.config.1.normalization:
-    values: [True, False]
-  model.config.1.radial_function: 
-    _target_: model.layer.rbf.rbf_gaussian
-    _partial_: True
-  model.config.1.norm_function: 
-    _target_: model.layer.rbf.l_norm
-    _partial_: True
+    - num_kernels:
+        distribution: int_uniform
+        min: 1
+        max: 100
+      no_groups:
+        distribution: int_uniform
+        min: 1
+        max: 50
+      growing_mask: 
+        value: True
+      start_empty:
+        value: True
+      no_mask_update_iterations:
+        distribution: int_uniform
+        min: 100
+        max: 3000
+      local_linear:
+        values: [True, False]
+      normalization:
+        values: [True, False]
+      radial_function: 
+        _target_: model.layer.rbf.rbf_gaussian
+        _partial_: True
+      norm_function: 
+        _target_: model.layer.rbf.l_norm
+        _partial_: True
 
   # Method configuration
   method._partial_: 
