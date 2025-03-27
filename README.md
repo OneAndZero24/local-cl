@@ -28,14 +28,15 @@
 
 ## Results
 **SplitMNIST**
-| Method | Normal | RBF |
-| ------ | ------ | --- |
-| Naive | *19.94* | |
-| LwF | *39.91* |  |
-| EWC | ***54.65*** | **50.21** |
-| SI | *32.32* | 32.28|
-| MAS | 36.51 | *37.69* |
-| Sharpening | 19.93 | *20.65* |
+| Method | Full MLP | RBF+MultiRBFHead | RBF+SingleRBFHead | MLP+MultiRBFHead |
+| ------ | -------- | ---------------- | ----------------- | ---------------- |
+| Naive | *19.94* | | | |
+| LwF | *39.91* | | NA | |
+| EWC | ***54.65*** | | | |
+| SI | *32.32* | | | |
+| MAS | *36.51* | | | |
+| Sharpening | *19.93* | | | |
+| NReg | NA | | | |
 
 ## Commands
 **Setup**
