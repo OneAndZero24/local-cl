@@ -37,10 +37,6 @@ parameters:
     value: 2          
   model.sizes:
     value: [1024, 400]
-  method.criterion_scale:
-    distribution: uniform
-    min: 1e-8
-    max: 1.0
   model.head_type: 
     value: Normal
   model.layers: 
@@ -53,6 +49,10 @@ parameters:
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
+  method.criterion_scale:
+    distribution: uniform
+    min: 1e-8
+    max: 1.0
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
