@@ -4,6 +4,7 @@ criterion: CrossEntropyLoss
 first_lr: 0.001
 lr: 0.001
 criterion_scale: 1.0
+reset_rbf_mask: False
 plugins:
   - _target_: method.EWC
     alpha: 2000

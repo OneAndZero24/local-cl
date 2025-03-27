@@ -3,6 +3,7 @@ _target_: method.Composer
 criterion: MahalanobisDistanceLoss
 first_lr: 0.01
 lr: 0.01
+reset_rbf_mask: False
 plugins:
   - _target_: method.Dreaming
     alpha: 0.4
