@@ -197,6 +197,8 @@ class RBFLayer(LocalModule):
     def init_group_mask(self):
         """Initialize masks to define group of neurons within a neural network"""
 
+        device = self.kernels_centers.device
+
         self.iteration = 0
         assert self.no_groups > 0, "Number of created groups should be greater than 0."
         group_size_neurons = self.num_kernels // self.no_groups
@@ -223,7 +225,7 @@ class RBFLayer(LocalModule):
             # unused_neurons = np.where(mask.sum(axis=1) == 0)[0]
             # assert len(unused_neurons) == 0, "There are unused neurons!"
 
-        return nn.Parameter(mask, requires_grad=False)
+        return nn.Parameter(mask.to(device), requires_grad=False)
     
     def update_mask(self):
         """Gradually increases the number of ones in a mask, guaranteeing full ones at the final epoch."""
