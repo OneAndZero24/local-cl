@@ -42,7 +42,7 @@ parameters:
   model.layers: 
     value: ["Normal", "Normal"]
 
-   model.config.0.num_kernels:
+  model.config.0.num_kernels:
     distribution: int_uniform
     min: 1
     max: 100
@@ -60,12 +60,14 @@ parameters:
     values: [True, False]
   model.config.0.normalization:
     values: [True, False]
-  model.config.0.radial_function: 
-    _target_: model.layer.rbf.rbf_gaussian
-    _partial_: True
-  model.config.0.norm_function: 
-    _target_: model.layer.rbf.l_norm
-    _partial_: True
+  model.config.0.radial_function._target_: 
+    value: model.layer.rbf.rbf_gaussian
+  model.config.0.radial_function._partial_:
+    value: True
+  model.config.0.norm_function._target_:
+    value: model.layer.rbf.l_norm
+  model.config.0.norm_function._partial_:
+    value: True
 
   model.config.1.num_kernels:
     distribution: int_uniform
@@ -87,12 +89,14 @@ parameters:
     values: [True, False]
   model.config.1.normalization:
     values: [True, False]
-  model.config.1.radial_function: 
-    _target_: model.layer.rbf.rbf_gaussian
-    _partial_: True
-  model.config.1.norm_function: 
-    _target_: model.layer.rbf.l_norm
-    _partial_: True
+  model.config.1.radial_function._target_: 
+    value: model.layer.rbf.rbf_gaussian
+  model.config.1.radial_function._partial_:
+    value: True
+  model.config.1.norm_function._target_:
+    value: model.layer.rbf.l_norm
+  model.config.1.norm_function._partial_:
+    value: True
 
   # Method configuration
   method._partial_: 
