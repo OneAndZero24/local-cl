@@ -183,7 +183,7 @@ class RBFLayer(LocalModule):
 
         if self.local_linear:
             self.local_linear_weights = nn.Parameter(
-                torch.zeros(self.num_kernels, self.in_features, self.out_features, dtype=torch.float32)
+                torch.zeros(self.out_features, self.num_kernels, self.in_features, dtype=torch.float32)
             )
             self.local_linear_bias = nn.Parameter(
                 torch.zeros(self.out_features, self.num_kernels, dtype=torch.float32)
@@ -318,7 +318,7 @@ class RBFLayer(LocalModule):
 
         # Apply local linear transformation
         if self.local_linear:
-            weights = torch.einsum('bni,nio->bon', diff, self.local_linear_weights) + self.local_linear_bias
+            weights = torch.einsum('bni,oni->bon', diff, self.local_linear_weights) + self.local_linear_bias
 
         # Apply linear combination; out has size B x Fout
         out = weights * rbfs.view(
@@ -343,4 +343,4 @@ class RBFLayer(LocalModule):
     
     def incrementable_params(self):
         """ Returns the incrementable parameters of the module. """
-        return ["weights"]
+        return ["weights", "local_linear_weights", "local_linear_bias"] if self.local_linear else ["weights"]
