@@ -83,7 +83,7 @@ class DynamicScaling():
             dynamic_lambda = 1.0
         return dynamic_lambda * loss_ce + loss_reg
 
-    def compute_dynamic_lambda(self, grads_ce: list, grads_reg: list) -> float:
+    def compute_dynamic_lambda(self, grads_ce, grads_reg):
         """
         Computes the dynamic lambda_t using exponential annealing of misaligned gradients.
 
@@ -108,7 +108,7 @@ class DynamicScaling():
 
         if grads_ce_flat.numel() == 0 or grads_reg_flat.numel() == 0:
             log.warning("Skipping lambda_t update due to missing gradients.")
-            return self.prev_dynamic_lambda
+            return self.prev_dynamic_lambda 
 
         cos_theta = F.cosine_similarity(
             grads_ce_flat.unsqueeze(0), 
@@ -118,7 +118,7 @@ class DynamicScaling():
         if cos_theta < self.threshold:
             dynamic_lambda = self.min_lambda
         else:
-            dynamic_lambda = torch.exp(-self.beta * (1 - cos_theta)).item()
+            dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
 
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda
