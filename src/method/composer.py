@@ -12,6 +12,7 @@ from model.layer.rbf import RBFLayer
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
+from method.dynamic_loss_scaling import DynamicScaling
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -55,6 +56,9 @@ class Composer:
         first_lr: float, 
         lr: float,
         criterion_scale: float,
+        min_lambda: float,
+        max_lambda: float,
+        beta: float,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -89,6 +93,9 @@ class Composer:
         self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
+        self.max_lambda = max_lambda
+        self.min_lambda = min_lambda
+        self.beta = beta
         self.reg_type = reg_type
         self.gamma = gamma
         self.task_heads = task_heads
@@ -166,6 +173,8 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
+        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta)
+
 
     def forward(self, x, y, task_id):
         """
@@ -186,11 +195,14 @@ class Composer:
         loss = self.criterion(preds, y)
         if task_id > 0:
             loss *= self.criterion_scale
+        loss_ce = loss
         loss = self._add_reg(loss)
 
         old_loss = loss
         for plugin in self.plugins:
-            loss, preds = plugin.forward(x, y, loss, preds)
+            reg_loss, preds = plugin.forward(x, y, loss, preds)
+        loss = self.dynamic_scaling.forward(task_id, loss_ce, reg_loss)
+        # loss = loss_ce + reg_loss
         if self.log_reg:
             wandb.log({f'Loss/train/{task_id}/reg': loss-old_loss})
         return loss, preds
