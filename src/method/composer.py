@@ -59,6 +59,8 @@ class Composer:
         min_lambda: float,
         max_lambda: float,
         beta: float,
+        threshold: float,
+        ema_scale: float,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -96,6 +98,8 @@ class Composer:
         self.max_lambda = max_lambda
         self.min_lambda = min_lambda
         self.beta = beta
+        self.threshold = threshold
+        self.ema_scale = ema_scale
         self.reg_type = reg_type
         self.gamma = gamma
         self.task_heads = task_heads
@@ -173,7 +177,8 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta)
+        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta,
+                                              self.threshold, self.ema_scale)
 
 
     def forward(self, x, y, task_id):
