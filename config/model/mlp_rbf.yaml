@@ -9,6 +9,7 @@ config:
     growing_mask: False
     no_mask_update_iterations: 1500
     local_linear: False
+    times_square: False
     normalization: True
     radial_function: 
       _target_: model.layer.rbf.rbf_gaussian
@@ -21,6 +22,7 @@ config:
     growing_mask: True
     no_mask_update_iterations: 1500
     local_linear: False
+    times_square: False
     normalization: True
     start_empty: True
     radial_function: 
