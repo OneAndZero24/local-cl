@@ -3,5 +3,5 @@ initial_out_features: 2
 kernel_sizes: [5, 5, 5]
 kernel_strides: [1, 1, 1]
 sizes: [1, 6, 16, 120]
-mlp_sizes: [84, 42]
-mlp_layers: ["Normal", "Normal"]
+mlp_sizes: [120, 40]
+mlp_layers: ["Normal"]

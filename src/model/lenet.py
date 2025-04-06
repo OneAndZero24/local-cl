@@ -91,10 +91,22 @@ class LeNet(CLModuleABC):
         assert len(kernel_sizes) == len(kernel_strides), "Kernel sizes and strides must match"
         assert len(kernel_sizes) == len(sizes)-1, "Kernel sizes and sizes must match"
 
+        mlp = MLP(
+            initial_out_features,
+            mlp_sizes,
+            mlp_layers,
+            head_type,
+            mlp_activation,
+            mlp_config
+        )
+        super().__init__(mlp.head)
+
+        self.mlp = mlp
+
         conv_type = LayerType(conv_type)
 
-        list_config = isinstance(config, (list, ListConfig))
         config = conv_config
+        list_config = isinstance(config, (list, ListConfig))
 
         layers = []
         for i in range(len(sizes)-1):
@@ -109,16 +121,7 @@ class LeNet(CLModuleABC):
                 layers.append(nn.AvgPool2d(kernel_size=2, stride=2))
 
         self.conv_layers = nn.ModuleList(layers)
-
-        self.mlp = MLP(
-            initial_out_features,
-            mlp_sizes,
-            mlp_layers,
-            head_type,
-            mlp_activation,
-            mlp_config
-        )
-        super().__init__(self.mlp.head)
+        self.layers = self.conv_layers+self.mlp.layers
 
 
     def forward(self, x):
