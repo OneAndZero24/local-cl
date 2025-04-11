@@ -12,7 +12,7 @@ parameters:
   model:
     value: mlp_rbf
   method:
-    value: composer_rbf_naive
+    value: composer_naive
   exp.seed: 
     value: 42      
   exp.batch_size:
