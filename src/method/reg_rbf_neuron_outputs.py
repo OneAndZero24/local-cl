@@ -68,7 +68,7 @@ class RBFNeuronOutReg(MethodPluginABC):
                 if self.hidden_layers_reg and isinstance(module, torch.nn.ModuleList):
                     for idx, layer in enumerate(module):
                         if type(layer).__name__ == "RBFLayer":
-                            self.params_buffer.update(get_rbf_layer_params(layer, idx))
+                            self.params_buffer.update(get_rbf_layer_params(layer, idx, old_nclasses, "multi"))
                 elif type(module).__name__ == "IncrementalClassifier":
                     layer = module.classifier
                     old_nclasses = module.old_nclasses
@@ -115,7 +115,7 @@ class RBFNeuronOutReg(MethodPluginABC):
                     for idx, layer in enumerate(module):
                         if type(layer).__name__ == "RBFLayer":
                             # Get current parameters
-                            W_curr, C_curr, Sigma_curr = get_rbf_layer_params(layer)
+                            W_curr, C_curr, Sigma_curr = get_rbf_layer_params(layer, old_nclasses, "multi")
 
                             # Retrieve old stored parameters
                             W_old, C_old, Sigma_old = get_old_rbf_layer_params(idx)
