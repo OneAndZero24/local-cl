@@ -98,9 +98,7 @@ class EWC(MethodPluginABC):
         self.data_buffer.add((x, y))
 
         if self.task_id > 0:
-            loss = self.alpha*param_change_loss(self.module, self.fisher_diag, self.params_buffer, self.head_opt)
-        else:
-            loss = torch.tensor(0.0)
+            loss += self.alpha*param_change_loss(self.module, self.fisher_diag, self.params_buffer, self.head_opt)
         return loss, preds
 
 

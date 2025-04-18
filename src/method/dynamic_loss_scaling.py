@@ -113,6 +113,7 @@ class DynamicScaling():
             grads_reg_flat.unsqueeze(0), dim=1, eps=1e-8
         ).item()
 
+        preds = F.softmax(preds, dim=-1)
         entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
         entropy /= torch.log(torch.tensor(preds.size(1))).item()
 
