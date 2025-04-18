@@ -42,7 +42,7 @@ parameters:
   model.layers: 
     value: ["Normal", "Normal"]
 
-  model.config.0.num_kernels:
+  model.config.0.num_kernels: 
     distribution: int_uniform
     min: 1
     max: 100
