@@ -26,7 +26,8 @@ class DynamicScaling():
         prev_dynamic_lambda (float or None): Stores the previous lambda value for EMA updates.
     """
 
-    def __init__(self, module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float):
+    def __init__(self, module, min_lambda: float, max_lambda: float, beta: float, 
+                 ema_scale: float, use_entropy_scale: bool):
         """
         Initializes the DynamicScaling module.
 
@@ -36,9 +37,10 @@ class DynamicScaling():
             max_lambda (float): Maximum lambda value for scaling CE loss.
             beta (float): Exponential decay factor controlling the lambda update.
             ema_scale (float): EMA factor for smoothing lambda updates.
+            use_entropy_scale (bool): Flag to indicate if entropy scaling should be used.
 
         Methods:
-            __init__(module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float):
+            __init__(module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float, use_entropy_scale: bool):
                 Initializes the DynamicScaling method with the given hyperparameters.
             forward(task_id, loss_ce, loss_reg):
                 Computes the dynamically scaled loss by adjusting the cross-entropy loss weight.
@@ -51,6 +53,7 @@ class DynamicScaling():
         self.beta = beta
         self.ema_scale = ema_scale
         self.module = module
+        self.use_entropy_scale = use_entropy_scale
 
         self.prev_dynamic_lambda = None
 
@@ -113,14 +116,16 @@ class DynamicScaling():
             grads_reg_flat.unsqueeze(0), dim=1, eps=1e-8
         ).item()
 
-        preds = F.softmax(preds, dim=-1)
-        entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
-        entropy /= torch.log(torch.tensor(preds.size(1))).item()
-
         dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
         dynamic_lambda -= torch.exp(torch.tensor(-2.0 * self.beta)).item()
-        dynamic_lambda *= entropy
 
+        if self.use_entropy_scale:
+            preds = F.softmax(preds, dim=-1)
+            preds = torch.clamp(preds, min=1e-8, max=1.0)
+            entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
+            entropy /= torch.log(torch.tensor(preds.size(1))).item()
+            dynamic_lambda *= entropy
+            print(f"Entropy: {entropy:.4f}")
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda
         else:

@@ -77,10 +77,14 @@ parameters:
     distribution: uniform
     min: 0.7
     max: 0.99
+  method.use_entropy_scale:
+    values: [True, False]
   method.plugins.0._target_:
     value: method.SI
   method.plugins.0.alpha: 
-   value: 1.0
+    distribution: uniform
+    min: 0.1
+    max: 10000.0
   method.plugins.0.head_opt:
     value: True
 
