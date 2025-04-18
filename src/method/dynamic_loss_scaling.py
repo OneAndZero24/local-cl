@@ -118,6 +118,7 @@ class DynamicScaling():
         entropy /= torch.log(torch.tensor(preds.size(1))).item()
 
         dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
+        dynamic_lambda -= torch.exp(torch.tensor(-2.0 * self.beta)).item()
         dynamic_lambda *= entropy
 
         if self.prev_dynamic_lambda is None:
