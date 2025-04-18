@@ -19,7 +19,7 @@
 | Method | Status | Custom Layers | Status | Model | Status | Scenario | Status | Dataset | Status |
 | ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
 | Naive | ✅ | Local | ✅ | MLP | ✅ | CI | ✅ | MNIST | ✅ |
-| LwF | ✅ | RBF | ✅ | LeNet | ⭕️ | DI | ✅ | ImageNet | ✅ |
+| LwF | ✅ | RBF | ✅ | LeNet | ✅ | DI | ✅ | ImageNet | ✅ |
 | EWC | ✅ | SingleRBFHead | ✅ | | | TI | ✅ | CIFAR100 | ✅ |
 | Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
@@ -30,13 +30,13 @@
 **SplitMNIST**
 | Method | Full MLP | RBF+MultiRBFHead | RBF+SingleRBFHead | MLP+MultiRBFHead |
 | ------ | -------- | ---------------- | ----------------- | ---------------- |
-| Naive | *19.94* | | | |
-| LwF | *39.91* | | NA | |
-| EWC | ***54.65*** | | | |
-| SI | *32.32* | | | |
-| MAS | *36.51* | | | |
-| Sharpening | *19.93* | | | |
-| NReg | NA | | | |
+| Naive | 19.94 | 19.87 | *19.98* | 19.95 |
+| LwF | *39.91* | **22.71** | NA |  |
+| EWC | ***54.65*** | 19.74 | 21.86 | **51.81** |
+| SI | *32.32* | 12.62 | 19.32 | 31.56 |
+| MAS | 36.51 | 10.18 | **26.58** | *49.24* |
+| Sharpening | 19.93 | *19.94* | 19.83 | |
+| NReg | NA | 19.90 | 19.85 | 19.92 |
 
 ## Commands
 **Setup**

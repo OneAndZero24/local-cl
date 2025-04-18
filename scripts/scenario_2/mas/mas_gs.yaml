@@ -58,6 +58,8 @@ parameters:
     max: 3000
   model.config.0.local_linear:
     values: [True, False]
+  model.config.0.times_square:
+    values: [True, False]
   model.config.0.normalization:
     values: [True, False]
   model.config.0.radial_function._target_: 
@@ -86,6 +88,8 @@ parameters:
     min: 100
     max: 3000
   model.config.1.local_linear:
+    values: [True, False]
+  model.config.1.times_square:
     values: [True, False]
   model.config.1.normalization:
     values: [True, False]

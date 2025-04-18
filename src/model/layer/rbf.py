@@ -90,6 +90,7 @@ class RBFLayer(LocalModule):
         norm_function (Callable[[torch.Tensor], torch.Tensor]): Normalization function applied to the features.
         normalization (bool, optional): If True, applies the normalization trick to the RBF layer. Default is True.
         local_linear (bool, optional): If True, applies a trainable linear transformation to x-c. Default is False.
+        times_square (bool, optional): If True, multiplies x^2 by output. Default is False.
         initial_shape_parameter (torch.Tensor, optional): Sets the shape parameter to the desired value. Default is None.
         initial_centers_parameter (torch.Tensor, optional): Sets the centers to the desired value. Default is None.
         initial_weights_parameters (torch.Tensor, optional): Sets the weights parameter to the desired value. Default is None.
@@ -110,6 +111,7 @@ class RBFLayer(LocalModule):
                  norm_function: Callable[[torch.Tensor], torch.Tensor],
                  normalization: bool = True,
                  local_linear: bool = False,
+                 times_square: bool = False,
                  initial_shape_parameter: torch.Tensor = None,
                  initial_centers_parameter: torch.Tensor = None,
                  initial_weights_parameters: torch.Tensor = None,
@@ -127,6 +129,7 @@ class RBFLayer(LocalModule):
         self.norm_function = norm_function
         self.normalization = normalization
         self.local_linear = local_linear
+        self.times_square = times_square
 
         self.initial_shape_parameter = initial_shape_parameter
         self.constant_shape_parameter = constant_shape_parameter
@@ -187,6 +190,11 @@ class RBFLayer(LocalModule):
             )
             self.local_linear_bias = nn.Parameter(
                 torch.zeros(self.out_features, self.num_kernels, dtype=torch.float32)
+            )
+
+        if self.times_square:
+            self.square_scale = nn.Parameter(
+                torch.ones(self.num_kernels, self.in_features, dtype=torch.float32)
             )
 
         # Initialize mask to define groups
@@ -272,6 +280,9 @@ class RBFLayer(LocalModule):
             nn.init.xavier_uniform_(self.local_linear_weights, gain=gain_weights)
             nn.init.constant_(self.local_linear_bias, 0.01)
 
+        if self.times_square:
+            nn.init.xavier_uniform_(self.square_scale, gain=gain_weights)
+
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the RBF layer.
@@ -299,7 +310,9 @@ class RBFLayer(LocalModule):
         sigma = self.log_shapes.exp().expand(batch_size, self.num_kernels,
                                              self.in_features)
 
-        diff = (input.view(batch_size, 1, self.in_features) - c) / sigma
+        x = input.view(batch_size, 1, self.in_features)
+
+        diff = (x - c) / sigma
         diff *= self.mask
 
         # Apply norm function; c has size B x num_kernels
@@ -321,8 +334,13 @@ class RBFLayer(LocalModule):
             weights = torch.einsum('bni,oni->bon', diff, self.local_linear_weights) + self.local_linear_bias
 
         # Apply linear combination; out has size B x Fout
-        out = weights * rbfs.view(
-            batch_size, 1, self.num_kernels)
+
+        out = weights * rbfs.view(batch_size, 1, self.num_kernels)
+
+        if self.times_square:
+            square_scale = self.square_scale.expand(batch_size, self.num_kernels, self.in_features)
+            sq = square_scale*(x*x)
+            out = torch.einsum('bni,bon->bon', sq, out)
 
         return out.sum(dim=-1)
 
@@ -343,4 +361,9 @@ class RBFLayer(LocalModule):
     
     def incrementable_params(self):
         """ Returns the incrementable parameters of the module. """
-        return ["weights", "local_linear_weights", "local_linear_bias"] if self.local_linear else ["weights"]
+        
+        R = ["weights"]
+        if self.local_linear:
+            R.append("local_linear_weights")
+            R.append("local_linear_bias")
+        return R
