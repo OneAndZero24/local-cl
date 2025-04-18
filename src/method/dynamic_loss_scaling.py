@@ -22,13 +22,11 @@ class DynamicScaling():
         min_lambda (float): Minimum value of lambda (lower bound).
         max_lambda (float): Maximum value of lambda (upper bound).
         beta (float): Scaling factor that controls the rate of exponential annealing.
-        threshold (float): Cosine similarity threshold to decide if scaling should be applied.
         ema_scale (float): Exponential Moving Average (EMA) factor for smoothing updates.
         prev_dynamic_lambda (float or None): Stores the previous lambda value for EMA updates.
     """
 
-    def __init__(self, module, min_lambda: float, max_lambda: float, beta: float, 
-                 threshold: float, ema_scale: float):
+    def __init__(self, module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float):
         """
         Initializes the DynamicScaling module.
 
@@ -37,12 +35,10 @@ class DynamicScaling():
             min_lambda (float): Minimum lambda value for scaling CE loss.
             max_lambda (float): Maximum lambda value for scaling CE loss.
             beta (float): Exponential decay factor controlling the lambda update.
-            threshold (float): Cosine similarity threshold for deciding whether to scale.
             ema_scale (float): EMA factor for smoothing lambda updates.
 
         Methods:
-            __init__(module, min_lambda: float, max_lambda: float, beta: float, 
-                 threshold: float, ema_scale: float):
+            __init__(module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float):
                 Initializes the DynamicScaling method with the given hyperparameters.
             forward(task_id, loss_ce, loss_reg):
                 Computes the dynamically scaled loss by adjusting the cross-entropy loss weight.
@@ -53,13 +49,13 @@ class DynamicScaling():
         self.min_lambda = min_lambda
         self.max_lambda = max_lambda
         self.beta = beta
-        self.threshold = threshold
         self.ema_scale = ema_scale
         self.module = module
 
         self.prev_dynamic_lambda = None
 
-    def forward(self, task_id: int, loss_ce: torch.Tensor, loss_reg: torch.Tensor) -> torch.Tensor:
+    def forward(self, task_id: int, loss_ce: torch.Tensor, loss_reg: torch.Tensor, 
+                preds: torch.Tensor) -> torch.Tensor:
         """
         Computes the dynamically scaled loss based on gradient alignment.
 
@@ -70,6 +66,7 @@ class DynamicScaling():
             task_id (int): The current task index in a continual learning setup.
             loss_ce (torch.Tensor): Cross-entropy loss for classification.
             loss_reg (torch.Tensor): Regularization loss (e.g., EWC, L2 penalty).
+            preds (torch.Tensor): Model predictions.
 
         Returns:
             torch.Tensor: The weighted sum of `loss_ce` and `loss_reg`, 
@@ -78,12 +75,12 @@ class DynamicScaling():
         if task_id > 0 and self.module.training:
             grads_reg = torch.autograd.grad(loss_reg, self.module.parameters(), retain_graph=True)            
             grads_ce = torch.autograd.grad(loss_ce, self.module.parameters(), retain_graph=True)
-            dynamic_lambda = self.compute_dynamic_lambda(grads_ce, grads_reg)
+            dynamic_lambda = self.compute_dynamic_lambda(grads_ce, grads_reg, preds)
         else:
             dynamic_lambda = 1.0
         return dynamic_lambda * loss_ce + loss_reg
 
-    def compute_dynamic_lambda(self, grads_ce, grads_reg):
+    def compute_dynamic_lambda(self, grads_ce, grads_reg, preds):
         """
         Computes the dynamic lambda_t using exponential annealing of misaligned gradients.
 
@@ -97,6 +94,7 @@ class DynamicScaling():
         Args:
             grads_ce (list of torch.Tensor): Gradients of cross-entropy loss.
             grads_reg (list of torch.Tensor): Gradients of regularization loss.
+            preds (torch.Tensor): Model predictions.
 
         Returns:
             float: The updated lambda_t value, ensuring it remains within 
@@ -115,10 +113,11 @@ class DynamicScaling():
             grads_reg_flat.unsqueeze(0), dim=1, eps=1e-8
         ).item()
 
-        if cos_theta < self.threshold:
-            dynamic_lambda = self.min_lambda
-        else:
-            dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
+        entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
+        entropy /= torch.log(torch.tensor(preds.size(1))).item()
+
+        dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
+        dynamic_lambda *= entropy
 
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda

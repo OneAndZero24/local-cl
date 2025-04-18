@@ -5,6 +5,11 @@ first_lr: 0.001
 lr: 0.001
 criterion_scale: 1e-5
 reset_rbf_mask: False
+min_lambda: 1e-8
+max_lambda: 1.0
+beta: 10.0
+ema_scale: 0.9
+use_dynamic_alpha: True
 plugins:
   - _target_: method.SI
     alpha: 2048
