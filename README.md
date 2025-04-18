@@ -25,6 +25,8 @@
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
 | MAS | ✅ | LocalHead | ⭕️ |
 | RBFReg | ✅ | LocalConv2D | ⭕️ |
+| Dreaming | ✅ | TIMM Big Models | ✅ |
+| Dynamic Loss Scaling | ✅ |
 
 ## Results
 **SplitMNIST**
