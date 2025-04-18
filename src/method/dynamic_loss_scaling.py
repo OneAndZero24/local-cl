@@ -125,7 +125,6 @@ class DynamicScaling():
             entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
             entropy /= torch.log(torch.tensor(preds.size(1))).item()
             dynamic_lambda *= entropy
-            print(f"Entropy: {entropy:.4f}")
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda
         else:
