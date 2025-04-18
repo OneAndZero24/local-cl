@@ -20,12 +20,12 @@
 | ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
 | Naive | ✅ | Local | ✅ | MLP | ✅ | CI | ✅ | MNIST | ✅ |
 | LwF | ✅ | RBF | ✅ | LeNet | ✅ | DI | ✅ | ImageNet | ✅ |
-| EWC | ✅ | SingleRBFHead | ✅ | | | TI | ✅ | CIFAR100 | ✅ |
+| EWC | ✅ | SingleRBFHead | ✅ | TIMM Big Backbone | ✅ | TI | ✅ | CIFAR100 | ✅ |
 | Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
 | MAS | ✅ | LocalHead | ⭕️ |
 | RBFReg | ✅ | LocalConv2D | ⭕️ |
-| Dreaming | ✅ | TIMM Big Models | ✅ |
+| Dreaming | ✅ |
 | Dynamic Loss Scaling | ✅ |
 
 ## Results
