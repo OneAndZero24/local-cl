@@ -68,7 +68,7 @@ parameters:
   method.max_lambda:
     distribution: uniform
     min: 1.0
-    max: 10.0
+    max: 100.0
   method.beta:
     distribution: uniform
     min: 0.1
