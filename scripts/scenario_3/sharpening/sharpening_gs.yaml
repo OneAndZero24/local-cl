@@ -38,7 +38,7 @@ parameters:
   model.sizes:
     values: [[1024, 100, 8], [1024, 400, 32]]
   model.head_type: 
-    value: MultiRBFHead
+    value: SingleRBFHead
   model.layers: 
     value: ["Normal", "Normal"]
 
