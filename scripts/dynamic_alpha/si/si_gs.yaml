@@ -12,11 +12,11 @@ parameters:
   model:
     value: mlp
   method:
-    value: composer_ewc
+    value: composer_si
   exp.seed: 
     value: 42      
   exp.batch_size:
-    value: 128     
+    values: [512,256,128,64]      
   exp.epochs: 
     values: [50, 10, 5, 1]
   exp.gen_cm: 
@@ -28,7 +28,7 @@ parameters:
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True    
+    value: True     
 
   # Model configuration
   model._target_: 
@@ -40,7 +40,7 @@ parameters:
   model.head_type: 
     value: Normal
   model.layers: 
-    value: ["Normal"]    
+    value: ["Normal"]      
 
   # Method configuration
   method._partial_: 
@@ -49,14 +49,14 @@ parameters:
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
-  method.criterion_scale:
-    distribution: uniform
-    min: 1e-8
-    max: 1.0
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
     max: 0.01
+  method.criterion_scale:
+    value: 1.0
+  method.use_dynamic_alpha:
+    value: True
   method.lr: 
     distribution: log_uniform_values 
     min: 0.0001
@@ -66,22 +66,25 @@ parameters:
     min: 1e-8
     max: 1e-3
   method.max_lambda:
-    value: 1.0
+    distribution: uniform
+    min: 1.0
+    max: 10.0
   method.beta:
     distribution: uniform
     min: 0.1
-    max: 10.0
+    max: 100.0
   method.ema_scale:
     distribution: uniform
     min: 0.7
     max: 0.99
-
+  method.use_entropy_scale:
+    values: [True, False]
   method.plugins.0._target_:
-    value: method.EWC
+    value: method.SI
   method.plugins.0.alpha: 
-    distribution: uniform      
-    min: 100
-    max: 10000
+    distribution: uniform
+    min: 0.1
+    max: 10000.0
   method.plugins.0.head_opt:
     value: True
 
@@ -91,5 +94,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - ewc_split_mnist_mlp.yaml
+  - si_split_mnist_mlp.yaml
   - ${args_no_hyphens}

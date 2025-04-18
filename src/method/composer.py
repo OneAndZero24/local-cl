@@ -12,6 +12,7 @@ from model.layer.rbf import RBFLayer
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
+from method.dynamic_loss_scaling import DynamicScaling
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -22,31 +23,27 @@ class Composer:
 
     Attributes:
         module (CLModuleABC): The module to be trained.
-        criterion (str): The loss function.
+        criterion (LossCriterion): The loss function.
         optimizer (Optional[optim.Optimizer]): The optimizer for training.
         first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
-        criterion_scale (float): The regularization strength of the used criterion loss function.
-        reg_type (Optional[str]): The type of regularization to apply.
+        criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
+        max_lambda (float): The maximum lambda value for dynamic scaling.
+        min_lambda (float): The minimum lambda value for dynamic scaling.
+        beta (float): The beta value for dynamic scaling.
+        ema_scale (float): The EMA scale for dynamic scaling.
+        use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
+        use_entropy_scale (bool): Whether to use entropy scaling.
+        reg_type (Optional[str]): The type of regularization to apply (e.g., L1, L2).
         gamma (Optional[float]): The regularization strength.
-        task_heads (bool): Whether to use task-specific heads.
-        reset_rbf_mask (bool): Reset RBF mask per task.
+        task_heads (bool): Whether to use task-specific heads for multi-task learning.
+        reset_rbf_mask (bool): Whether to reset the RBF mask for each task.
         clipgrad (Optional[float]): The gradient clipping value.
+        retaingraph (Optional[bool]): Whether to retain the computation graph during backpropagation.
+        log_reg (Optional[bool]): Whether to log the regularization loss during training.
         plugins (Optional[list[MethodPluginABC]]): List of plugins to be used during training.
-
-    Methods:
-        __init__(module, criterion, first_lr, lr, reg_type=None, gamma=None, clipgrad=None, plugins=[]):
-            Initializes the Composer with the given parameters.
-        _setup_optim(task_id):
-            Sets up the optimizer for the given task.
-        _add_reg(loss):
-            Adds regularization to the loss if applicable.
-        setup_task(task_id):
-            Sets up the task by initializing the optimizer and plugins.
-        forward(x, y):
-            Performs a forward pass through the module and plugins, returning the loss and predictions.
-        backward(loss):
-            Performs a backward pass, applying gradient clipping if specified, and updates the model parameters.
+        heads (list[nn.Module]): List of task-specific heads, initialized if `task_heads` is True.
+        dynamic_scaling (DynamicScaling): Instance of DynamicScaling for dynamic loss scaling.
     """
 
     def __init__(self, 
@@ -55,6 +52,12 @@ class Composer:
         first_lr: float, 
         lr: float,
         criterion_scale: float,
+        min_lambda: float,
+        max_lambda: float,
+        beta: float,
+        ema_scale: float,
+        use_dynamic_alpha: bool,
+        use_entropy_scale: bool,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -68,19 +71,25 @@ class Composer:
         Initialize the Composer class.
 
         Args:
-            module (CLModuleABC): The module to be used.
-            criterion (str): The criterion (loss function) to be used.
-            first_lr (float): The initial learning rate.
-            lr (float): The learning rate.
-            criterion_scale (float): The scale of the criterion loss.
-            reg_type (Optional[str], optional): The type of regularization to be used. Defaults to None.
-            gamma (Optional[float], optional): The gamma value for learning rate decay. Defaults to None.
-            task_heads (Optional[bool], optional): Whether to use task-specific heads. Defaults to False.
-            reset_rbf_mask (Optional[bool], optional): Whether to reset the RBF mask per task. Defaults to False. IMPORTANT only works with `RBFLayer` `start_empty=True`
-            clipgrad (Optional[float], optional): The value to clip gradients. Defaults to None.
-            retaingraph (Optional[bool], optional): Whether to retain the computation graph. Defaults to False.
-            log_reg (Optional[bool], optional): Whether to log the regularization loss. Defaults to False.
-            plugins (Optional[list[MethodPluginABC]], optional): A list of plugins to be used. Defaults to an empty list.
+            module (CLModuleABC): The continual learning module to be trained.
+            criterion (str): The name of the loss function to be used.
+            first_lr (float): The learning rate for the first task.
+            lr (float): The learning rate for subsequent tasks.
+            criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
+            min_lambda (float): Minimum lambda value for dynamic loss scaling.
+            max_lambda (float): Maximum lambda value for dynamic loss scaling.
+            beta (float): Beta parameter for dynamic loss scaling.
+            ema_scale (float): Exponential moving average scale for dynamic loss scaling.
+            use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
+            use_entropy_scale (bool): Whether to use entropy scaling.
+            reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
+            gamma (Optional[float], optional): Regularization strength. Defaults to None.
+            task_heads (bool, optional): Whether to use task-specific heads for multi-task learning. Defaults to False.
+            reset_rbf_mask (bool, optional): Whether to reset the RBF mask for each task. Only applicable if `RBFLayer` is used with `start_empty=True`. Defaults to False.
+            clipgrad (Optional[float], optional): Maximum gradient norm for gradient clipping. Defaults to None.
+            retaingraph (Optional[bool], optional): Whether to retain the computation graph during backpropagation. Defaults to False.
+            log_reg (Optional[bool], optional): Whether to log the regularization loss during training. Defaults to False.
+            plugins (Optional[list[MethodPluginABC]], optional): List of method plugins to extend the training process. Defaults to an empty list.
         """
 
         self.module = module
@@ -89,6 +98,10 @@ class Composer:
         self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
+        self.max_lambda = max_lambda
+        self.min_lambda = min_lambda
+        self.beta = beta
+        self.ema_scale = ema_scale
         self.reg_type = reg_type
         self.gamma = gamma
         self.task_heads = task_heads
@@ -97,6 +110,8 @@ class Composer:
         self.retaingraph = retaingraph
         self.plugins = plugins
         self.log_reg = log_reg
+        self.use_dynamic_alpha = use_dynamic_alpha
+        self.use_entropy_scale = use_entropy_scale
         
         if self.task_heads:
             self.heads = []
@@ -104,6 +119,9 @@ class Composer:
         for plugin in self.plugins:
             plugin.set_module(self.module)
             log.info(f'Plugin {plugin.__class__.__name__} added to composer')
+
+        if use_dynamic_alpha:
+            log.info('Dynamic scaling is enabled')
 
 
     def _setup_optim(self, task_id: int):
@@ -166,6 +184,9 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
+        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta,
+                                              self.ema_scale, self.use_entropy_scale)
+
 
     def forward(self, x, y, task_id):
         """
@@ -186,13 +207,21 @@ class Composer:
         loss = self.criterion(preds, y)
         if task_id > 0:
             loss *= self.criterion_scale
-        loss = self._add_reg(loss)
+            
+        loss_ce = loss
 
-        old_loss = loss
-        for plugin in self.plugins:
-            loss, preds = plugin.forward(x, y, loss, preds)
+        if self.use_dynamic_alpha:
+            reg_loss = 0.0
+            for plugin in self.plugins:
+                reg_loss, preds = plugin.forward(x, y, reg_loss, preds)
+            loss = self.dynamic_scaling.forward(task_id, loss_ce, reg_loss, preds)
+        else:
+            loss = self._add_reg(loss)
+            for plugin in self.plugins:
+                loss, preds = plugin.forward(x, y, loss, preds)
+
         if self.log_reg:
-            wandb.log({f'Loss/train/{task_id}/reg': loss-old_loss})
+            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ce})
         return loss, preds
 
 
