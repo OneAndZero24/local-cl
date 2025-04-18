@@ -15,6 +15,7 @@
 - Lightning Fabric
 - Custom Plugin System for Methods
 - Incremental Classifier
+- Ability to use any timm model as pretrained backbone
 
 | Method | Status | Custom Layers | Status | Model | Status | Scenario | Status | Dataset | Status |
 | ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
