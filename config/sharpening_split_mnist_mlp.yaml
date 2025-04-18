@@ -2,7 +2,7 @@ defaults:
   - _self_
   - dataset: mnist
   - scenario: class_inc
-  - model: mlp
+  - model: mlp_rbf
   - method: composer_sharpening
 
 exp:
