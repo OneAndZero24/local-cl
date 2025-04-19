@@ -145,10 +145,6 @@ class DynamicScaling():
             log.warning("Skipping lambda_t update due to missing gradients.")
             return self.prev_dynamic_lambda 
 
-        # cos_theta = F.cosine_similarity(
-        #     grads_ce_flat.unsqueeze(0), 
-        #     grads_reg_flat.unsqueeze(0), dim=1, eps=1e-8
-        # ).item()
         cos_theta = self._cosine_similarity(
             grads_ce_flat.unsqueeze(0), 
             grads_reg_flat.unsqueeze(0)).item()
