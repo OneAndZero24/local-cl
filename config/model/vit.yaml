@@ -1,0 +1,10 @@
+_target_: model.BigModel
+pretrained_backbone_name: "vit_base_patch16_224_in21k"
+head:
+  _target_: model.MLP
+  initial_out_features: 2
+  sizes: [150528, 10000, 1000, 200]
+  layers: ["Normal", "Normal", "Normal"]
+  head_type: Normal
+  activation: 
+    _target_: torch.nn.ReLU
