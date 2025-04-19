@@ -8,6 +8,7 @@ beta: 10.0
 ema_scale: 0.9
 use_dynamic_alpha: True
 use_entropy_scale: True
+angle_constraint_scale: 2.0
 lr: 0.001
 criterion_scale: 1.0
 reset_rbf_mask: False

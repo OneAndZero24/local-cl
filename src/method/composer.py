@@ -34,6 +34,8 @@ class Composer:
         ema_scale (float): The EMA scale for dynamic scaling.
         use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
         use_entropy_scale (bool): Whether to use entropy scaling.
+        angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
+            when computing the dynamic scaling factor.
         reg_type (Optional[str]): The type of regularization to apply (e.g., L1, L2).
         gamma (Optional[float]): The regularization strength.
         task_heads (bool): Whether to use task-specific heads for multi-task learning.
@@ -58,6 +60,7 @@ class Composer:
         ema_scale: float,
         use_dynamic_alpha: bool,
         use_entropy_scale: bool,
+        angle_constraint_scale: float,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -82,6 +85,8 @@ class Composer:
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
             use_entropy_scale (bool): Whether to use entropy scaling.
+            angle_constraint_scale (float): A factor that adjusts the influence of angular constraints
+                when computing the dynamic scaling factor.
             reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
             gamma (Optional[float], optional): Regularization strength. Defaults to None.
             task_heads (bool, optional): Whether to use task-specific heads for multi-task learning. Defaults to False.
@@ -112,6 +117,7 @@ class Composer:
         self.log_reg = log_reg
         self.use_dynamic_alpha = use_dynamic_alpha
         self.use_entropy_scale = use_entropy_scale
+        self.angle_constraint_scale = angle_constraint_scale
         
         if self.task_heads:
             self.heads = []
@@ -185,7 +191,7 @@ class Composer:
             plugin.setup_task(task_id)
 
         self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta,
-                                              self.ema_scale, self.use_entropy_scale)
+                                              self.ema_scale, self.use_entropy_scale, self.angle_constraint_scale)
 
 
     def forward(self, x, y, task_id):
