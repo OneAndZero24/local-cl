@@ -2,6 +2,7 @@ import logging
 import torch
 from torch.nn import functional as F
 
+import math
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -153,11 +154,20 @@ class DynamicScaling():
         dynamic_lambda -= torch.exp(torch.tensor(-2.0 * self.beta)).item()
 
         if self.use_entropy_scale:
-            preds = F.softmax(preds, dim=-1)
-            preds = torch.clamp(preds, min=1e-8, max=1.0)
-            entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
-            entropy /= torch.log(torch.tensor(preds.size(1))).item()
+            old_classes = self.module.head.old_nclasses
+            preds = preds[:, old_classes:]
+            log_preds = F.log_softmax(preds, dim=-1)
+            preds = log_preds.exp() 
+
+            entropy = -(preds * log_preds).sum(dim=-1) 
+            entropy = entropy.mean() 
+
+            num_classes = preds.size(-1)
+            max_entropy = math.log(num_classes)
+            entropy = entropy / max_entropy
+            entropy = entropy.item()
             dynamic_lambda *= entropy
+
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda
         else:
