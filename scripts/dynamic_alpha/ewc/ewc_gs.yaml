@@ -79,7 +79,7 @@ parameters:
     max: 0.99
   method.use_entropy_scale:
     values: [True, False]
-  angle_constraint_scale:
+  method.angle_constraint_scale:
     distribution: uniform
     min: 1.0
     max: 100.0
