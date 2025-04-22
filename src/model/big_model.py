@@ -32,6 +32,7 @@ class BigModel(CLModuleABC):
     def __init__(self,
         pretrained_backbone_name: str,
         head: nn.Module,
+        pretrained: bool=True,
         frozen: bool=True,
         out_index: int=-1,
         size: tuple[int]=(224, 224),
@@ -42,6 +43,7 @@ class BigModel(CLModuleABC):
         Args:
             pretrained_backbone_name (str): The name of the pretrained backbone model to use.
             head (nn.Module): The custom head module to apply after feature extraction.
+            pretrained (bool, optional): Whether to use a pretrained backbone. Defaults to True.
             out_index (int, optional): The index of the output feature map from the backbone. Defaults to -1.
             frozen (bool, optional): Whether to freeze the backbone parameters. Defaults to True.
             size (tuple[int], optional): The target size for input tensors (height, width). Defaults to (224, 224).
@@ -52,7 +54,7 @@ class BigModel(CLModuleABC):
         self.fe = timm.create_model(
             pretrained_backbone_name, 
             features_only=True,
-            pretrained=True
+            pretrained=pretrained
         )
 
         self.head = head
