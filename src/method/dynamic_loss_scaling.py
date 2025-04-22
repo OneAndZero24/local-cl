@@ -2,6 +2,7 @@ import logging
 import torch
 from torch.nn import functional as F
 
+import math
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -24,10 +25,12 @@ class DynamicScaling():
         beta (float): Scaling factor that controls the rate of exponential annealing.
         ema_scale (float): Exponential Moving Average (EMA) factor for smoothing updates.
         prev_dynamic_lambda (float or None): Stores the previous lambda value for EMA updates.
+        angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
+                                        when computing the dynamic scaling factor.
     """
 
     def __init__(self, module, min_lambda: float, max_lambda: float, beta: float, 
-                 ema_scale: float, use_entropy_scale: bool):
+                 ema_scale: float, use_entropy_scale: bool, angle_constraint_scale: float):
         """
         Initializes the DynamicScaling module.
 
@@ -38,9 +41,12 @@ class DynamicScaling():
             beta (float): Exponential decay factor controlling the lambda update.
             ema_scale (float): EMA factor for smoothing lambda updates.
             use_entropy_scale (bool): Flag to indicate if entropy scaling should be used.
+            angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
+                                        when computing the dynamic scaling factor.
 
         Methods:
-            __init__(module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float, use_entropy_scale: bool):
+            __init__(module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float, 
+                use_entropy_scale: bool, angle_constraint_scale: float):
                 Initializes the DynamicScaling method with the given hyperparameters.
             forward(task_id, loss_ce, loss_reg):
                 Computes the dynamically scaled loss by adjusting the cross-entropy loss weight.
@@ -54,6 +60,7 @@ class DynamicScaling():
         self.ema_scale = ema_scale
         self.module = module
         self.use_entropy_scale = use_entropy_scale
+        self.angle_constraint_scale = angle_constraint_scale
 
         self.prev_dynamic_lambda = None
 
@@ -82,8 +89,36 @@ class DynamicScaling():
         else:
             dynamic_lambda = 1.0
         return dynamic_lambda * loss_ce + loss_reg
+    
+    def _cosine_similarity(self, x1: torch.Tensor, x2: torch.Tensor, dim: int=1, 
+                           eps: float=1e-8) -> torch.Tensor:
+        """
+        Computes a scaled cosine similarity between two input tensors.
+        This function calculates the cosine similarity between two tensors, 
+        scales the angle (in radians) by a given factor `alpha`, and then 
+        computes the cosine of the scaled angle.
+        Args:
+            x1 (torch.Tensor): The first input tensor.
+            x2 (torch.Tensor): The second input tensor.
+            dim (int, optional): The dimension along which the cosine similarity 
+                is computed. Default is 1.
+            eps (float, optional): A small value to avoid division by zero 
+                during normalization. Default is 1e-8.
+        Returns:
+            torch.Tensor: A tensor containing the scaled cosine similarity 
+            values, with the same shape as the input tensors along the 
+            specified dimension.
+        """
 
-    def compute_dynamic_lambda(self, grads_ce, grads_reg, preds):
+        cos_theta = F.cosine_similarity(x1, x2, dim=dim, eps=eps)        
+        theta = torch.acos(cos_theta)  # theta in [0, pi]
+        alpha_theta = self.angle_constraint_scale * theta        
+        cos_alpha_theta = torch.cos(alpha_theta)
+        
+        return cos_alpha_theta
+
+    def compute_dynamic_lambda(self, grads_ce: torch.Tensor, grads_reg: torch.Tensor, 
+                               preds: torch.Tensor) -> float:
         """
         Computes the dynamic lambda_t using exponential annealing of misaligned gradients.
 
@@ -111,21 +146,28 @@ class DynamicScaling():
             log.warning("Skipping lambda_t update due to missing gradients.")
             return self.prev_dynamic_lambda 
 
-        cos_theta = F.cosine_similarity(
+        cos_theta = self._cosine_similarity(
             grads_ce_flat.unsqueeze(0), 
-            grads_reg_flat.unsqueeze(0), dim=1, eps=1e-8
-        ).item()
+            grads_reg_flat.unsqueeze(0)).item()
 
         dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
         dynamic_lambda -= torch.exp(torch.tensor(-2.0 * self.beta)).item()
 
         if self.use_entropy_scale:
-            preds = F.softmax(preds, dim=-1)
-            preds = torch.clamp(preds, min=1e-8, max=1.0)
-            entropy = -torch.sum(preds * preds.log(), dim=1).mean().item()
-            entropy /= torch.log(torch.tensor(preds.size(1))).item()
+            old_classes = self.module.head.old_nclasses
+            preds = preds[:, old_classes:]
+            log_preds = F.log_softmax(preds, dim=-1)
+            preds = log_preds.exp() 
+
+            entropy = -(preds * log_preds).sum(dim=-1) 
+            entropy = entropy.mean() 
+
+            num_classes = preds.size(-1)
+            max_entropy = math.log(num_classes)
+            entropy = entropy / max_entropy
+            entropy = entropy.item()
             dynamic_lambda *= entropy
-            print(f"Entropy: {entropy:.4f}")
+
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda
         else:
