@@ -13,7 +13,6 @@ from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
 from method.dynamic_loss_scaling import DynamicScaling
-from method.dynamic_loss_scaling import DynamicScaling
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -41,16 +40,10 @@ class Composer:
         gamma (Optional[float]): The regularization strength.
         task_heads (bool): Whether to use task-specific heads for multi-task learning.
         reset_rbf_mask (bool): Whether to reset the RBF mask for each task.
-        task_heads (bool): Whether to use task-specific heads for multi-task learning.
-        reset_rbf_mask (bool): Whether to reset the RBF mask for each task.
         clipgrad (Optional[float]): The gradient clipping value.
         retaingraph (Optional[bool]): Whether to retain the computation graph during backpropagation.
         log_reg (Optional[bool]): Whether to log the regularization loss during training.
-        retaingraph (Optional[bool]): Whether to retain the computation graph during backpropagation.
-        log_reg (Optional[bool]): Whether to log the regularization loss during training.
         plugins (Optional[list[MethodPluginABC]]): List of plugins to be used during training.
-        heads (list[nn.Module]): List of task-specific heads, initialized if `task_heads` is True.
-        dynamic_scaling (DynamicScaling): Instance of DynamicScaling for dynamic loss scaling.
         heads (list[nn.Module]): List of task-specific heads, initialized if `task_heads` is True.
         dynamic_scaling (DynamicScaling): Instance of DynamicScaling for dynamic loss scaling.
     """
@@ -132,9 +125,6 @@ class Composer:
         for plugin in self.plugins:
             plugin.set_module(self.module)
             log.info(f'Plugin {plugin.__class__.__name__} added to composer')
-
-        if use_dynamic_alpha:
-            log.info('Dynamic scaling is enabled')
 
         if use_dynamic_alpha:
             log.info('Dynamic scaling is enabled')

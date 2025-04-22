@@ -1,10 +1,8 @@
 _partial_: True
 _target_: method.Composer
 criterion: CrossEntropyLoss
-criterion: CrossEntropyLoss
 first_lr: 0.001
 lr: 0.001
-criterion_scale: 1.0
 criterion_scale: 1.0
 reset_rbf_mask: False
 min_lambda: 1e-8
