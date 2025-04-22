@@ -2,7 +2,7 @@ defaults:
   - _self_
   - dataset: cifar100
   - scenario: class_inc
-  - model: resnet50
+  - model: resnet18
   - method: composer_naive
 
 exp:
