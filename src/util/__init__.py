@@ -8,8 +8,8 @@ from .wandb import *
 from .fabric import *
 from .tensor import *
 
-resize_transform = lambda : [
-    transforms.Resize(32), 
+resize_transform = lambda size=32 : [
+    transforms.Resize(size), 
     transforms.ToTensor()
 ]
 
