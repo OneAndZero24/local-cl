@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_mnist_si_dynamic_alpha
+#SBATCH --job-name=local_cl_split_imagenet_resnet_ewc_dynamic_alpha
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/dynamic_alpha/mnist/si/si_gs"
+run_sweep_and_agent "scripts/dynamic_alpha/imagenet/resnet18/ewc/ewc_gs"

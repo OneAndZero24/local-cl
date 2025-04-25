@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/dynamic_alpha/ewc/ewc_gs"
+run_sweep_and_agent "scripts/dynamic_alpha/mnist/ewc/ewc_gs"

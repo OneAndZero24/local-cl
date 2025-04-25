@@ -1,0 +1,96 @@
+program: src/main.py
+method: bayes
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: cifar100
+  scenario:
+    value: class_inc
+  model:
+    value: timm_resnet18
+  method:
+    value: composer_mas
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    values: [512,256,128,64]   
+  exp.epochs: 
+    values: [50, 10, 5, 1]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu   
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True     
+
+  # Model configuration
+  model._target_: 
+    value: timm.create_model
+  model.model_name: 
+    value: "resnet18"
+  pretrained: 
+    value: true
+  num_classes: 
+    value: 100     
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.use_dynamic_alpha: 
+    value: True
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  method.criterion_scale:
+    value: 1.0
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+  method.min_lambda:
+    distribution: uniform
+    min: 1e-8
+    max: 1e-3
+  method.max_lambda:
+    value: 1.0
+  method.beta:
+    distribution: uniform
+    min: 0.1
+    max: 1000.0
+  method.ema_scale:
+    distribution: uniform
+    min: 0.1
+    max: 0.99
+  method.angle_constraint_scale:
+    distribution: uniform
+    min: 1.0
+    max: 100.0
+  method.use_entropy_scale:
+    values: [True, False]
+  method.plugins.0._target_:
+    value: method.MAS
+  method.plugins.0.alpha: 
+    distribution: uniform
+    min: 0.1
+    max: 10000.0
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - mas_split_mnist_mlp.yaml
+  - ${args_no_hyphens}

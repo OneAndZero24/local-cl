@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/dynamic_alpha/mas/mas_gs"
+run_sweep_and_agent "scripts/dynamic_alpha/mnist/mas/mas_gs"
