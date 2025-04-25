@@ -112,7 +112,7 @@ class DynamicScaling():
 
         cos_theta = F.cosine_similarity(x1, x2, dim=dim, eps=eps)        
         theta = torch.acos(cos_theta)  # theta in [0, pi]
-        alpha_theta = self.angle_constraint_scale * theta        
+        alpha_theta = torch.minimum(self.angle_constraint_scale * theta, torch.tensor(math.pi))
         cos_alpha_theta = torch.cos(alpha_theta)
         
         return cos_alpha_theta
