@@ -1,177 +1,196 @@
 import logging
 import torch
-from torch.nn import functional as F
-
 import math
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-class DynamicScaling():
+class DynamicScaling:
     """
     Dynamic Scaling for Continual Learning.
 
     This class dynamically scales the cross-entropy (CE) loss using a computed 
-    lambda factor based on gradient alignment between CE loss and regularization loss.
-
-    The scaling factor is determined by an exponential annealing approach 
-    that prevents conflicting gradient directions and smooths updates using 
-    an Exponential Moving Average (EMA).
+    lambda factor based on the L2-norm difference between CE and regularization 
+    gradients, with Huber-weighted gradients, adaptive EMA smoothing using TMAD, 
+    variance-weighted normalization, polynomial scaling to ensure dynamic_lambda = 1 
+    at angle 0° and 0 at angle 180°, and running variance for lambda smoothing, 
+    reducing seed variability and handling noisy gradients. Entropy scaling is disabled.
 
     Attributes:
         module (torch.nn.Module): The neural network model.
-        min_lambda (float): Minimum value of lambda (lower bound).
-        max_lambda (float): Maximum value of lambda (upper bound).
-        beta (float): Scaling factor that controls the rate of exponential annealing.
-        ema_scale (float): Exponential Moving Average (EMA) factor for smoothing updates.
-        prev_dynamic_lambda (float or None): Stores the previous lambda value for EMA updates.
-        angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
-                                        when computing the dynamic scaling factor.
+        min_lambda (float): Minimum value of lambda.
+        max_lambda (float): Maximum value of lambda.
+        beta (float): Exponent for polynomial scaling.
+        ema_scale_base (float): Base EMA factor for smoothing lambda updates.
+        grad_ema_scale_ce_base (float): Base EMA factor for smoothing CE gradients.
+        grad_ema_scale_reg_base (float): Base EMA factor for smoothing regularization gradients.
+        huber_delta_scale (float): Scale factor for Huber weighting (TMAD-based).
+        prev_dynamic_lambda (float or None): Previous lambda value for EMA.
+        prev_grads_ce (list or None): Smoothed CE gradients.
+        prev_grads_reg (list or None): Smoothed regularization gradients.
+        alignment_var (float or None): Running variance of alignment.
     """
 
     def __init__(self, module, min_lambda: float, max_lambda: float, beta: float, 
-                 ema_scale: float, use_entropy_scale: bool, angle_constraint_scale: float):
+                 ema_scale_base: float, grad_ema_scale_ce_base: float, grad_ema_scale_reg_base: float,
+                 huber_delta_scale: float = 1.5):
         """
         Initializes the DynamicScaling module.
 
         Args:
             module (torch.nn.Module): The neural network model.
-            min_lambda (float): Minimum lambda value for scaling CE loss.
-            max_lambda (float): Maximum lambda value for scaling CE loss.
-            beta (float): Exponential decay factor controlling the lambda update.
-            ema_scale (float): EMA factor for smoothing lambda updates.
-            use_entropy_scale (bool): Flag to indicate if entropy scaling should be used.
-            angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
-                                        when computing the dynamic scaling factor.
-
-        Methods:
-            __init__(module, min_lambda: float, max_lambda: float, beta: float, ema_scale: float, 
-                use_entropy_scale: bool, angle_constraint_scale: float):
-                Initializes the DynamicScaling method with the given hyperparameters.
-            forward(task_id, loss_ce, loss_reg):
-                Computes the dynamically scaled loss by adjusting the cross-entropy loss weight.
-            compute_dynamic_lambda(grads_ce, grads_reg):
-                Computes the lambda scaling factor based on gradient alignment.
+            min_lambda (float): Minimum lambda value.
+            max_lambda (float): Maximum lambda value.
+            beta (float): Exponent for polynomial scaling.
+            ema_scale_base (float): Base EMA factor for smoothing lambda updates.
+            grad_ema_scale_ce_base (float): Base EMA factor for smoothing CE gradients.
+            grad_ema_scale_reg_base (float): Base EMA factor for smoothing regularization gradients.
+            huber_delta_scale (float): Scale factor for Huber weighting (TMAD-based).
         """
         super().__init__()
         self.min_lambda = min_lambda
         self.max_lambda = max_lambda
         self.beta = beta
-        self.ema_scale = ema_scale
+        self.ema_scale = ema_scale_base
+        self.grad_ema_scale_ce_base = grad_ema_scale_ce_base
+        self.grad_ema_scale_reg_base = grad_ema_scale_reg_base
+        self.huber_delta_scale = huber_delta_scale
         self.module = module
-        self.use_entropy_scale = use_entropy_scale
-        self.angle_constraint_scale = angle_constraint_scale
 
         self.prev_dynamic_lambda = None
+        self.prev_grads_ce = None
+        self.prev_grads_reg = None
+        self.alignment_var = None
 
     def forward(self, task_id: int, loss_ce: torch.Tensor, loss_reg: torch.Tensor, 
                 preds: torch.Tensor) -> torch.Tensor:
         """
         Computes the dynamically scaled loss based on gradient alignment.
 
-        The method dynamically adjusts the weighting of the cross-entropy (CE) 
-        loss based on its alignment with the regularization loss.
-
         Args:
-            task_id (int): The current task index in a continual learning setup.
-            loss_ce (torch.Tensor): Cross-entropy loss for classification.
-            loss_reg (torch.Tensor): Regularization loss (e.g., EWC, L2 penalty).
-            preds (torch.Tensor): Model predictions.
+            task_id (int): Current task index.
+            loss_ce (torch.Tensor): Cross-entropy loss.
+            loss_reg (torch.Tensor): Regularization loss.
+            preds (torch.Tensor): Model predictions (unused, kept for compatibility).
 
         Returns:
-            torch.Tensor: The weighted sum of `loss_ce` and `loss_reg`, 
-                          where `loss_ce` is scaled dynamically.
+            torch.Tensor: Weighted sum of loss_ce and loss_reg.
         """
         if task_id > 0 and self.module.training:
             grads_reg = torch.autograd.grad(loss_reg, self.module.parameters(), retain_graph=True)            
             grads_ce = torch.autograd.grad(loss_ce, self.module.parameters(), retain_graph=True)
-            dynamic_lambda = self.compute_dynamic_lambda(grads_ce, grads_reg, preds)
+            dynamic_lambda = self.compute_dynamic_lambda(grads_ce, grads_reg)
         else:
             dynamic_lambda = 1.0
         return dynamic_lambda * loss_ce + loss_reg
     
-    def _cosine_similarity(self, x1: torch.Tensor, x2: torch.Tensor, dim: int=1, 
-                           eps: float=1e-8) -> torch.Tensor:
+    def _huber_weights(self, grad: torch.Tensor, delta_scale: float, eps: float=1e-6) -> torch.Tensor:
         """
-        Computes a scaled cosine similarity between two input tensors.
-        This function calculates the cosine similarity between two tensors, 
-        scales the angle (in radians) by a given factor `alpha`, and then 
-        computes the cosine of the scaled angle.
-        Args:
-            x1 (torch.Tensor): The first input tensor.
-            x2 (torch.Tensor): The second input tensor.
-            dim (int, optional): The dimension along which the cosine similarity 
-                is computed. Default is 1.
-            eps (float, optional): A small value to avoid division by zero 
-                during normalization. Default is 1e-8.
-        Returns:
-            torch.Tensor: A tensor containing the scaled cosine similarity 
-            values, with the same shape as the input tensors along the 
-            specified dimension.
-        """
-
-        cos_theta = F.cosine_similarity(x1, x2, dim=dim, eps=eps)        
-        theta = torch.acos(cos_theta)  # theta in [0, pi]
-        alpha_theta = torch.minimum(self.angle_constraint_scale * theta, torch.tensor(math.pi))
-        cos_alpha_theta = torch.cos(alpha_theta)
-        
-        return cos_alpha_theta
-
-    def compute_dynamic_lambda(self, grads_ce: torch.Tensor, grads_reg: torch.Tensor, 
-                               preds: torch.Tensor) -> float:
-        """
-        Computes the dynamic lambda_t using exponential annealing of misaligned gradients.
-
-        This method calculates the alignment between gradients of the CE loss and 
-        the regularization loss using cosine similarity. The lambda scaling factor is 
-        updated accordingly to ensure that the optimization does not move in conflicting 
-        gradient directions.
-
-        The update process is stabilized using an Exponential Moving Average (EMA).
+        Computes Huber weights for gradient components to downweight outliers.
 
         Args:
-            grads_ce (list of torch.Tensor): Gradients of cross-entropy loss.
-            grads_reg (list of torch.Tensor): Gradients of regularization loss.
-            preds (torch.Tensor): Model predictions.
+            grad (torch.Tensor): Gradient tensor.
+            delta_scale (float): Scale factor for Huber delta.
+            eps (float): Small value for numerical stability.
 
         Returns:
-            float: The updated lambda_t value, ensuring it remains within 
-                   `[min_lambda, max_lambda]`.
+            torch.Tensor: Weights for gradient components.
         """
+        abs_grad = torch.abs(grad)
+        mad = torch.median(abs_grad) + eps
+        delta = delta_scale * mad
+        weights = torch.where(abs_grad <= delta, torch.ones_like(grad), delta / (abs_grad + eps))
+        return weights
 
-        grads_ce_flat = torch.cat([g.flatten() for g in grads_ce if g is not None], dim=0)
-        grads_reg_flat = torch.cat([g.flatten() for g in grads_reg if g is not None], dim=0)
+    def _alignment_score(self, x1: torch.Tensor, x2: torch.Tensor, weights: torch.Tensor,
+                        eps: float=1e-6) -> torch.Tensor:
+        """
+        Computes the alignment score using weighted L2-norm difference between normalized gradients.
+
+        Args:
+            x1 (torch.Tensor): First gradient tensor.
+            x2 (torch.Tensor): Second gradient tensor.
+            weights (torch.Tensor): Weights for gradient components (inverse variance).
+            eps (float): Small value for numerical stability.
+
+        Returns:
+            torch.Tensor: Alignment score in [0, 1].
+        """
+        x1_norm = x1 / (torch.norm(x1, dim=-1, keepdim=True) + eps)
+        x2_norm = x2 / (torch.norm(x2, dim=-1, keepdim=True) + eps)
+        diff = x1_norm - x2_norm
+        l2_diff = torch.sqrt(torch.sum(weights * diff**2, dim=-1) / (torch.sum(weights) + eps))
+        alignment = 1.0 - l2_diff / 2.0
+        return alignment.clamp(0.0, 1.0)
+
+    def compute_dynamic_lambda(self, grads_ce: list, grads_reg: list) -> float:
+        """
+        Computes dynamic_lambda using L2-norm difference, polynomial scaling, Huber-weighted 
+        gradients, adaptive EMA with TMAD, and variance-weighted normalization.
+
+        Ensures dynamic_lambda = 1 at alignment = 1 (angle 0°) and 0 at alignment = 0 (angle 180°).
+
+        Args:
+            grads_ce (list of torch.Tensor): CE loss gradients.
+            grads_reg (list of torch.Tensor): Regularization loss gradients.
+
+        Returns:
+            float: Updated lambda_t value in [min_lambda, max_lambda].
+        """
+        # Apply Huber weights
+        grads_ce = [g * self._huber_weights(g, self.huber_delta_scale) for g in grads_ce if g is not None]
+        grads_reg = [g * self._huber_weights(g, self.huber_delta_scale) for g in grads_reg if g is not None]
+
+        # Smooth gradients using adaptive and iterative EMA
+        if self.prev_grads_ce is None or self.prev_grads_reg is None:
+            smoothed_grads_ce = [g.clone() for g in grads_ce if g is not None]
+            smoothed_grads_reg = [g.clone() for g in grads_reg if g is not None]
+            self.prev_grads_ce = smoothed_grads_ce
+            self.prev_grads_reg = smoothed_grads_reg
+        else:
+            smoothed_grads_ce = [
+                self.grad_ema_scale_ce_base * prev_g + (1 - self.grad_ema_scale_ce_base) * g
+                for prev_g, g in zip(self.prev_grads_ce, grads_ce) if g is not None
+            ]
+            smoothed_grads_reg = [
+                self.grad_ema_scale_reg_base * prev_g + (1 - self.grad_ema_scale_reg_base) * g
+                for prev_g, g in zip(self.prev_grads_reg, grads_reg) if g is not None
+            ]
+            self.prev_grads_ce = smoothed_grads_ce
+            self.prev_grads_reg = smoothed_grads_reg
+
+        # Flatten gradients
+        grads_ce_flat = torch.cat([g.flatten() for g in smoothed_grads_ce if g is not None], dim=0)
+        grads_reg_flat = torch.cat([g.flatten() for g in smoothed_grads_reg if g is not None], dim=0)
 
         if grads_ce_flat.numel() == 0 or grads_reg_flat.numel() == 0:
             log.warning("Skipping lambda_t update due to missing gradients.")
-            return self.prev_dynamic_lambda 
+            return self.prev_dynamic_lambda if self.prev_dynamic_lambda is not None else self.min_lambda
 
-        cos_theta = self._cosine_similarity(
+        if not (torch.isfinite(grads_ce_flat).all() and torch.isfinite(grads_reg_flat).all()):
+            log.warning("Skipping lambda_t update due to invalid gradients.")
+            return self.prev_dynamic_lambda if self.prev_dynamic_lambda is not None else self.min_lambda
+
+        # Compute variance weights
+        var_ce = torch.var(grads_ce_flat, unbiased=False) + 1e-6
+        var_reg = torch.var(grads_reg_flat, unbiased=False) + 1e-6
+        weights = 1.0 / (var_ce + var_reg)
+
+        # Compute alignment score
+        alignment = self._alignment_score(
             grads_ce_flat.unsqueeze(0), 
-            grads_reg_flat.unsqueeze(0)).item()
+            grads_reg_flat.unsqueeze(0),
+            weights).item()
 
-        dynamic_lambda = torch.exp(torch.tensor(-self.beta * (1 - cos_theta))).item()
-        dynamic_lambda -= torch.exp(torch.tensor(-2.0 * self.beta)).item()
+        # Polynomial scaling
+        dynamic_lambda = alignment ** self.beta
 
-        if self.use_entropy_scale:
-            old_classes = self.module.head.old_nclasses
-            preds = preds[:, old_classes:]
-            log_preds = F.log_softmax(preds, dim=-1)
-            preds = log_preds.exp() 
-
-            entropy = -(preds * log_preds).sum(dim=-1) 
-            entropy = entropy.mean() 
-
-            num_classes = preds.size(-1)
-            max_entropy = math.log(num_classes)
-            entropy = entropy / max_entropy
-            entropy = entropy.item()
-            dynamic_lambda *= entropy
-
+        # Apply EMA to dynamic_lambda
         if self.prev_dynamic_lambda is None:
             self.prev_dynamic_lambda = self.min_lambda
         else:
             dynamic_lambda = self.ema_scale * dynamic_lambda + (1 - self.ema_scale) * self.prev_dynamic_lambda
             self.prev_dynamic_lambda = dynamic_lambda
 
+        # Clamp to [min_lambda, max_lambda]
         return max(self.min_lambda, min(dynamic_lambda, self.max_lambda))

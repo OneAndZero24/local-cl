@@ -33,8 +33,6 @@ class Composer:
         beta (float): The beta value for dynamic scaling.
         ema_scale (float): The EMA scale for dynamic scaling.
         use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
-        use_entropy_scale (bool): Whether to use entropy scaling.
-        angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
             when computing the dynamic scaling factor.
         reg_type (Optional[str]): The type of regularization to apply (e.g., L1, L2).
         gamma (Optional[float]): The regularization strength.
@@ -58,9 +56,10 @@ class Composer:
         max_lambda: float,
         beta: float,
         ema_scale: float,
+        grad_ema_scale_ce: float,
+        grad_ema_scale_reg: float,
         use_dynamic_alpha: bool,
-        use_entropy_scale: bool,
-        angle_constraint_scale: float,
+        huber_delta_scale: bool,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -83,10 +82,8 @@ class Composer:
             max_lambda (float): Maximum lambda value for dynamic loss scaling.
             beta (float): Beta parameter for dynamic loss scaling.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
+            huber_delta_scale (float): Scaling factor for the delta parameter in the Huber loss function, used to adjust sensitivity to outliers.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
-            use_entropy_scale (bool): Whether to use entropy scaling.
-            angle_constraint_scale (float): A factor that adjusts the influence of angular constraints
-                when computing the dynamic scaling factor.
             reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
             gamma (Optional[float], optional): Regularization strength. Defaults to None.
             task_heads (bool, optional): Whether to use task-specific heads for multi-task learning. Defaults to False.
@@ -107,6 +104,9 @@ class Composer:
         self.min_lambda = min_lambda
         self.beta = beta
         self.ema_scale = ema_scale
+        self.grad_ema_scale_ce = grad_ema_scale_ce
+        self.grad_ema_scale_reg = grad_ema_scale_reg
+        self.huber_delta_scale = huber_delta_scale
         self.reg_type = reg_type
         self.gamma = gamma
         self.task_heads = task_heads
@@ -116,8 +116,6 @@ class Composer:
         self.plugins = plugins
         self.log_reg = log_reg
         self.use_dynamic_alpha = use_dynamic_alpha
-        self.use_entropy_scale = use_entropy_scale
-        self.angle_constraint_scale = angle_constraint_scale
         
         if self.task_heads:
             self.heads = []
@@ -191,7 +189,8 @@ class Composer:
             plugin.setup_task(task_id)
 
         self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta,
-                                              self.ema_scale, self.use_entropy_scale, self.angle_constraint_scale)
+                                              self.ema_scale, self.grad_ema_scale_ce, self.grad_ema_scale_reg, 
+                                              self.huber_delta_scale)
 
 
     def forward(self, x, y, task_id):
