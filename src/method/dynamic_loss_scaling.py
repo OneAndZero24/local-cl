@@ -120,7 +120,7 @@ class DynamicScaling:
         x2_norm = x2 / (torch.norm(x2, dim=-1, keepdim=True) + eps)
         diff = x1_norm - x2_norm
         l2_diff = torch.sqrt(torch.sum(weights * diff**2, dim=-1) / (torch.sum(weights) + eps))
-        alignment = 1.0 - l2_diff / 2.0
+        alignment = 1.0 - l2_diff / torch.sqrt(torch.tensor(2.0))
         return alignment.clamp(0.0, 1.0)
 
     def compute_dynamic_lambda(self, grads_ce: list, grads_reg: list) -> float:
