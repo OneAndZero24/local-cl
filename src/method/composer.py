@@ -28,9 +28,7 @@ class Composer:
         first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
         criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
-        max_lambda (float): The maximum lambda value for dynamic scaling.
         min_lambda (float): The minimum lambda value for dynamic scaling.
-        beta (float): The beta value for dynamic scaling.
         ema_scale (float): The EMA scale for dynamic scaling.
         use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
             when computing the dynamic scaling factor.
@@ -53,11 +51,8 @@ class Composer:
         lr: float,
         criterion_scale: float,
         min_lambda: float,
-        max_lambda: float,
-        beta: float,
         ema_scale: float,
         grad_ema_scale_ce: float,
-        grad_ema_scale_reg: float,
         use_dynamic_alpha: bool,
         huber_delta_scale: bool,
         reg_type: Optional[str]=None,
@@ -79,8 +74,6 @@ class Composer:
             lr (float): The learning rate for subsequent tasks.
             criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
             min_lambda (float): Minimum lambda value for dynamic loss scaling.
-            max_lambda (float): Maximum lambda value for dynamic loss scaling.
-            beta (float): Beta parameter for dynamic loss scaling.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
             huber_delta_scale (float): Scaling factor for the delta parameter in the Huber loss function, used to adjust sensitivity to outliers.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
@@ -100,12 +93,9 @@ class Composer:
         self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
-        self.max_lambda = max_lambda
         self.min_lambda = min_lambda
-        self.beta = beta
         self.ema_scale = ema_scale
         self.grad_ema_scale_ce = grad_ema_scale_ce
-        self.grad_ema_scale_reg = grad_ema_scale_reg
         self.huber_delta_scale = huber_delta_scale
         self.reg_type = reg_type
         self.gamma = gamma
@@ -188,8 +178,8 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta,
-                                              self.ema_scale, self.grad_ema_scale_ce, self.grad_ema_scale_reg, 
+        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda,
+                                              self.ema_scale, self.grad_ema_scale_ce, 
                                               self.huber_delta_scale)
 
 

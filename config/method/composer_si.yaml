@@ -1,18 +1,15 @@
 _partial_: True
 _target_: method.Composer
 criterion: CrossEntropyLoss
-first_lr: 0.001
-lr: 0.001
-criterion_scale: 1e-5
-reset_rbf_mask: False
-min_lambda: 1e-8
-max_lambda: 1.0
-beta: 10.0
+first_lr: 0.001  
+lr: 0.001      
+min_lambda: 1e-4
 ema_scale: 0.9
-angle_constraint_scale: 2.0
+grad_ema_scale_ce: 0.9
 use_dynamic_alpha: True
-use_entropy_scale: True
+huber_delta_scale: 1.5
+criterion_scale: 1.0
 plugins:
   - _target_: method.SI
-    alpha: 2048
+    alpha: 8000.0  
     head_opt: True
