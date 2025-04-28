@@ -53,7 +53,6 @@ class Composer:
         min_lambda: float,
         ema_scale: float,
         use_dynamic_alpha: bool,
-        huber_delta_scale: bool,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -74,7 +73,6 @@ class Composer:
             criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
             min_lambda (float): Minimum lambda value for dynamic loss scaling.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
-            huber_delta_scale (float): Scaling factor for the delta parameter in the Huber loss function, used to adjust sensitivity to outliers.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
             reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
             gamma (Optional[float], optional): Regularization strength. Defaults to None.
@@ -99,7 +97,6 @@ class Composer:
         self.criterion_scale = criterion_scale
         self.min_lambda = min_lambda
         self.ema_scale = ema_scale
-        self.huber_delta_scale = huber_delta_scale
         self.reg_type = reg_type
         self.gamma = gamma
         self.task_heads = task_heads
@@ -181,8 +178,7 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda,
-                                              self.ema_scale, self.huber_delta_scale)
+        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.ema_scale)
 
 
     def forward(self, x, y, task_id):

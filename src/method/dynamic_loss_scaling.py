@@ -10,16 +10,14 @@ class DynamicScaling:
     Dynamic Scaling for Continual Learning, with Stable-Reference Alignment.
 
     This class dynamically scales the cross-entropy (CE) loss relative to a 
-    stable regularization gradient (grad_reg). It applies Huber weighting to noisy CE gradients, 
-    exponential moving average (EMA) smoothing for CE gradients, and computes 
-    alignment via a projection-based stable reference method.
+    stable regularization gradient (grad_reg). It computes alignment via a
+    projection-based stable reference method.
 
     Dynamic lambda is discretized into bins to improve robustness against noisy estimates.
     """
 
     def __init__(self, module, min_lambda: float,
-                 ema_scale_base: float,
-                 huber_delta_scale: float = 1.5):
+                 ema_scale_base: float):
         """
         Initializes the DynamicScaling module.
 
@@ -27,12 +25,10 @@ class DynamicScaling:
             module (torch.nn.Module): The neural network model.
             min_lambda (float): Minimum value of dynamic lambda.
             ema_scale_base (float): EMA smoothing factor for dynamic lambda updates.
-            huber_delta_scale (float, optional): Scale factor for Huber weighting (default=1.5).
         """
         super().__init__()
         self.min_lambda = min_lambda
         self.ema_scale = ema_scale_base
-        self.huber_delta_scale = huber_delta_scale
         self.module = module
 
         self.prev_dynamic_lambda = None
@@ -62,26 +58,8 @@ class DynamicScaling:
             dynamic_lambda = 1.0
         return dynamic_lambda * loss_ce.mean() + loss_reg
 
-    def _huber_weights(self, grad: torch.Tensor, delta_scale: float, eps: float = 1e-6) -> torch.Tensor:
-        """
-        Computes Huber weights to downweight outlier components of the gradient, per batch sample.
-
-        Args:
-            grad (torch.Tensor): Gradient tensor of shape [batch_size, grad_shape].
-            delta_scale (float): Scaling factor for Huber threshold.
-            eps (float, optional): Small epsilon for numerical stability.
-
-        Returns:
-            torch.Tensor: Weighted gradient tensor, same shape as input [batch_size, grad_shape].
-        """
-        abs_grad = torch.abs(grad)
-        mad = torch.median(abs_grad, dim=0, keepdim=True).values + eps  # [1, grad_shape]
-        delta = delta_scale * mad  # [1, grad_shape]
-        weights = torch.where(abs_grad <= delta, torch.ones_like(grad), delta / (abs_grad + eps))
-        
-        return weights * grad
-
-    def _alignment_score_stable_ref(self, grads_ce_flat: torch.Tensor, grads_reg_flat: torch.Tensor, eps: float=1e-6) -> torch.Tensor:
+    def _alignment_score_stable_ref(self, grads_ce_flat: torch.Tensor, grads_reg_flat: torch.Tensor, 
+                                    eps: float=1e-8) -> torch.Tensor:
         """
         Computes alignment score by projecting CE gradients onto stable regularization gradients.
 
@@ -93,12 +71,13 @@ class DynamicScaling:
         Returns:
             torch.Tensor: Alignment score in [0, 1].
         """
-        proj = (grads_ce_flat * grads_reg_flat).sum(dim=-1, keepdim=True) / (grads_reg_flat.norm()**2 + eps)
+        eps = torch.tensor(eps)
+        proj = (grads_ce_flat * grads_reg_flat).sum(dim=-1, keepdim=True) / (torch.max(grads_reg_flat.norm()**2, eps))
         residual = grads_ce_flat - proj * grads_reg_flat
         
-        residual_norm = torch.norm(residual, p=2, dim=-1)
-        ce_norm = torch.norm(grads_ce_flat, p=2, dim=-1)
-        alignment = 1.0 - (residual_norm / (ce_norm + eps)).mean()
+        residual_norm_avg = torch.norm(residual, p=2, dim=-1).mean()
+        ce_norm_avg = torch.norm(grads_ce_flat, p=2, dim=-1).mean()
+        alignment = 1.0 - residual_norm_avg / torch.max(ce_norm_avg, eps)
         return alignment.clamp(0.0, 1.0)
 
     def compute_dynamic_lambda(self, grads_ce: list, grads_reg: list) -> float:
@@ -121,7 +100,6 @@ class DynamicScaling:
             for sample_grads in grads_ce
         ], dim=0)
         
-        grads_ce_flat = self._huber_weights(grads_ce_flat, delta_scale=self.huber_delta_scale)
         grads_reg_flat = torch.cat([g.flatten() for g in grads_reg], dim=0)
 
         if grads_ce_flat.numel() == 0 or grads_reg_flat.numel() == 0:
