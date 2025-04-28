@@ -52,7 +52,6 @@ class Composer:
         criterion_scale: float,
         min_lambda: float,
         ema_scale: float,
-        grad_ema_scale_ce: float,
         use_dynamic_alpha: bool,
         huber_delta_scale: bool,
         reg_type: Optional[str]=None,
@@ -88,14 +87,18 @@ class Composer:
         """
 
         self.module = module
-        self.criterion = LossCriterion(criterion)
+
+        if use_dynamic_alpha and criterion == "CrossEntropyLoss":
+            reduction="none"
+        else:
+            reduction="mean"
+        self.criterion = LossCriterion(criterion, reduction=reduction)
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
         self.min_lambda = min_lambda
         self.ema_scale = ema_scale
-        self.grad_ema_scale_ce = grad_ema_scale_ce
         self.huber_delta_scale = huber_delta_scale
         self.reg_type = reg_type
         self.gamma = gamma
@@ -179,8 +182,7 @@ class Composer:
             plugin.setup_task(task_id)
 
         self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda,
-                                              self.ema_scale, self.grad_ema_scale_ce, 
-                                              self.huber_delta_scale)
+                                              self.ema_scale, self.huber_delta_scale)
 
 
     def forward(self, x, y, task_id):
@@ -216,7 +218,7 @@ class Composer:
                 loss, preds = plugin.forward(x, y, loss, preds)
 
         if self.log_reg:
-            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ce})
+            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ce.mean()})
         return loss, preds
 
 

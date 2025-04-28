@@ -5,7 +5,6 @@ first_lr: 0.001
 lr: 0.001      
 min_lambda: 1e-4
 ema_scale: 0.9
-grad_ema_scale_ce: 0.9
 use_dynamic_alpha: True
 huber_delta_scale: 1.5
 criterion_scale: 1.0
