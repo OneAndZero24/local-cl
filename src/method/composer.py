@@ -201,20 +201,20 @@ class Composer:
         if task_id > 0:
             loss *= self.criterion_scale
             
-        loss_ce = loss
+        loss_ct = loss
 
         if self.use_dynamic_alpha:
             reg_loss = 0.0
             for plugin in self.plugins:
                 reg_loss, preds = plugin.forward(x, y, reg_loss, preds)
-            loss = self.dynamic_scaling.forward(task_id, loss_ce, reg_loss, preds)
+            loss = self.dynamic_scaling.forward(task_id, loss_ct, reg_loss, preds)
         else:
             loss = self._add_reg(loss)
             for plugin in self.plugins:
                 loss, preds = plugin.forward(x, y, loss, preds)
 
         if self.log_reg:
-            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ce.mean()})
+            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ct.mean()})
         return loss, preds
 
 
