@@ -31,6 +31,9 @@ class Composer:
         min_lambda (float): The minimum lambda value for dynamic scaling.
         ema_scale (float): The EMA scale for dynamic scaling.
         grad_ema_scale_ct (float): The EMA scale for the norm of the current task loss gradient.
+        beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
+                between gradient of the current task loss and projection of gradient current task loss onto the gradient
+                regularization loss.
         use_dynamic_alpha (bool): Whether to use dynamic alpha scaling when computing the dynamic scaling factor.
         reg_type (Optional[str]): The type of regularization to apply (e.g., L1, L2).
         gamma (Optional[float]): The regularization strength.
@@ -53,6 +56,7 @@ class Composer:
         min_lambda: float,
         ema_scale: float,
         grad_ema_scale_ct: float,
+        beta: float,
         use_dynamic_alpha: bool,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
@@ -75,6 +79,9 @@ class Composer:
             min_lambda (float): Minimum lambda value for dynamic loss scaling.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
             grad_ema_scale_ct (float): The EMA scale for the norm of the current task loss gradient.
+            beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
+                between gradient of the current task loss and projection of gradient current task loss onto the gradient
+                regularization loss.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
             reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
             gamma (Optional[float], optional): Regularization strength. Defaults to None.
@@ -109,6 +116,7 @@ class Composer:
         self.plugins = plugins
         self.log_reg = log_reg
         self.use_dynamic_alpha = use_dynamic_alpha
+        self.beta = beta
         
         if self.task_heads:
             self.heads = []
@@ -182,7 +190,7 @@ class Composer:
             plugin.setup_task(task_id)
 
         self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.ema_scale, 
-                                              self.grad_ema_scale_ct)
+                                              self.grad_ema_scale_ct, self.beta)
 
 
     def forward(self, x, y, task_id):

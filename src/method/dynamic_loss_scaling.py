@@ -16,7 +16,8 @@ class DynamicScaling:
     Dynamic lambda is discretized into bins to improve robustness against noisy estimates.
     """
 
-    def __init__(self, module, min_lambda: float, ema_scale_base: float, grad_ema_scale_ct: float):
+    def __init__(self, module, min_lambda: float, ema_scale_base: float, grad_ema_scale_ct: float,
+                 beta: float):
         """
         Initializes the DynamicScaling module.
 
@@ -25,17 +26,22 @@ class DynamicScaling:
             min_lambda (float): The minimum value of dynamic lambda.
             ema_scale_base (float): The EMA smoothing factor for dynamic lambda updates.
             grad_ema_scale_ct (float): The EMA smoothing factor for the gradient norm of the current task loss.
+            beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
+                between gradient of the current task loss and projection of gradient current task loss onto the gradient
+                regularization loss.
         """
         super().__init__()
         self.min_lambda = min_lambda
         self.ema_scale = ema_scale_base
         self.grad_ema_scale_ct = grad_ema_scale_ct
+        self.beta = beta
         self.module = module
 
         self.prev_dynamic_lambda = None
         self.prev_grads_ct = None
 
-    def forward(self, task_id: int, loss_ct: torch.Tensor, loss_reg: torch.Tensor, preds: torch.Tensor) -> torch.Tensor:
+    def forward(self, task_id: int, loss_ct: torch.Tensor, loss_reg: torch.Tensor,
+                 preds: torch.Tensor) -> torch.Tensor:
         """
         Computes the dynamically scaled loss based on current task and training mode.
 
@@ -84,7 +90,7 @@ class DynamicScaling:
         else:
             ct_norm_avg = self.grad_ema_scale_ct * ct_norm_avg + (1-self.grad_ema_scale_ct) * self.prev_grads_ct
 
-        alignment = 1.0 - residual_norm_avg / torch.max(ct_norm_avg, eps)
+        alignment = 1.0 - (residual_norm_avg / torch.max(ct_norm_avg, eps))**self.beta
         return alignment.clamp(0.0, 1.0)
 
     def compute_dynamic_lambda(self, grads_ct: list, grads_reg: list) -> float:
