@@ -69,10 +69,6 @@ parameters:
     distribution: uniform
     min: 0.6
     max: 0.99
-  method.grad_ema_scale_ct:
-    distribution: uniform
-    min: 0.6
-    max: 0.99
   method.beta:
     distribution: uniform
     min: 1e-3

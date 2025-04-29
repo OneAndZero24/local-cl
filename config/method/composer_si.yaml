@@ -5,10 +5,9 @@ first_lr: 0.001
 lr: 0.001      
 min_lambda: 1e-4
 ema_scale: 0.9
-grad_ema_scale_ct: 0.9
+grad_ema_scale_ce: 0.9
 use_dynamic_alpha: True
 criterion_scale: 1.0
-beta: 0.1
 plugins:
   - _target_: method.SI
     alpha: 8000.0  
