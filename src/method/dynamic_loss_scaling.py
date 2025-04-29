@@ -78,6 +78,12 @@ class DynamicScaling:
         
         residual_norm_avg = torch.norm(residual, p=2, dim=-1).mean()
         ct_norm_avg = torch.norm(grads_ct_flat, p=2, dim=-1).mean()
+
+        if self.prev_grads_ct is None:
+            self.prev_grads_ct = ct_norm_avg
+        else:
+            ct_norm_avg = self.grad_ema_scale_ct * ct_norm_avg + (1-self.grad_ema_scale_ct) * self.prev_grads_ct
+
         alignment = 1.0 - residual_norm_avg / torch.max(ct_norm_avg, eps)
         return alignment.clamp(0.0, 1.0)
 
