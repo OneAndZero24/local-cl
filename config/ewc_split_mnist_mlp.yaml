@@ -8,9 +8,9 @@ defaults:
 exp:
   run_func:
     _target_: experiment.experiment
-  seed: 42
+  seed: 1
   log_dir: # set during runtime to automatically created dir
-  batch_size: 32
+  batch_size: 512
   epochs: 5
   gen_cm: False
   log_per_batch: False
