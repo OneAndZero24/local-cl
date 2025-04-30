@@ -28,14 +28,11 @@ class Composer:
         first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
         criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
-        max_lambda (float): The maximum lambda value for dynamic scaling.
-        min_lambda (float): The minimum lambda value for dynamic scaling.
-        beta (float): The beta value for dynamic scaling.
         ema_scale (float): The EMA scale for dynamic scaling.
-        use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
-        use_entropy_scale (bool): Whether to use entropy scaling.
-        angle_constraint_scale (float): A factor that adjusts the influence of angular constraints 
-            when computing the dynamic scaling factor.
+        beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
+                between gradient of the current task loss and projection of gradient current task loss onto the gradient
+                regularization loss.
+        use_dynamic_alpha (bool): Whether to use dynamic alpha scaling when computing the dynamic scaling factor.
         reg_type (Optional[str]): The type of regularization to apply (e.g., L1, L2).
         gamma (Optional[float]): The regularization strength.
         task_heads (bool): Whether to use task-specific heads for multi-task learning.
@@ -54,13 +51,9 @@ class Composer:
         first_lr: float, 
         lr: float,
         criterion_scale: float,
-        min_lambda: float,
-        max_lambda: float,
-        beta: float,
         ema_scale: float,
+        beta: float,
         use_dynamic_alpha: bool,
-        use_entropy_scale: bool,
-        angle_constraint_scale: float,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -79,14 +72,11 @@ class Composer:
             first_lr (float): The learning rate for the first task.
             lr (float): The learning rate for subsequent tasks.
             criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
-            min_lambda (float): Minimum lambda value for dynamic loss scaling.
-            max_lambda (float): Maximum lambda value for dynamic loss scaling.
-            beta (float): Beta parameter for dynamic loss scaling.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
+            beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
+                between gradient of the current task loss and projection of gradient current task loss onto the gradient
+                regularization loss.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
-            use_entropy_scale (bool): Whether to use entropy scaling.
-            angle_constraint_scale (float): A factor that adjusts the influence of angular constraints
-                when computing the dynamic scaling factor.
             reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
             gamma (Optional[float], optional): Regularization strength. Defaults to None.
             task_heads (bool, optional): Whether to use task-specific heads for multi-task learning. Defaults to False.
@@ -98,14 +88,16 @@ class Composer:
         """
 
         self.module = module
-        self.criterion = LossCriterion(criterion)
+
+        if use_dynamic_alpha and criterion == "CrossEntropyLoss":
+            reduction="none"
+        else:
+            reduction="mean"
+        self.criterion = LossCriterion(criterion, reduction=reduction)
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
-        self.max_lambda = max_lambda
-        self.min_lambda = min_lambda
-        self.beta = beta
         self.ema_scale = ema_scale
         self.reg_type = reg_type
         self.gamma = gamma
@@ -116,8 +108,7 @@ class Composer:
         self.plugins = plugins
         self.log_reg = log_reg
         self.use_dynamic_alpha = use_dynamic_alpha
-        self.use_entropy_scale = use_entropy_scale
-        self.angle_constraint_scale = angle_constraint_scale
+        self.beta = beta
         
         if self.task_heads:
             self.heads = []
@@ -190,8 +181,7 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.max_lambda, self.beta,
-                                              self.ema_scale, self.use_entropy_scale, self.angle_constraint_scale)
+        self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta)
 
 
     def forward(self, x, y, task_id):
@@ -214,20 +204,20 @@ class Composer:
         if task_id > 0:
             loss *= self.criterion_scale
             
-        loss_ce = loss
+        loss_ct = loss
 
         if self.use_dynamic_alpha:
             reg_loss = 0.0
             for plugin in self.plugins:
                 reg_loss, preds = plugin.forward(x, y, reg_loss, preds)
-            loss = self.dynamic_scaling.forward(task_id, loss_ce, reg_loss, preds)
+            loss = self.dynamic_scaling.forward(task_id, loss_ct, reg_loss, preds)
         else:
             loss = self._add_reg(loss)
             for plugin in self.plugins:
                 loss, preds = plugin.forward(x, y, loss, preds)
 
         if self.log_reg:
-            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ce})
+            wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ct.mean()})
         return loss, preds
 
 

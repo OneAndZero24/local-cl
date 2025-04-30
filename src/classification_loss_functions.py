@@ -15,12 +15,15 @@ class LossCriterion(nn.Module):
 
     Args:
     - criterion (str): Loss function name, either "CrossEntropyLoss" or "MahalanobisDistanceLoss".
+    - reduction (str): Specifies the reduction to apply to the output. If DynamicScaling is applied,
+                       no reduction is applied. This parameter is only applicale if cross entropy is applied.
     """
 
-    def __init__(self, criterion: str):
+    def __init__(self, criterion: str, reduction: str):
         super().__init__()
 
         self.criterion_name = self._map_to_loss_type(criterion)
+        self.reduction = reduction
 
         self.loss_functions = {
             LossCriterionType.CROSS_ENTROPY: self._cross_entropy_loss,
@@ -101,7 +104,7 @@ class LossCriterion(nn.Module):
         Returns:
         - Tensor: CrossEntropy loss.
         """
-        return F.cross_entropy(x, target)
+        return F.cross_entropy(x, target, reduction=self.reduction)
 
     def _mahalanobis_distance_loss(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
