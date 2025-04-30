@@ -3,10 +3,9 @@ _target_: method.Composer
 criterion: CrossEntropyLoss
 first_lr: 0.001  
 lr: 0.001      
-min_lambda: 1e-8
-ema_scale: 0.9
+ema_scale: 0.95
 use_dynamic_alpha: True
-beta: 0.001
+beta: 0.1
 criterion_scale: 1.0
 plugins:
   - _target_: method.EWC

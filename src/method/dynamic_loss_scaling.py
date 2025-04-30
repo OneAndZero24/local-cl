@@ -14,23 +14,21 @@ class DynamicScaling:
     projection-based stable reference method.
     """
 
-    def __init__(self, module, min_lambda: float, ema_scale_base: float, beta: float):
+    def __init__(self, module, ema_scale_base: float, beta: float):
         """
         Initializes the DynamicScaling module.
 
         Args:
             module (torch.nn.Module): The neural network model.
-            min_lambda (float): The minimum value of dynamic lambda.
             ema_scale_base (float): The EMA smoothing factor for dynamic lambda updates.
             beta (float): A hyperparameter controlling vanishing of a tanh argument.
         """
         super().__init__()
-        self.min_lambda = min_lambda
         self.ema_scale = ema_scale_base
         self.beta = beta
         self.module = module
 
-        self.prev_dynamic_lambda = None
+        self.prev_dynamic_lambda = 0.0
 
     def forward(self, task_id: int, loss_ct: torch.Tensor, loss_reg: torch.Tensor,
                  preds: torch.Tensor) -> torch.Tensor:
@@ -72,7 +70,7 @@ class DynamicScaling:
         """
         eps = torch.tensor(eps)
         proj = (grads_ct_flat * grads_reg_flat).sum(dim=-1, keepdim=True) / (torch.max(grads_reg_flat.norm()**2, eps))
-        alignment = torch.tanh(self.beta * proj.mean())
+        alignment = self.beta * torch.sigmoid(proj.mean() / self.beta)
         return alignment.clamp(0.0, 1.0)
 
     def compute_dynamic_lambda(self, grads_ct: list, grads_reg: list) -> float:
@@ -100,19 +98,16 @@ class DynamicScaling:
 
         if grads_ct_flat.numel() == 0 or grads_reg_flat.numel() == 0:
             log.warning("Skipping dynamic_lambda update due to missing gradients.")
-            return self.prev_dynamic_lambda if self.prev_dynamic_lambda is not None else self.min_lambda
+            return self.prev_dynamic_lambda
 
         if not (torch.isfinite(grads_ct_flat).all() and torch.isfinite(grads_reg_flat).all()):
             log.warning("Skipping dynamic_lambda update due to invalid gradients.")
-            return self.prev_dynamic_lambda if self.prev_dynamic_lambda is not None else self.min_lambda
+            return self.prev_dynamic_lambda
 
         dynamic_lambda = self._alignment_score_stable_ref(grads_ct_flat, grads_reg_flat).item()
+        
+        # EMA smoothing on lambda
+        dynamic_lambda = self.ema_scale * dynamic_lambda + (1 - self.ema_scale) * self.prev_dynamic_lambda
+        self.prev_dynamic_lambda = dynamic_lambda
 
-        # EMA smoothing on lambda itself
-        if self.prev_dynamic_lambda is None:
-            self.prev_dynamic_lambda = dynamic_lambda
-        else:
-            dynamic_lambda = self.ema_scale * dynamic_lambda + (1 - self.ema_scale) * self.prev_dynamic_lambda
-            self.prev_dynamic_lambda = dynamic_lambda
-
-        return max(self.min_lambda, dynamic_lambda)
+        return dynamic_lambda

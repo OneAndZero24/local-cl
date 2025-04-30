@@ -28,7 +28,6 @@ class Composer:
         first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
         criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
-        min_lambda (float): The minimum lambda value for dynamic scaling.
         ema_scale (float): The EMA scale for dynamic scaling.
         beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
                 between gradient of the current task loss and projection of gradient current task loss onto the gradient
@@ -52,7 +51,6 @@ class Composer:
         first_lr: float, 
         lr: float,
         criterion_scale: float,
-        min_lambda: float,
         ema_scale: float,
         beta: float,
         use_dynamic_alpha: bool,
@@ -74,7 +72,6 @@ class Composer:
             first_lr (float): The learning rate for the first task.
             lr (float): The learning rate for subsequent tasks.
             criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
-            min_lambda (float): Minimum lambda value for dynamic loss scaling.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
             beta (float): A hyperparameter controlling vanishing of norm residuals. The residual is the difference
                 between gradient of the current task loss and projection of gradient current task loss onto the gradient
@@ -101,7 +98,6 @@ class Composer:
         self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
-        self.min_lambda = min_lambda
         self.ema_scale = ema_scale
         self.reg_type = reg_type
         self.gamma = gamma
@@ -185,7 +181,7 @@ class Composer:
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.min_lambda, self.ema_scale, self.beta)
+        self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta)
 
 
     def forward(self, x, y, task_id):

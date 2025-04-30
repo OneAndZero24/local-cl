@@ -61,14 +61,8 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
-  method.min_lambda:
-    distribution: uniform
-    min: 1e-8
-    max: 1e-3
   method.ema_scale:
-    distribution: uniform
-    min: 0.7
-    max: 0.99
+    value: 0.95
 
   method.plugins.0._target_:
     value: method.EWC
