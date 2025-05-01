@@ -40,6 +40,14 @@ parameters:
   num_classes: 
     value: 100  
 
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_: 
+    value: continuum.ClassIncremental
+  scenario.increment: 
+    value: 20
+
   # Method configuration
   method._partial_: 
     value: True
@@ -59,7 +67,6 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
- 
   method.max_lambda:
     value: 1.0
   method.beta:

@@ -40,7 +40,15 @@ parameters:
   model.head_type: 
     value: Normal
   model.layers: 
-    value: ["Normal"]      
+    value: ["Normal"]     
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_: 
+    value: continuum.ClassIncremental
+  scenario.increment: 
+    value: 2 
 
   # Method configuration
   method._partial_: 

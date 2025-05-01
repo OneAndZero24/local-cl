@@ -40,7 +40,15 @@ parameters:
   pretrained: 
     value: true
   num_classes: 
-    value: 200     
+    value: 200    
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_: 
+    value: continuum.ClassIncremental
+  scenario.increment: 
+    value: 20 
 
   # Method configuration
   method._partial_: 

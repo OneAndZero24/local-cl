@@ -42,6 +42,14 @@ parameters:
   num_classes: 
     value: 100 
 
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_: 
+    value: continuum.ClassIncremental
+  scenario.increment: 
+    value: 20
+
   # Method configuration
   method._partial_: 
     value: True
@@ -69,9 +77,6 @@ parameters:
     max: 1.0
   method.ema_scale:
     value: 0.95
- 
-  
-
   method.plugins.0._target_:
     value: method.EWC
   method.plugins.0.alpha: 

@@ -42,6 +42,14 @@ parameters:
   num_classes: 
     value: 100 
 
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_: 
+    value: continuum.ClassIncremental
+  scenario.increment: 
+    value: 20
+
   # Method configuration
   method._partial_: 
     value: True
