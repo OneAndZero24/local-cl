@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 from copy import deepcopy
 
+import torch
 from torch import nn
 from torch import optim
 
@@ -180,6 +181,9 @@ class Composer:
         self._setup_optim(task_id)
         for plugin in self.plugins:
             plugin.setup_task(task_id)
+
+        if len(self.plugins) == 0:
+            self.use_dynamic_alpha = False
 
         self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta)
 

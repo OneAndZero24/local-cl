@@ -166,6 +166,7 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
     for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
         loss, preds = method.forward(X, y, task_id)
 
+        loss = loss.mean()
         method.backward(loss)
 
         avg_loss += loss
