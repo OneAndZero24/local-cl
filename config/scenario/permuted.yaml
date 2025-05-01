@@ -5,3 +5,4 @@ seed: 42
 shared_label_space: False
 transformations: 
   _target_: util.resize_transform
+  size: 32
