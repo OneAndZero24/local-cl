@@ -37,9 +37,9 @@ parameters:
     value: timm.create_model
   model.model_name: 
     value: "vit_base_patch16_224_in21k"
-  pretrained: 
+  model.pretrained: 
     value: true
-  num_classes: 
+  model.num_classes: 
     value: 200  
 
   # Scenario configuration

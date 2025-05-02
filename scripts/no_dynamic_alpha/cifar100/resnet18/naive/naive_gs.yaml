@@ -35,9 +35,9 @@ parameters:
     value: timm.create_model
   model.model_name: 
     value: "resnet18"
-  pretrained: 
+  model.pretrained: 
     value: true
-  num_classes: 
+  model.num_classes: 
     value: 100 
 
   # Scenario configuration
