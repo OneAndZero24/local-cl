@@ -18,7 +18,7 @@ parameters:
   exp.batch_size:
     value: 128    
   exp.epochs: 
-    values: [50, 10, 5, 1]
+    values: [100, 50, 10, 5, 1]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:

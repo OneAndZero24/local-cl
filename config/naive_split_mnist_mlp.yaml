@@ -1,4 +1,4 @@
-defaults:
+2defaults:
   - _self_
   - dataset: mnist
   - scenario: class_inc

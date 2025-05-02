@@ -150,7 +150,7 @@ class Composer:
             float: The loss value with regularization added if applicable.
         """
 
-        if self.gamma is not None and self.reg_type is not None:
+        if (self.gamma is not None) and (self.reg_type is not None) and hasattr(self.module, 'activations'):
             loss += self.gamma*regularization(self.module.activations, self.reg_type)
         return loss
 
