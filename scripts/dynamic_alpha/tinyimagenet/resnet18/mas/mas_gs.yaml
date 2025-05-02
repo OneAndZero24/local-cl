@@ -67,7 +67,7 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
-  method.max_lambda:
+  method.:
     value: 1.0
   method.beta:
     distribution: uniform
