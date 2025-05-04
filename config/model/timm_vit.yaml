@@ -1,4 +1,0 @@
-_target_: timm.create_model
-model_name: "vit_base_patch16_224_in21k"
-pretrained: true
-num_classes: 100

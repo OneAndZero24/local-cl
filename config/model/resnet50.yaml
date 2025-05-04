@@ -1,10 +1,11 @@
 _target_: model.BigModel
 pretrained_backbone_name: "resnet50"
+frozen: false
 head:
   _target_: model.MLP
   initial_out_features: 20
-  sizes: [100352, 10000, 1000, 200]
-  layers: ["Normal", "Normal", "Normal"]
+  sizes: [2048, 100]
+  layers: ["Normal"]
   head_type: Normal
   activation: 
     _target_: torch.nn.ReLU
