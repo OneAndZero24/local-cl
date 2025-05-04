@@ -4,5 +4,5 @@ Full models and custom layers.
 - `cl_module_abc.py` - `CLModuleABC` acts as a base class for CL Modules that record activations
 - `lenet.py` - LeNet
 - `mlp.py` - Cutomizable MLP wrapper
-- `big_model.py` - "Big model" - pretrained timm backbone with custom head
+- `big_model.py` - "Big model" - pretrained torchvision backbone with custom head
 - `layer/` - Custom layer implementations. Use `instantiate` & `instantiate2D` API

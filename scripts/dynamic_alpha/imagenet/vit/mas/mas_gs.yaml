@@ -12,7 +12,7 @@ parameters:
   scenario.transformations.size:
     value: 224
   model:
-    value: timm_vit
+    value: vit
   method:
     value: composer_mas
   exp.seed: 

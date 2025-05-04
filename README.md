@@ -15,13 +15,13 @@
 - Lightning Fabric
 - Custom Plugin System for Methods
 - Incremental Classifier
-- Ability to use any timm model as pretrained backbone
+- Ability to use any torchvision model as pretrained backbone
 
 | Method | Status | Custom Layers | Status | Model | Status | Scenario | Status | Dataset | Status |
 | ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
 | Naive | ✅ | Local | ✅ | MLP | ✅ | CI | ✅ | MNIST | ✅ |
 | LwF | ✅ | RBF | ✅ | LeNet | ✅ | DI | ✅ | ImageNet | ✅ |
-| EWC | ✅ | SingleRBFHead | ✅ | TIMM Big Backbone | ✅ | TI | ✅ | CIFAR100 | ✅ |
+| EWC | ✅ | SingleRBFHead | ✅ | Big Backbone | ✅ | TI | ✅ | CIFAR100 | ✅ |
 | Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
 | MAS | ✅ | LocalHead | ⭕️ |
