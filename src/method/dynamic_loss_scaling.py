@@ -37,7 +37,7 @@ class DynamicScaling:
 
         Args:
             task_id (int): Current task ID.
-            loss_ct (torch.Tensor): Cross-entropy loss. It should be non-reduced.
+            loss_ct (torch.Tensor): Cross-entropy loss.
             loss_reg (torch.Tensor): Regularization loss.
             preds (torch.Tensor): Model predictions (unused, for interface compatibility).
 
@@ -46,14 +46,11 @@ class DynamicScaling:
         """
         if task_id > 0 and self.module.training:
             grads_reg = torch.autograd.grad(loss_reg, self.module.parameters(), retain_graph=True)
-            grads_ct = []
-            for loss in loss_ct:
-                grad = torch.autograd.grad(loss, self.module.parameters(), retain_graph=True)
-                grads_ct.append(grad)
+            grads_ct = torch.autograd.grad(loss_ct, self.module.parameters(), retain_graph=True)
             dynamic_lambda = self.compute_dynamic_lambda(grads_ct, grads_reg)
         else:
             dynamic_lambda = 1.0
-        return dynamic_lambda * loss_ct.mean() + loss_reg
+        return dynamic_lambda * loss_ct + loss_reg
 
     def _alignment_score_stable_ref(self, grads_ct_flat: torch.Tensor, grads_reg_flat: torch.Tensor, 
                                     eps: float=1e-8) -> torch.Tensor:
@@ -69,8 +66,8 @@ class DynamicScaling:
             torch.Tensor: Alignment score in [0, 1].
         """
         eps = torch.tensor(eps)
-        proj = (grads_ct_flat * grads_reg_flat).sum(dim=-1, keepdim=True) / (torch.max(grads_reg_flat.norm()**2, eps))
-        alignment = self.beta * torch.sigmoid(proj.mean() / self.beta)
+        proj = (grads_ct_flat * grads_reg_flat).sum() / (torch.max(grads_reg_flat.norm()**2, eps))
+        alignment = self.beta * torch.sigmoid(proj / self.beta)
         return alignment.clamp(0.0, 1.0)
 
     def compute_dynamic_lambda(self, grads_ct: list, grads_reg: list) -> float:
@@ -88,12 +85,7 @@ class DynamicScaling:
         grads_ct = [g for g in grads_ct if g is not None]
         grads_reg = [g for g in grads_reg if g is not None]
 
-        # Flatten per parameter, per sample, but KEEP batch dimension
-        grads_ct_flat = torch.stack([
-            torch.cat([g.flatten() for g in sample_grads], dim=0)
-            for sample_grads in grads_ct
-        ], dim=0)
-        
+        grads_ct_flat = torch.cat([g.flatten() for g in grads_ct], dim=0)
         grads_reg_flat = torch.cat([g.flatten() for g in grads_reg], dim=0)
 
         if grads_ct_flat.numel() == 0 or grads_reg_flat.numel() == 0:

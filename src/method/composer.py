@@ -90,11 +90,7 @@ class Composer:
 
         self.module = module
 
-        if use_dynamic_alpha and criterion == "CrossEntropyLoss":
-            reduction="none"
-        else:
-            reduction="mean"
-        self.criterion = LossCriterion(criterion, reduction=reduction)
+        self.criterion = LossCriterion(criterion)
         self.optimizer = None
         self.first_lr = first_lr
         self.lr = lr
