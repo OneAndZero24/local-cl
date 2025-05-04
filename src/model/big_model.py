@@ -66,7 +66,7 @@ class BigModel(CLModuleABC):
             self.fe = nn.Sequential(*list(self.fe.children())[:-1])  # Remove classification head
             self.flatten_output = False
 
-        self.head = head
+        self.c_head = head
         self.layers = head.layers
         self.size = size
         self.frozen = frozen
@@ -96,4 +96,4 @@ class BigModel(CLModuleABC):
         if self.flatten_output:
             x = x.view(x.size(0), -1)
         
-        return self.head(x)
+        return self.c_head(x)
