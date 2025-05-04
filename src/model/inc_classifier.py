@@ -35,7 +35,7 @@ class IncrementalClassifier(nn.Module):
         in_features: int,
         initial_out_features: int=2,
         layer_type: LayerType=LayerType.NORMAL,
-        masking: bool=True,
+        masking: bool=False,
         mask_value: int=-1000,
         **kwargs,
     ):

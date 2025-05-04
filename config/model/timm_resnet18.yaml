@@ -1,4 +1,0 @@
-_target_: timm.create_model
-model_name: "resnet18"
-pretrained: true
-num_classes: 100

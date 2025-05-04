@@ -98,11 +98,9 @@ def experiment(config: DictConfig):
         b = np.zeros(N)
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{N}')
-
-        if hasattr(method.module, 'head'):
-            if isinstance(method.module.head, IncrementalClassifier):
-                log.info(f'Incrementing model head')
-                method.module.head.increment(train_task.dataset.get_classes())
+        if isinstance(method.module.head, IncrementalClassifier):
+            log.info(f'Incrementing model head')
+            method.module.head.increment(train_task.dataset.get_classes())
 
         log.info(f'Setting up task')
         method.setup_task(task_id)
