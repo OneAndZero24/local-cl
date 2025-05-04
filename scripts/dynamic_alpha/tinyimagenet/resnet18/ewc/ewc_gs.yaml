@@ -31,7 +31,7 @@ parameters:
     value: True    
 
   # Model configuration
-  model_target_:
+  model._target_:
     value: model.BigModel
   model.pretrained_backbone_name:
     value: "resnet18"
