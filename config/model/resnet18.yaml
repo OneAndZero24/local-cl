@@ -1,5 +1,6 @@
 _target_: model.BigModel
 pretrained_backbone_name: "resnet18"
+pretrained: true
 frozen: false
 head:
   _target_: model.MLP

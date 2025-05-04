@@ -1,6 +1,7 @@
 _target_: model.BigModel
 pretrained_backbone_name: "resnet50"
 frozen: false
+pretrained: true
 head:
   _target_: model.MLP
   initial_out_features: 20

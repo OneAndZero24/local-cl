@@ -1,6 +1,6 @@
 _partial_: True
 _target_: continuum.ClassIncremental
-increment: 2
+increment: 20
 transformations: 
   _target_: util.resize_transform
   size: 32

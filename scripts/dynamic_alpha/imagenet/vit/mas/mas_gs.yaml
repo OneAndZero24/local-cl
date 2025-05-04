@@ -18,9 +18,9 @@ parameters:
   exp.seed: 
     value: 42      
   exp.batch_size:
-    values: [128, 64]      
+    values: [512, 256]      
   exp.epochs: 
-    values: [100, 50, 10, 5, 1]
+    values: [50, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -34,13 +34,13 @@ parameters:
 
   # Model configuration
   model._target_: 
-    value: timm.create_model
-  model.model_name: 
-    value: "vit_base_patch16_224_in21k"
-  model.pretrained: 
-    value: true
-  model.num_classes: 
-    value: 100     
+    value: model.BigModel
+  model.pretrained_backbone_name: 
+    value: "vit_b_16"
+  model.frozen: 
+    value: false
+  model.pretrained:
+    value: true     
 
   # Scenario configuration
   scenario._partial_:
