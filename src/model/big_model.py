@@ -76,6 +76,12 @@ class BigModel(CLModuleABC):
             for param in self.fe.parameters():
                 param.requires_grad = False
 
+            # Unfreeze last layer of the feature extractor
+            if isinstance(self.fe, nn.Sequential):
+                last_layer = list(self.fe.children())[-1]
+                for param in last_layer.parameters():
+                    param.requires_grad = True
+
     def forward(self, x):
         """
         Performs a forward pass through the model.
