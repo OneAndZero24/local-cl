@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 from torchvision import models
 
 from model.cl_module_abc import CLModuleABC
@@ -16,9 +15,11 @@ class BigModel(CLModuleABC):
         pretrained (bool, optional): Whether to use a pretrained backbone. Defaults to True.
         frozen (bool, optional): Whether to freeze the backbone parameters. Defaults to False.
         size (tuple[int], optional): The target size for input tensors (height, width). Defaults to (224, 224).
+        reduced_dim (int, optional): Output feature dimension after replacing the last ResNet block. Defaults to 128.
     
     Attributes:
         fe (nn.Module): The feature extractor backbone model (ResNet-18, ResNet-50, or ViT-B/16).
+        reducer (nn.Module): Lightweight custom layer replacing the last ResNet block.
         head (nn.Module): The custom head module.
         layers (list[nn.Module]): The layers of the custom head module.
         size (tuple[int]): The target size for input tensors.
@@ -36,6 +37,7 @@ class BigModel(CLModuleABC):
         pretrained: bool=True,
         frozen: bool=False,
         size: tuple[int]=(224, 224),
+        reduced_dim: int=64,
     ):
         """
         Initializes the BigModel with a pretrained backbone and a custom head.
@@ -46,25 +48,60 @@ class BigModel(CLModuleABC):
             pretrained (bool, optional): Whether to use a pretrained backbone. Defaults to True.
             frozen (bool, optional): Whether to freeze the backbone parameters. Defaults to False.
             size (tuple[int], optional): The target size for input tensors (height, width). Defaults to (224, 224).
+            reduced_dim (int, optional): Output feature dimension after replacing the last ResNet block. Defaults to 64.
         """
-
         super().__init__(head.head)
+
+        self.flatten_output = False
+        self.reducer = None
+        self.output_dim = reduced_dim
 
         if pretrained_backbone_name not in ['resnet18', 'resnet50', 'vit_b_16']:
             raise ValueError("pretrained_backbone_name must be 'resnet18', 'resnet50', or 'vit_b_16'")
 
         if pretrained_backbone_name == 'resnet18':
-            self.fe = models.resnet18(pretrained=pretrained)
-            self.fe = nn.Sequential(*list(self.fe.children())[:-1])  # Remove FC layer
-            self.flatten_output = True
+            base_model = models.resnet18(pretrained=pretrained)
+            channels = 256
+            self.fe = nn.Sequential(
+                base_model.conv1,
+                base_model.bn1,
+                base_model.relu,
+                base_model.maxpool,
+                base_model.layer1,
+                base_model.layer2,
+                base_model.layer3,
+            )
+            self.reducer = nn.Sequential(
+                nn.Conv2d(channels, reduced_dim, kernel_size=1),
+                nn.ReLU(inplace=True),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+            )
+
         elif pretrained_backbone_name == 'resnet50':
-            self.fe = models.resnet50(pretrained=pretrained)
-            self.fe = nn.Sequential(*list(self.fe.children())[:-1])  # Remove FC layer
-            self.flatten_output = True
-        else: 
-            self.fe = models.vit_b_16(pretrained=pretrained)
-            self.fe = nn.Sequential(*list(self.fe.children())[:-1])  # Remove classification head
+            base_model = models.resnet50(pretrained=pretrained)
+            channels = 1024
+            self.fe = nn.Sequential(
+                base_model.conv1,
+                base_model.bn1,
+                base_model.relu,
+                base_model.maxpool,
+                base_model.layer1,
+                base_model.layer2,
+                base_model.layer3,
+            )
+            self.reducer = nn.Sequential(
+                nn.Conv2d(channels, reduced_dim, kernel_size=1),
+                nn.ReLU(inplace=True),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+            )
+
+        else:
+            vit = models.vit_b_16(pretrained=pretrained)
+            self.fe = nn.Sequential(*list(vit.children())[:-1])
             self.flatten_output = False
+            self.reducer = nn.Identity()
 
         self.c_head = head
         self.layers = head.layers
@@ -76,11 +113,8 @@ class BigModel(CLModuleABC):
             for param in self.fe.parameters():
                 param.requires_grad = False
 
-            # Unfreeze last layer of the feature extractor
-            if isinstance(self.fe, nn.Sequential):
-                last_layer = list(self.fe.children())[-1]
-                for param in last_layer.parameters():
-                    param.requires_grad = True
+            for param in self.reducer.parameters():
+                param.requires_grad = True
 
     def forward(self, x):
         """
@@ -93,13 +127,12 @@ class BigModel(CLModuleABC):
             torch.Tensor: The output of the custom head after processing the input tensor.
         """  
         self.reset_activations()
+
         if self.frozen:
             with torch.no_grad():
                 x = self.fe(x)
-        else:   
+        else:
             x = self.fe(x)
-        
-        if self.flatten_output:
-            x = x.view(x.size(0), -1)
-        
+
+        x = self.reducer(x)
         return self.c_head(x)
