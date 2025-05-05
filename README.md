@@ -23,9 +23,9 @@
 | LwF | ✅ | RBF | ✅ | LeNet | ✅ | DI | ✅ | ImageNet | ✅ |
 | EWC | ✅ | SingleRBFHead | ✅ | Big Backbone | ✅ | TI | ✅ | CIFAR100 | ✅ |
 | Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
-| SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ |
-| MAS | ✅ | LocalHead | ⭕️ |
-| RBFReg | ✅ | LocalConv2D | ⭕️ |
+| SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ | SVHN | ✅ |
+| MAS | ✅ | LocalHead | ⭕️ | | | | | CIFAR-10 | ✅ |
+| RBFReg | ✅ | LocalConv2D | ⭕️ | | | | | FMNIST | ✅ |
 | Dreaming | ✅ |
 | Dynamic Loss Scaling | ✅ |
 

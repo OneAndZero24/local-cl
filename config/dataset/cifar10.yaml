@@ -1,0 +1,4 @@
+_partial_: True
+_target_: continuum.datasets.CIFAR10
+data_path: ${oc.env:DATA_DIR}/cifar10
+download: True

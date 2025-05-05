@@ -1,0 +1,4 @@
+_partial_: True
+_target_: continuum.datasets.SVHN
+data_path: ${oc.env:DATA_DIR}/svhn
+download: True
