@@ -18,7 +18,7 @@ parameters:
   exp.batch_size:
     values: [512, 256]         
   exp.epochs: 
-    values: [50, 10]
+    values: [20, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -36,7 +36,7 @@ parameters:
   model.pretrained_backbone_name:
     value: "resnet18"
   model.frozen:
-    value: false
+    value: true
   model.pretrained:
     value: true  
 

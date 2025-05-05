@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_fmnist_resnet_ewc_dynamic_alpha
+#SBATCH --job-name=local_cl_split_fmnist_resnet_si_dynamic_alpha
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/no_dynamic_alpha/fmnist/resnet18/ewc/ewc_gs"
+run_sweep_and_agent "scripts/no_dynamic_alpha/fmnist/mlp/si/si_gs"

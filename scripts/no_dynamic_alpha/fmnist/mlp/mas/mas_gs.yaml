@@ -12,13 +12,13 @@ parameters:
   model:
     value: resnet18
   method:
-    value: composer_ewc
+    value: composer_mas
   exp.seed: 
     value: 42      
   exp.batch_size:
-    values: [512, 256]        
+    values: [512, 256]      
   exp.epochs: 
-    values: [50, 10]
+    values: [20, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -28,17 +28,19 @@ parameters:
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True    
+    value: True     
 
   # Model configuration
-  model._target_:
-    value: model.BigModel
-  model.pretrained_backbone_name:
-    value: "resnet18"
-  model.frozen:
-    value: false
-  model.pretrained:
-    value: true 
+  model._target_: 
+    value: model.MLP
+  model.initial_out_features:
+    value: 2          
+  model.sizes:
+    value: [1024, 400]
+  model.head_type: 
+    value: Normal
+  model.layers: 
+    value: ["Normal"]    
 
   # Scenario configuration
   scenario._partial_:
@@ -51,30 +53,28 @@ parameters:
   # Method configuration
   method._partial_: 
     value: True
-  method.use_dynamic_alpha: 
-    value: False
   method._target_: 
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
-  method.criterion_scale:
-    value: 1.0
+  method.use_dynamic_alpha: 
+    value: False
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
     max: 0.01
+  method.criterion_scale:
+    value: 1.0
   method.lr: 
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
   method.plugins.0._target_:
-    value: method.EWC
+    value: method.MAS
   method.plugins.0.alpha: 
     distribution: uniform
     min: 0.1
     max: 10000.0
-  method.plugins.0.head_opt:
-    value: True
 
 
 command:
@@ -82,5 +82,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - ewc_split_mnist_mlp.yaml
+  - mas_split_mnist_mlp.yaml
   - ${args_no_hyphens}

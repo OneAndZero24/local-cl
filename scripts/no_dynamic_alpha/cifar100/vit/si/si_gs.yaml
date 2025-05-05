@@ -33,12 +33,12 @@ parameters:
     value: True     
 
   # Model configuration
- model._target_: 
+  model._target_: 
     value: model.BigModel
   model.pretrained_backbone_name: 
     value: "vit_b_16"
   model.frozen: 
-    value: false
+    value: true
   model.pretrained:
     value: true 
 
