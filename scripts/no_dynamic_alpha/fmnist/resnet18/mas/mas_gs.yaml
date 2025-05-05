@@ -1,0 +1,84 @@
+program: src/main.py
+method: bayes
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: fmnist
+  scenario:
+    value: class_inc
+  model:
+    value: resnet18
+  method:
+    value: composer_mas
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    values: [512, 256]      
+  exp.epochs: 
+    values: [50, 10]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu   
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True     
+
+  # Model configuration
+  model._target_:
+    value: model.BigModel
+  model.pretrained_backbone_name:
+    value: "resnet18"
+  model.frozen:
+    value: false
+  model.pretrained:
+    value: true     
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_: 
+    value: continuum.ClassIncremental
+  scenario.increment: 
+    value: 2
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.use_dynamic_alpha: 
+    value: False
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  method.criterion_scale:
+    value: 1.0
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+  method.plugins.0._target_:
+    value: method.MAS
+  method.plugins.0.alpha: 
+    distribution: uniform
+    min: 0.1
+    max: 10000.0
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - mas_split_mnist_mlp.yaml
+  - ${args_no_hyphens}
