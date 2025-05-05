@@ -10,7 +10,7 @@ parameters:
   scenario:
     value: class_inc
   model:
-    value: resnet18
+    value: mlp
   method:
     value: composer_si
   exp.seed: 

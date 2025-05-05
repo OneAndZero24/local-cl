@@ -10,7 +10,7 @@ parameters:
   scenario:
     value: class_inc
   model:
-    value: resnet18
+    value: mlp
   method:
     value: composer_mas
   exp.seed: 
@@ -18,7 +18,7 @@ parameters:
   exp.batch_size:
     values: [512, 256]      
   exp.epochs: 
-    values: [50, 10]
+    values: [20, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
