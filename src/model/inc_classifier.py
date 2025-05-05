@@ -64,7 +64,6 @@ class IncrementalClassifier(nn.Module):
         self.masking = masking
         self.mask_value = mask_value
 
-        self.mul = 1.0
         self.old_nclasses = None
 
         self.get_classifier = (lambda in_features, out_features: 
@@ -119,7 +118,6 @@ class IncrementalClassifier(nn.Module):
             self.active_units[new_classes] = 1
 
         if old_nclasses != new_nclasses:
-            self.mul = old_nclasses/new_nclasses
             self.old_nclasses = old_nclasses
             state_dict = self.classifier.state_dict()
             self.classifier = self.get_classifier(in_features, new_nclasses).to(device)
