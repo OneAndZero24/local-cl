@@ -45,8 +45,9 @@ class DynamicScaling:
             torch.Tensor: Weighted sum of loss_ct and loss_reg.
         """
         if task_id > 0 and self.module.training:
-            grads_reg = torch.autograd.grad(loss_reg, self.module.parameters(), retain_graph=True)
-            grads_ct = torch.autograd.grad(loss_ct, self.module.parameters(), retain_graph=True)
+            params = [p for p in self.module.parameters() if p.requires_grad]
+            grads_reg = torch.autograd.grad(loss_reg, params, retain_graph=True)
+            grads_ct = torch.autograd.grad(loss_ct, params, retain_graph=True)
             dynamic_lambda = self.compute_dynamic_lambda(grads_ct, grads_reg)
         else:
             dynamic_lambda = 1.0
