@@ -96,7 +96,7 @@ class Composer:
         self.lr = lr
         self.criterion_scale = criterion_scale
         self.ema_scale = ema_scale
-        self.reg_type = reg_type
+        self.reg_type = None if (reg_type is None) or (not reg_type) else reg_type
         self.gamma = gamma
         self.task_heads = task_heads
         self.reset_rbf_mask = reset_rbf_mask
@@ -147,7 +147,6 @@ class Composer:
         """
 
         if (self.gamma is not None) and (self.reg_type is not None) and hasattr(self.module, 'activations'):
-            log.info(f'gamma: {self.gamma}, reg_type: {self.reg_type}')
             loss += self.gamma*regularization(self.module.activations, self.reg_type)
         return loss
 
