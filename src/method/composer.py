@@ -147,6 +147,7 @@ class Composer:
         """
 
         if (self.gamma is not None) and (self.reg_type is not None) and hasattr(self.module, 'activations'):
+            log.info(f'gamma: {self.gamma}, reg_type: {self.reg_type}')
             loss += self.gamma*regularization(self.module.activations, self.reg_type)
         return loss
 
