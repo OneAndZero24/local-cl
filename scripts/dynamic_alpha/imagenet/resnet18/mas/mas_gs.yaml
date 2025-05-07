@@ -12,7 +12,7 @@ parameters:
   model:
     value: resnet18
   method:
-    value: composer_mas
+    value: resnet18_256
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -28,17 +28,7 @@ parameters:
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True     
-
-  # Model configuration
-  model._target_:
-    value: model.BigModel
-  model.pretrained_backbone_name:
-    value: "resnet18"
-  model.frozen:
-    value: true
-  model.pretrained:
-    value: true     
+    value: True      
 
   # Scenario configuration
   scenario._partial_:
