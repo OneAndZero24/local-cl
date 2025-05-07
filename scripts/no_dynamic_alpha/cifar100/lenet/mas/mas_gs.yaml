@@ -6,11 +6,11 @@ metric:
 
 parameters:
   dataset:
-    value: imagenet
+    value: cifar100
   scenario:
     value: class_inc
   model:
-    value: resnet18_256
+    value: lenet
   method:
     value: composer_mas
   exp.seed: 
@@ -28,7 +28,7 @@ parameters:
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True      
+    value: True     
 
   # Scenario configuration
   scenario._partial_:
@@ -46,7 +46,7 @@ parameters:
   method.criterion: 
     value: CrossEntropyLoss
   method.use_dynamic_alpha: 
-    value: True
+    value: False
   method.first_lr: 
     distribution: log_uniform_values
     min: 0.0001
@@ -57,12 +57,6 @@ parameters:
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
-  method.beta:
-    distribution: uniform
-    min: 1e-3
-    max: 1.0
-  method.ema_scale:
-    value: 0.95
   method.plugins.0._target_:
     value: method.MAS
   method.plugins.0.alpha: 

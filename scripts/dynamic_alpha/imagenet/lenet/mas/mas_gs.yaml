@@ -10,7 +10,7 @@ parameters:
   scenario:
     value: class_inc
   model:
-    value: resnet18_256
+    value: lenet
   method:
     value: composer_mas
   exp.seed: 

@@ -6,11 +6,11 @@ metric:
 
 parameters:
   dataset:
-    value: imagenet
+    value: cifar100
   scenario:
     value: class_inc
   model:
-    value: resnet18_256
+    value: lenet
   method:
     value: composer_mas
   exp.seed: 
