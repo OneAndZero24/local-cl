@@ -59,6 +59,7 @@ class BigModel(CLModuleABC):
         if pretrained_backbone_name not in ['resnet18', 'resnet50', 'vit_b_16']:
             raise ValueError("pretrained_backbone_name must be 'resnet18', 'resnet50', or 'vit_b_16'")
 
+        channels = None
         if pretrained_backbone_name == 'resnet18':
             base_model = models.resnet18(pretrained=pretrained)
             channels = 256
@@ -102,6 +103,13 @@ class BigModel(CLModuleABC):
             self.fe = nn.Sequential(*list(vit.children())[:-1])
             self.flatten_output = False
             self.reducer = nn.Identity()
+
+        if (channels is not None) and (channels == reduced_dim):
+            self.reducer = nn.Sequential(
+                nn.ReLU(inplace=True),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+            )
 
         self.c_head = head
         self.layers = head.layers
