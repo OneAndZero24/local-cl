@@ -69,7 +69,7 @@ class DynamicScaling:
         eps = torch.tensor(eps)
         proj = (grads_ct_flat * grads_reg_flat).sum() / (torch.max(grads_reg_flat.norm()**2, eps))
         alignment = self.beta * torch.sigmoid(proj / self.beta)
-        return alignment.clamp(0.0, 1.0)
+        return alignment
 
     def compute_dynamic_lambda(self, grads_ct: list, grads_reg: list) -> float:
         """
