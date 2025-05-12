@@ -1,6 +1,6 @@
 import logging
 import torch
-import math
+import wandb
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -14,7 +14,7 @@ class DynamicScaling:
     projection-based stable reference method.
     """
 
-    def __init__(self, module, ema_scale_base: float, beta: float):
+    def __init__(self, module, ema_scale_base: float, beta: float, clamp: bool = False):
         """
         Initializes the DynamicScaling module.
 
@@ -27,6 +27,7 @@ class DynamicScaling:
         self.ema_scale = ema_scale_base
         self.beta = beta
         self.module = module
+        self.clamp = clamp
 
         self.prev_dynamic_lambda = 0.0
 
@@ -51,6 +52,7 @@ class DynamicScaling:
             dynamic_lambda = self.compute_dynamic_lambda(grads_ct, grads_reg)
         else:
             dynamic_lambda = 1.0
+        wandb.log({"dynamic_lambda": dynamic_lambda})
         return dynamic_lambda * loss_ct + loss_reg
 
     def _alignment_score_stable_ref(self, grads_ct_flat: torch.Tensor, grads_reg_flat: torch.Tensor, 
@@ -69,6 +71,11 @@ class DynamicScaling:
         eps = torch.tensor(eps)
         proj = (grads_ct_flat * grads_reg_flat).sum() / (torch.max(grads_reg_flat.norm()**2, eps))
         alignment = self.beta * torch.sigmoid(proj / self.beta)
+        wandb.log({"alignment": alignment.item()})
+        wandb.log({"grads_reg_flat_norm": grads_reg_flat.norm().item()})
+        wandb.log({"grads_ct_flat_norm": grads_ct_flat.norm().item()})
+        if self.clamp:
+            alignment = torch.clamp(alignment, min=0.0, max=1.0)
         return alignment
 
     def compute_dynamic_lambda(self, grads_ct: list, grads_reg: list) -> float:

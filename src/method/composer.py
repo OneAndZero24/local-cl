@@ -55,6 +55,7 @@ class Composer:
         ema_scale: float,
         beta: float,
         use_dynamic_alpha: bool,
+        dynamic_alpha_clamp: bool=False,
         reg_type: Optional[str]=None,
         gamma: Optional[float]=None,
         task_heads: bool=False,
@@ -78,6 +79,7 @@ class Composer:
                 between gradient of the current task loss and projection of gradient current task loss onto the gradient
                 regularization loss.
             use_dynamic_alpha (bool): Whether to use dynamic alpha scaling.
+            dynamic_alpha_clamp (bool): Whether to clamp the dynamic alpha value.
             reg_type (Optional[str], optional): The type of regularization to apply (e.g., L1, L2). Defaults to None.
             gamma (Optional[float], optional): Regularization strength. Defaults to None.
             task_heads (bool, optional): Whether to use task-specific heads for multi-task learning. Defaults to False.
@@ -105,6 +107,7 @@ class Composer:
         self.plugins = plugins
         self.log_reg = log_reg
         self.use_dynamic_alpha = use_dynamic_alpha
+        self.dynamic_alpha_clamp = dynamic_alpha_clamp
         self.beta = beta
         
         if self.task_heads:
@@ -181,7 +184,7 @@ class Composer:
         if len(self.plugins) == 0:
             self.use_dynamic_alpha = False
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta)
+        self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta, self.dynamic_alpha_clamp)
 
 
     def forward(self, x, y, task_id):

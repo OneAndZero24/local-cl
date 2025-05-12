@@ -153,6 +153,10 @@ def experiment(config: DictConfig):
         log.info(f'Saving model')
         torch.save(model.state_dict(), config.exp.model_path)
 
+    columns = [f"task_{i}" for i in range(N)]
+    table = wandb.Table(data=R.tolist(), columns=columns)
+    wandb.log({"acc_after_task": table})
+
 
 def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool, quiet: bool = False):
     """
