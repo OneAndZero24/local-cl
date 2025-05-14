@@ -51,6 +51,10 @@ def experiment(config: DictConfig):
     if 'calc_fwt' in config.exp:
         calc_fwt = config.exp
 
+    acc_table = False
+    if 'acc_table' in config.exp:
+        acc_table = config.exp
+
     stop_task = None
     if 'stop_after_task' in config.exp:
         stop_task = config.exp.stop_after_task
@@ -153,9 +157,9 @@ def experiment(config: DictConfig):
         log.info(f'Saving model')
         torch.save(model.state_dict(), config.exp.model_path)
 
-    columns = [f"task_{i}" for i in range(N)]
-    table = wandb.Table(data=R.tolist(), columns=columns)
-    wandb.log({"acc_after_task": table})
+    if acc_table:
+        log.info(f'Logging accuracy table')
+        wandb.log({"acc_table": wandb.Table(data=R.tolist(), columns=[f"task_{i}" for i in range(N)])})
 
 
 def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool, quiet: bool = False):

@@ -29,18 +29,6 @@
 | Dreaming | ✅ |
 | Dynamic Loss Scaling | ✅ |
 
-## Results
-**SplitMNIST**
-| Method | Full MLP | RBF+MultiRBFHead | RBF+SingleRBFHead | MLP+MultiRBFHead |
-| ------ | -------- | ---------------- | ----------------- | ---------------- |
-| Naive | 19.94 | 19.87 | *19.98* | 19.95 |
-| LwF | *39.91* | **22.71** | NA | 25.38 |
-| EWC | ***54.65*** | 19.74 | 21.86 | **51.81** |
-| SI | *32.32* | 12.62 | 19.32 | 31.56 |
-| MAS | 36.51 | 10.18 | **26.58** | *49.24* |
-| Sharpening | 19.93 | *19.94* | 19.83 | 19.92 |
-| NReg | NA | 19.90 | 19.85 | 19.92 |
-
 ## Commands
 **Setup**
 ```

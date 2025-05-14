@@ -5,3 +5,5 @@ kernel_strides: [1, 1, 1]
 sizes: [3, 6, 16, 120]
 mlp_sizes: [120, 84]
 mlp_layers: ["Normal"]
+mlp_activation: 
+  _target_: torch.nn.ReLU

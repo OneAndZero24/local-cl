@@ -8,7 +8,7 @@ mlp_layers: ["RBF"]
 mlp_config:
   - num_kernels: 1
     no_groups: 1
-    growing_mask: False
+    growing_mask: True
     no_mask_update_iterations: 1500
     local_linear: False
     times_square: False

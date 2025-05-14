@@ -18,6 +18,7 @@ exp:
   cleanup: True
   calc_bwt: True
   calc_fwt: True
+  acc_table: True
 
 fabric:
   _target_: lightning.Fabric

@@ -4,8 +4,8 @@ criterion: CrossEntropyLoss
 first_lr: 0.001  
 lr: 0.001      
 ema_scale: 0.95
-use_dynamic_alpha: True
-beta: 0.5
+beta: 0.1
+use_dynamic_alpha: False
 criterion_scale: 1.0
 plugins:
   - _target_: method.EWC
