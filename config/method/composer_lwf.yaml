@@ -3,7 +3,10 @@ _target_: method.Composer
 criterion: CrossEntropyLoss
 first_lr: 0.001
 lr: 0.001
-criterion_scale: 1e-5
+ema_scale: 0.95
+beta: 0.1
+use_dynamic_alpha: False
+criterion_scale: 1.0
 reset_rbf_mask: False
 plugins:
   - _target_: method.LwF
