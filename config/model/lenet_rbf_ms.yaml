@@ -1,0 +1,36 @@
+_target_: model.LeNet
+initial_out_features: 2
+kernel_sizes: [5, 5, 5]
+kernel_strides: [1, 1, 1]
+sizes: [3, 6, 16, 120]
+mlp_sizes: [120, 40]
+mlp_layers: ["RBF"]
+mlp_config:
+  - num_kernels: 100
+    no_groups: 50
+    growing_mask: True
+    no_mask_update_iterations: 1500
+    local_linear: False
+    times_square: False
+    normalization: True
+    radial_function: 
+      _target_: model.layer.rbf.rbf_gaussian
+      _partial_: true
+    norm_function: 
+      _target_: model.layer.rbf.l_norm
+      _partial_: true
+  - num_kernels: 100
+    no_groups: 50
+    growing_mask: True
+    no_mask_update_iterations: 1500
+    local_linear: False
+    times_square: False
+    normalization: True
+    start_empty: True
+    radial_function: 
+      _target_: model.layer.rbf.rbf_gaussian
+      _partial_: true
+    norm_function: 
+      _target_: model.layer.rbf.l_norm
+      _partial_: true
+head_type: MultiRBFHead

@@ -1,0 +1,119 @@
+program: src/main.py
+method: bayes
+run_cap: 30
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: cifar10
+  scenario:
+    value: class_inc
+  model:
+    value: lenet_rbf_head_ms
+  method:
+    value: composer_naive
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    value: 128    
+  exp.epochs: 
+    values: [25, 10, 5]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu  
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True      
+
+  model.mlp_config.0.num_kernels:
+    distribution: int_uniform
+    min: 1
+    max: 100
+  model.mlp_config.0.no_groups:
+    distribution: int_uniform
+    min: 1
+    max: 50
+  model.mlp_config.0.no_mask_update_iterations:
+    distribution: int_uniform
+    min: 100
+    max: 3000
+  model.mlp_config.0.local_linear:
+    values: [True, False]
+  model.mlp_config.0.times_square:
+    values: [True, False]
+  model.mlp_config.0.normalization:
+    values: [True, False]
+  model.mlp_config.0.radial_function._target_: 
+    value: model.layer.rbf.rbf_gaussian
+  model.mlp_config.0.radial_function._partial_:
+    value: True
+  model.mlp_config.0.norm_function._target_:
+    value: model.layer.rbf.l_norm
+  model.mlp_config.0.norm_function._partial_:
+    value: True
+
+  model.mlp_config.1.num_kernels:
+    distribution: int_uniform
+    min: 1
+    max: 100
+  model.mlp_config.1.no_groups:
+    distribution: int_uniform
+    min: 1
+    max: 50
+  model.mlp_config.1.growing_mask: 
+    value: True
+  model.mlp_config.1.start_empty:
+    value: True
+  model.mlp_config.1.no_mask_update_iterations:
+    distribution: int_uniform
+    min: 100
+    max: 3000
+  model.mlp_config.1.local_linear:
+    values: [True, False]
+  model.mlp_config.1.times_square:
+    values: [True, False]
+  model.mlp_config.1.normalization:
+    values: [True, False]
+  model.mlp_config.1.radial_function._target_: 
+    value: model.layer.rbf.rbf_gaussian
+  model.mlp_config.1.radial_function._partial_:
+    value: True
+  model.mlp_config.1.norm_function._target_:
+    value: model.layer.rbf.l_norm
+  model.mlp_config.1.norm_function._partial_:
+    value: True
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.criterion_scale:
+    distribution: uniform
+    min: 0.001
+    max: 1.0
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - naive_split_mnist_mlp.yaml
+  - ${args_no_hyphens}
