@@ -5,7 +5,7 @@ frozen: true
 reduced_dim: 64
 head:
   _target_: model.MLP
-initial_out_features: 2
-sizes: [1024, 100, 10]
-layers: ["Normal", "Normal"]
-head_type: SingleRBFHead
+  initial_out_features: 2
+  sizes: [1024, 100, 10]
+  layers: ["Normal", "Normal"]
+  head_type: SingleRBFHead
