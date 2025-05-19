@@ -7,3 +7,4 @@ ema_scale: 0.95
 beta: 0.1
 use_dynamic_alpha: False
 criterion_scale: 1.0
+reset_rbf_mask: True
