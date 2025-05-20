@@ -55,8 +55,8 @@ parameters:
     value: method.EWC
   method.plugins.0.alpha: 
     distribution: uniform      
-    min: 100
-    max: 10000
+    min: 0.1
+    max: 1000
   method.plugins.0.head_opt:
     value: True
     
