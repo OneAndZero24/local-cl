@@ -44,6 +44,10 @@ conda activate lcl
 WANDB_MODE={offline/online} HYDRA_FULL_ERROR={0/1} python src/main.py --config-name config 
 ```
 
+## Diagrams
+<p align="center"><img src="classes.png" alt="classes"/></p>
+<p align="center"><img src="packages.png" alt="packages"/></p>
+
 ## Acknowledgements
 - Project Structure based on [template](https://github.com/sobieskibj/templates/tree/master) by Bartłomiej Sobieski
 - PyTorchRBFLayer [repo](https://github.com/rssalessio/PytorchRBFLayer) by Alessio Russo
