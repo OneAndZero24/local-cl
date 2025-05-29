@@ -2,11 +2,11 @@ _target_: model.BigModel
 pretrained_backbone_name: "resnet18"
 pretrained: true
 frozen: true
-reduced_dim: 64
+reduced_dim: 256
 head:
   _target_: model.MLP
   initial_out_features: 2
-  sizes: [1024, 100, 10]
+  sizes: [256, 100, 10]
   layers: ["RBF", "RBF"]
   head_type: SingleRBFHead
   config:
