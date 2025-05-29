@@ -7,7 +7,7 @@ metric:
 
 parameters:
   dataset:
-    value: cifat10
+    value: cifar10
   scenario:
     value: class_inc
   model:
