@@ -31,62 +31,62 @@ parameters:
   exp.cleanup:
     value: True      
 
-  model.config.0.num_kernels:
+  model.head.config.0.num_kernels:
     distribution: int_uniform
     min: 1
     max: 100
-  model.config.0.no_groups:
+  model.head.config.0.no_groups:
     distribution: int_uniform
     min: 1
     max: 50
-  model.config.0.no_mask_update_iterations:
+  model.head.config.0.no_mask_update_iterations:
     distribution: int_uniform
     min: 100
     max: 3000
-  model.config.0.local_linear:
+  model.head.config.0.local_linear:
     values: [True, False]
-  model.config.0.times_square:
+  model.head.config.0.times_square:
     values: [True, False]
-  model.config.0.normalization:
+  model.head.config.0.normalization:
     values: [True, False]
-  model.config.0.radial_function._target_: 
+  model.head.config.0.radial_function._target_: 
     value: model.layer.rbf.rbf_gaussian
-  model.config.0.radial_function._partial_:
+  model.head.config.0.radial_function._partial_:
     value: True
-  model.config.0.norm_function._target_:
+  model.head.config.0.norm_function._target_:
     value: model.layer.rbf.l_norm
-  model.config.0.norm_function._partial_:
+  model.head.config.0.norm_function._partial_:
     value: True
 
-  model.config.1.num_kernels:
+  model.head.config.1.num_kernels:
     distribution: int_uniform
     min: 1
     max: 100
-  model.config.1.no_groups:
+  model.head.config.1.no_groups:
     distribution: int_uniform
     min: 1
     max: 50
-  model.config.1.growing_mask: 
+  model.head.config.1.growing_mask: 
     value: True
-  model.config.1.start_empty:
+  model.head.config.1.start_empty:
     value: True
-  model.config.1.no_mask_update_iterations:
+  model.head.config.1.no_mask_update_iterations:
     distribution: int_uniform
     min: 100
     max: 3000
-  model.config.1.local_linear:
+  model.head.config.1.local_linear:
     values: [True, False]
-  model.config.1.times_square:
+  model.head.config.1.times_square:
     values: [True, False]
-  model.config.1.normalization:
+  model.head.config.1.normalization:
     values: [True, False]
-  model.config.1.radial_function._target_: 
+  model.head.config.1.radial_function._target_: 
     value: model.layer.rbf.rbf_gaussian
-  model.config.1.radial_function._partial_:
+  model.head.config.1.radial_function._partial_:
     value: True
-  model.config.1.norm_function._target_:
+  model.head.config.1.norm_function._target_:
     value: model.layer.rbf.l_norm
-  model.config.1.norm_function._partial_:
+  model.head.config.1.norm_function._partial_:
     value: True
 
   # Method configuration
