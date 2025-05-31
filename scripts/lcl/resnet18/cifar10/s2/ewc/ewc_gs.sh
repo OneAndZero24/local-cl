@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/lcl/cifar10/resnet18/s2/ewc/ewc_gs"
+run_sweep_and_agent "scripts/lcl/resnet18/cifar10/s2/ewc/ewc_gs"
