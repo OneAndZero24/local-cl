@@ -45,15 +45,15 @@ def experiment(config: DictConfig):
 
     calc_bwt = False
     if 'calc_bwt' in config.exp:
-        calc_bwt = config.exp
+        calc_bwt = config.exp.calc_bwt
 
     calc_fwt = False
     if 'calc_fwt' in config.exp:
-        calc_fwt = config.exp
+        calc_fwt = config.exp.calc_fwt
 
     acc_table = False
     if 'acc_table' in config.exp:
-        acc_table = config.exp
+        acc_table = config.exp.acc_table
 
     stop_task = None
     if 'stop_after_task' in config.exp:
