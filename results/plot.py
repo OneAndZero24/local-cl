@@ -16,11 +16,7 @@ for idx, (file, title) in enumerate(zip(files, titles)):
     colors = [cmap(i / len(data)) for i in range(len(data))]
     positions = range(1, len(data) + 1)
 
-    box = ax.boxplot(data, positions=positions, patch_artist=True, showmeans=True, meanprops={
-        'marker': '^',
-        'markerfacecolor': 'green',
-        'markeredgecolor': 'black'
-    })
+    box = ax.boxplot(data, positions=positions, patch_artist=True, showmeans=False)
 
     for patch, color in zip(box['boxes'], colors):
         patch.set_facecolor(color)
