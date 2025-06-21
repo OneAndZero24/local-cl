@@ -10,3 +10,4 @@ outputs
 .env
 *.log
 *.pyc
+*.zip
