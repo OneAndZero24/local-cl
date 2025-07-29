@@ -1,0 +1,7 @@
+_target_: model.DenseNet
+initial_out_features: 2
+sizes: [1024, 400]
+layers: ["Normal"]
+head_type: Normal
+activation:
+  _target_: torch.nn.ReLU
