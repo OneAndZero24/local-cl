@@ -6,6 +6,7 @@ from enum import Enum
 
 class LossCriterionType(Enum):
     CROSS_ENTROPY = "CrossEntropyLoss"
+    JUST_MAHA = "JustMahalanobisLoss"
     MAHALANOBIS_DISTANCE = "MahalanobisDistanceLoss"
 
 
@@ -25,6 +26,7 @@ class LossCriterion(nn.Module):
         self.loss_functions = {
             LossCriterionType.CROSS_ENTROPY: self._cross_entropy_loss,
             LossCriterionType.MAHALANOBIS_DISTANCE: self._mahalanobis_distance_loss,
+            LossCriterionType.JUST_MAHA: self._just_mahalanobis_loss,
         }
 
     def _map_to_loss_type(self, criterion: str) -> LossCriterionType:
@@ -45,7 +47,7 @@ class LossCriterion(nn.Module):
             raise ValueError("Invalid criterion. Use 'CrossEntropyLoss' or 'MahalanobisDistanceLoss'.")
 
     def compute_mahalanobis_distance(self, x: torch.Tensor, target: torch.Tensor,
-                                     margin: float = 0.5) -> torch.Tensor:
+                                     margin: float = 0.5, triplet: bool = True) -> torch.Tensor:
         """
         Contrastive loss using Mahalanobis distance for classification.
 
@@ -53,6 +55,7 @@ class LossCriterion(nn.Module):
         - x (torch.Tensor): Model output logits.
         - target (torch.Tensor): True class labels of shape [batch_size].
         - margin (float): Margin for separating correct class and incorrect classes.
+        - triplet (bool): If True, uses triplet loss; otherwise, uses a simpler distance-based loss.
 
         Returns:
         - torch.Tensor: Loss value of shape [batch_size].
@@ -65,6 +68,10 @@ class LossCriterion(nn.Module):
 
         # Get Mahalanobis distance for the correct class
         correct_class_distance = distances[torch.arange(batch_size), target]
+
+        if not triplet:
+            # If not using triplet loss, return the distance for the correct class
+            return correct_class_distance.mean()
 
         # Compute distances for all incorrect classes
         mask = torch.ones_like(distances, dtype=torch.bool)
@@ -115,3 +122,17 @@ class LossCriterion(nn.Module):
         - torch.Tensor: Mahalanobis distance loss.
         """
         return self.compute_mahalanobis_distance(x, target)
+    
+    def _just_mahalanobis_loss(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the Mahalanobis distance loss without triplet.
+
+        Args:
+        - x (torch.Tensor): Input features (or embeddings) of shape [batch_size, n_features].
+        - target (torch.Tensor): Class indices of shape [batch_size].
+
+        Returns:
+        - torch.Tensor: Mahalanobis distance loss.
+        """
+
+        return self.compute_mahalanobis_distance(x, target, False)
