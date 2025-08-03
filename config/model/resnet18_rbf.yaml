@@ -4,7 +4,7 @@ pretrained: true
 frozen: true
 reduced_dim: 256
 head:
-  _target_: model.MLP
+  _target_: model.DenseNet
   initial_out_features: 2
   sizes: [256, 100, 10]
   layers: ["RBF", "RBF"]

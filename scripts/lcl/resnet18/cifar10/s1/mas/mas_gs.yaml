@@ -95,7 +95,7 @@ parameters:
   method._target_: 
     value: method.Composer
   method.criterion: 
-    value: MahalanobisDistanceLoss
+    value: JustMahalanobisLoss
   method.criterion_scale:
     distribution: uniform
     min: 0.001

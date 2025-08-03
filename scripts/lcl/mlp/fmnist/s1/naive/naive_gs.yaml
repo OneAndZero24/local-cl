@@ -11,7 +11,7 @@ parameters:
   scenario:
     value: class_inc
   model:
-    value: mlp_rbf
+    value: densenet_rbf
   method:
     value: composer_naive
   exp.seed: 
@@ -95,7 +95,7 @@ parameters:
   method._target_: 
     value: method.Composer
   method.criterion: 
-    value: MahalanobisDistanceLoss
+    value: JustMahalanobisLoss
   method.criterion_scale:
     distribution: uniform
     min: 0.001

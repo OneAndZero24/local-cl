@@ -1,0 +1,33 @@
+_target_: model.DenseNet
+initial_out_features: 2
+sizes: [1024, 100, 10]
+layers: ["RBF", "RBF"]
+head_type: MultiRBFHead
+config:
+  - num_kernels: 100
+    no_groups: 50
+    growing_mask: True
+    no_mask_update_iterations: 1500
+    local_linear: False
+    times_square: False
+    normalization: True
+    radial_function: 
+      _target_: model.layer.rbf.rbf_gaussian
+      _partial_: true
+    norm_function: 
+      _target_: model.layer.rbf.l_norm
+      _partial_: true
+  - num_kernels: 100
+    no_groups: 50
+    growing_mask: True
+    no_mask_update_iterations: 1500
+    local_linear: False
+    times_square: False
+    normalization: True
+    start_empty: True
+    radial_function: 
+      _target_: model.layer.rbf.rbf_gaussian
+      _partial_: true
+    norm_function: 
+      _target_: model.layer.rbf.l_norm
+      _partial_: true

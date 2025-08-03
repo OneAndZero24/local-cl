@@ -11,7 +11,7 @@ parameters:
   scenario:
     value: class_inc
   model:
-    value: mlp_rbf_ms
+    value: densenet_rbf_ms
   method:
     value: composer_naive
   exp.seed: 
