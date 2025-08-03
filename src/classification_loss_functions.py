@@ -43,6 +43,8 @@ class LossCriterion(nn.Module):
             return LossCriterionType.CROSS_ENTROPY
         elif criterion == "MahalanobisDistanceLoss":
             return LossCriterionType.MAHALANOBIS_DISTANCE
+        elif criterion == "JustMahalanobisLoss":
+            return LossCriterionType.JUST_MAHA
         else:
             raise ValueError("Invalid criterion. Use 'CrossEntropyLoss' or 'MahalanobisDistanceLoss'.")
 
