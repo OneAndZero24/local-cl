@@ -58,7 +58,7 @@ class DenseNet(CLModuleABC):
             masking (optional): Masking parameter for layers.
             mask_value (optional): Mask value parameter for layers.
         """
-        assert len(sizes) == len(layers), "Number of sizes and layers must match"
+        assert len(sizes)-1 == len(layers), "Number of sizes and layers must match"
         head_type = LayerType(head_type)
         layer_types = [LayerType(x) for x in layers]
         list_config = isinstance(config, (list, ListConfig))
