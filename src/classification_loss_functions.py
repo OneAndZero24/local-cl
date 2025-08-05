@@ -73,7 +73,7 @@ class LossCriterion(nn.Module):
 
         if not triplet:
             # If not using triplet loss, return the distance for the correct class
-            return correct_class_distance.mean()
+            return correct_class_distance
 
         # Compute distances for all incorrect classes
         mask = torch.ones_like(distances, dtype=torch.bool)
