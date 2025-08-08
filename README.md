@@ -26,8 +26,9 @@
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ | SVHN | ✅ |
 | MAS | ✅ | LocalHead | ⭕️ | | | | | CIFAR-10 | ✅ |
 | RBFReg | ✅ | LocalConv2D | ⭕️ | | | | | FMNIST | ✅ |
-| Dreaming | ✅ |
+| Dreaming | ✅ | IntervalActivation | ✅ |
 | Dynamic Loss Scaling | ✅ |
+| Interval Penalization | ✅ |
 
 ## Commands
 **Setup**

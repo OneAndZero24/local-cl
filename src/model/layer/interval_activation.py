@@ -1,0 +1,111 @@
+import torch
+from torch import nn
+import numpy as np
+
+
+def _gaussian(x):
+    return torch.exp(-x**2)
+
+def _hard_bound(lower_bound, upper_bound, x):
+    if (x < lower_bound) or (x > upper_bound):
+        return 0
+    return x
+
+def _soft_bound(lower_bound, upper_bound, x):
+    if x < lower_bound:
+        return torch.exp(x-lower_bound )
+    elif x > upper_bound:
+        return torch.exp(upper_bound - x)
+    else:
+        return x
+
+class IntervalActivation(nn.Module):
+    """
+    A neural network module that applies a custom activation function and bounds each element independently based on percentiles.
+
+    Attributes:
+        input_shape (tuple or int): Shape of the input tensor (flattened size).
+        lower_percentile (float): Lower percentile for min bound calculation.
+        upper_percentile (float): Upper percentile for max bound calculation.
+        act_function (callable): Activation function applied to each element.
+        bound_multiplier (callable): Function to apply bounds to each element.
+        buffer (list): Stores output samples for percentile calculation.
+        min (torch.Tensor): Minimum bounds for each element.
+        max (torch.Tensor): Maximum bounds for each element.
+
+    Methods:
+        reset_range():
+            Computes min and max bounds for each element from the buffer using percentiles.
+        forward(x):
+            Applies the activation function and bounds to each element independently, updates buffer.
+    """
+
+    def __init__(self,
+        input_shape: tuple,
+        lower_percentile: float = 0.05,
+        upper_percentile: float = 0.95,
+        act_function: callable = _gaussian,
+        bound_multiplier: callable = None,
+    ):
+        """
+        Initializes the IntervalActivation layer.
+
+        Args:
+            input_shape (tuple): Shape of the input tensor.
+            lower_percentile (float, optional): Lower percentile for min bound. Defaults to 0.05.
+            upper_percentile (float, optional): Upper percentile for max bound. Defaults to 0.95.
+            act_function (callable, optional): Activation function. Defaults to _gaussian.
+            bound_multiplier (callable, optional): Function to apply bounds. Defaults to identity.
+        """
+
+        super().__init__()
+        self.input_shape = np.prod(input_shape)
+        self.act_function = act_function
+        self.bound_multiplier = bound_multiplier if bound_multiplier is not None else lambda lower_bound, upper_bound, x: x
+        self.lower_percentile = lower_percentile
+        self.upper_percentile = upper_percentile
+        self.reset_range()
+
+    def reset_range(self):
+        """
+        Computes min and max bounds for each element from the buffer using percentiles.
+        Resets the buffer after calculation.
+        """
+
+        if not hasattr(self, 'buffer'):
+            self.buffer = [] # samples x input_shape flattened
+            self.min = torch.full(self.input_shape, -np.inf)
+            self.max = torch.full(self.input_shape, np.inf)
+        else:
+            transposed = [[] for _ in range(len(self.input_shape))] # input_shape flattened x samples
+            for sample in self.buffer:
+                for i, val in enumerate(sample):
+                    transposed[i].append(val)
+            min_vals = []
+            max_vals = []
+            for element in transposed:
+                sorted_buf = sorted(element)
+                l_idx = int(len(sorted_buf) * self.lower_percentile)
+                u_idx = int(len(sorted_buf) * self.upper_percentile)
+                min_vals.append(sorted_buf[l_idx])
+                max_vals.append(sorted_buf[u_idx])
+            self.min = torch.tensor(min_vals)
+            self.max = torch.tensor(max_vals)
+            self.buffer = []
+
+    def forward(self, x):
+        """
+        Applies the activation function and bounds to each element independently, updates buffer.
+
+        Args:
+            x (torch.Tensor): Input tensor of arbitrary shape.
+
+        Returns:
+            torch.Tensor: Output tensor with activation and bounds applied elementwise.
+        """
+        
+        x_flat = x.view(-1)
+        output_flat = self.act_function(x_flat)
+        output = torch.Tensor([self.bound_multiplier(*args) for args in zip(self.min, self.max, output_flat)]).to(x.device)
+        self.buffer.append(output.detach().cpu())
+        return output.view(x.shape)
