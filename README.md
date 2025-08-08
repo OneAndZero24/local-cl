@@ -22,7 +22,7 @@
 | Naive | ✅ | Local | ✅ | MLP | ✅ | CI | ✅ | MNIST | ✅ |
 | LwF | ✅ | RBF | ✅ | LeNet | ✅ | DI | ✅ | ImageNet | ✅ |
 | EWC | ✅ | SingleRBFHead | ✅ | Big Backbone | ✅ | TI | ✅ | CIFAR100 | ✅ |
-| Sharpening | ✅ | MultiRBFHead | ✅ | | | II | ✅ | TinyImageNet | ✅ |
+| Sharpening | ✅ | MultiRBFHead | ✅ | DenseNet | ✅ | II | ✅ | TinyImageNet | ✅ |
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ | SVHN | ✅ |
 | MAS | ✅ | LocalHead | ⭕️ | | | | | CIFAR-10 | ✅ |
 | RBFReg | ✅ | LocalConv2D | ⭕️ | | | | | FMNIST | ✅ |
