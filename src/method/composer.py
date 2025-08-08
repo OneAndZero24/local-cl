@@ -10,6 +10,7 @@ import wandb
 
 from model.cl_module_abc import CLModuleABC
 from model.layer.rbf import RBFLayer
+from model.layer.interval_activation import IntervalActivation
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
@@ -171,6 +172,10 @@ class Composer:
                    tmp_head = deepcopy(self.module.head)
                 self.heads.append(tmp_head)
             self.module.head = self.heads[task_id]
+
+        for layer in self.module:
+            if isinstance(layer, IntervalActivation):
+                layer.reset_range()
 
         if self.reset_rbf_mask and task_id > 0:
             for layer in self.module.layers+[self.module.head]:

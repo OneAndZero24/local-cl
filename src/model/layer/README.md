@@ -5,3 +5,4 @@ Custom layers implementations
 - `local.py` - Local ReLU-based FC Layer
 - `local_conv.py` - **Deprecated** Local ReLU-based Conv Layer
 - `rbf_head.py` - Single RBF Head Layer
+- `interval_activation.py` - Bounding activations per element inside estimated interval
