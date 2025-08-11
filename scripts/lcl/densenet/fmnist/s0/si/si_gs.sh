@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_fmnist_mlp_s0_si
+#SBATCH --job-name=local_cl_split_fmnist_densenet_s0_si
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/lcl/mlp/fmnist/s0/si/si_gs"
+run_sweep_and_agent "scripts/lcl/densenet/fmnist/s0/si/si_gs"
