@@ -85,7 +85,7 @@ class DenseNet(CLModuleABC):
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
             layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
             if lt == LayerType.NORMAL:
-                self.layers.append(activation)
+                layers.append(activation)
         self.layers = nn.ModuleList(layers)
 
     def forward(self, x):
