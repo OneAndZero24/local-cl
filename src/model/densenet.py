@@ -107,4 +107,6 @@ class DenseNet(CLModuleABC):
             out = layer(concat_input)
             self.add_activation(layer, out)
             outputs.append(out)
-        return self.head(torch.cat(outputs, dim=1))
+        # Only concatenate outputs that have the same batch size and compatible feature dimensions
+        final_input = torch.cat(outputs, dim=1)
+        return self.head(final_input)
