@@ -11,7 +11,7 @@ parameters:
   scenario:
     value: class_inc
   model:
-    value: mlp
+    value: densenet
   method:
     value: composer_mas
   exp.seed: 
