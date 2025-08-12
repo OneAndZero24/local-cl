@@ -66,6 +66,9 @@ class DenseNet(CLModuleABC):
         if list_config:
             head_kwargs = config[0]
             config = config[1:]
+        print(config)
+        print(head_kwargs)
+        print(initial_out_features)
         super().__init__(
             IncrementalClassifier(
                 sum(sizes),
