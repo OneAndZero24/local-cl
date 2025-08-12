@@ -69,6 +69,7 @@ class DenseNet(CLModuleABC):
         print(config)
         print(head_kwargs)
         print(initial_out_features)
+        print(sum(sizes)) 
         super().__init__(
             IncrementalClassifier(
                 sum(sizes),
