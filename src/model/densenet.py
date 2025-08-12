@@ -109,4 +109,5 @@ class DenseNet(CLModuleABC):
             outputs.append(out)
         # Only concatenate outputs that have the same batch size and compatible feature dimensions
         final_input = torch.cat(outputs, dim=1)
+        print(final_input.shape)
         return self.head(final_input)
