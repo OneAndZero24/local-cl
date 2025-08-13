@@ -11,7 +11,7 @@ log.setLevel(logging.INFO)
 
 class IntervalPenalization(MethodPluginABC):
     """
-    A method plugin that penalizes predictions outside learned interval bounds from IntervalActivation layers.
+    A method plugin that penalizes predictions inside learned interval bounds from IntervalActivation layers.
 
     Attributes:
         alpha (float): Weight for the penalization term.
@@ -21,7 +21,7 @@ class IntervalPenalization(MethodPluginABC):
         setup_task(task_id):
             Sets the current task identifier.
         forward(x, y, loss, preds):
-            Adds penalization to the loss for predictions outside interval bounds.
+            Adds penalization to the loss for predictions inside interval bounds.
     """
 
     def __init__(self,
@@ -70,7 +70,14 @@ class IntervalPenalization(MethodPluginABC):
             if isinstance(layer, IntervalActivation):
                 lower_bound = layer.min
                 upper_bound = layer.max
-                oobsum += torch.sum(torch.clamp(lower_bound - preds, min=0)) + torch.sum(torch.clamp(preds - upper_bound, min=0))
+                middle = (lower_bound + upper_bound) / 2
+                oobsum += torch.sum(
+                    torch.where(
+                        (preds < upper_bound) & (preds > lower_bound),
+                        torch.square(preds - middle),
+                        torch.zeros_like(preds)
+                    )
+                )
 
         loss += self.alpha*oobsum
         return loss, preds

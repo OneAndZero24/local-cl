@@ -7,15 +7,14 @@ def _gaussian(x):
     return torch.exp(-x**2)
 
 def _hard_bound(lower_bound, upper_bound, x):
-    if (x < lower_bound) or (x > upper_bound):
+    if (lower_bound < x) and (x < upper_bound):
         return 0
     return x
 
 def _soft_bound(lower_bound, upper_bound, x):
-    if x < lower_bound:
-        return torch.exp(x-lower_bound )
-    elif x > upper_bound:
-        return torch.exp(upper_bound - x)
+    if (lower_bound < x) and (x < upper_bound):
+        middle = (lower_bound + upper_bound) / 2
+        return (x-middle)**2
     else:
         return x
 
