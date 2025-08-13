@@ -1,0 +1,72 @@
+program: src/main.py
+method: bayes
+run_cap: 30
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: fmnist
+  scenario:
+    value: class_inc
+  model:
+    value: densenet
+  method:
+    value: composer_lwf
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    value: 128    
+  exp.epochs: 
+    values: [25, 10, 5]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu  
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True      
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.criterion_scale:
+    distribution: uniform
+    min: 0.001
+    max: 1.0
+  method.first_lr: 
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+
+  method.plugins.0._target_:
+    value: method.LwF
+  method.plugins.0.T:
+    distribution: uniform      
+    min: 0.5
+    max: 4.0
+  method.plugins.0.alpha:
+    distribution: uniform      
+    min: 0.1
+    max: 0.9
+    
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - naive_split_mnist_mlp.yaml
+  - ${args_no_hyphens}
