@@ -7,16 +7,11 @@ def _gaussian(x):
     return torch.exp(-x**2)
 
 def _hard_bound(lower_bound, upper_bound, x):
-    if (lower_bound < x) and (x < upper_bound):
-        return 0
-    return x
+    return torch.where((lower_bound < x) | (x < upper_bound), x, torch.zeros_like(x))
 
 def _soft_bound(lower_bound, upper_bound, x):
-    if (lower_bound < x) and (x < upper_bound):
-        middle = (lower_bound + upper_bound) / 2
-        return (x-middle)**2
-    else:
-        return x
+    middle = (lower_bound + upper_bound) / 2
+    return torch.where((lower_bound < x) & (x < upper_bound), (x - middle)**2, x)
 
 class IntervalActivation(nn.Module):
     """
@@ -44,7 +39,7 @@ class IntervalActivation(nn.Module):
         lower_percentile: float = 0.05,
         upper_percentile: float = 0.95,
         act_function: callable = _gaussian,
-        bound_multiplier: callable = None,
+        bound_multiplier: callable = _hard_bound,
     ):
         """
         Initializes the IntervalActivation layer.
@@ -73,8 +68,8 @@ class IntervalActivation(nn.Module):
 
         if not hasattr(self, 'buffer'):
             self.buffer = [] # samples x input_shape flattened
-            self.min = torch.full(self.input_shape, -np.inf)
-            self.max = torch.full(self.input_shape, np.inf)
+            self.min = torch.zeros(self.input_shape)
+            self.max = torch.zeros(self.input_shape)
         else:
             transposed = [[] for _ in range(len(self.input_shape))] # input_shape flattened x samples
             for sample in self.buffer:
@@ -102,9 +97,12 @@ class IntervalActivation(nn.Module):
         Returns:
             torch.Tensor: Output tensor with activation and bounds applied elementwise.
         """
-        
         x_flat = x.view(-1)
         output_flat = self.act_function(x_flat)
-        output = torch.Tensor([self.bound_multiplier(*args) for args in zip(self.min, self.max, output_flat)]).to(x.device)
+        output = self.bound_multiplier(
+            self.min.repeat(x.shape[0]), 
+            self.max.repeat(x.shape[0]), 
+            output_flat
+        )
         self.buffer.append(output.detach().cpu())
         return output.view(x.shape)

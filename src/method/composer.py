@@ -173,7 +173,7 @@ class Composer:
                 self.heads.append(tmp_head)
             self.module.head = self.heads[task_id]
 
-        for layer in self.module:
+        for layer in self.module.layers+[self.module.head, self.module.neck if hasattr(self, 'neck') else None]:
             if isinstance(layer, IntervalActivation):
                 layer.reset_range()
 
