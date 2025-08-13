@@ -66,10 +66,6 @@ class DenseNet(CLModuleABC):
         if list_config:
             head_kwargs = config[0]
             config = config[1:]
-        print(config)
-        print(head_kwargs)
-        print(initial_out_features)
-        print(sum(sizes)) 
         super().__init__(
             IncrementalClassifier(
                 sum(sizes),
@@ -87,9 +83,15 @@ class DenseNet(CLModuleABC):
             out_size = sizes[i+1]
             lt = layer_types[i]
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
-            layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
+            layer = instantiate(lt, in_size, out_size, activation=activation, **layer_cfg)
             if lt == LayerType.NORMAL:
-                layers.append(activation)
+                layers.append(nn.Sequential(
+                        instantiate(layer),
+                        activation
+                    )
+                )
+            else:
+                layers.append(layer)
         self.layers = nn.ModuleList(layers)
 
     def forward(self, x):
@@ -111,7 +113,4 @@ class DenseNet(CLModuleABC):
             out = layer(concat_input)
             self.add_activation(layer, out)
             outputs.append(out)
-        # Only concatenate outputs that have the same batch size and compatible feature dimensions
-        final_input = torch.cat(outputs, dim=1)
-        print(final_input.shape)
-        return self.head(final_input)
+        return self.head(torch.cat(outputs, dim=1))
