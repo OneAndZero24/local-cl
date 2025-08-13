@@ -86,7 +86,7 @@ class DenseNet(CLModuleABC):
             layer = instantiate(lt, in_size, out_size, activation=activation, **layer_cfg)
             if lt == LayerType.NORMAL:
                 layers.append(nn.Sequential(
-                        instantiate(layer),
+                        layer,
                         activation
                     )
                 )
