@@ -7,7 +7,7 @@ def _gaussian(x):
     return torch.exp(-x**2)
 
 def _hard_bound(lower_bound, upper_bound, x):
-    return torch.where((lower_bound < x) | (x < upper_bound), x, torch.zeros_like(x))
+    return torch.where((lower_bound < x) & (x < upper_bound), torch.zeros_like(x), x)
 
 def _soft_bound(lower_bound, upper_bound, x):
     middle = (lower_bound + upper_bound) / 2
