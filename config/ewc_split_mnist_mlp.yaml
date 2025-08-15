@@ -1,8 +1,8 @@
 defaults:
   - _self_
-  - dataset: cifar100
+  - dataset: mnist
   - scenario: class_inc
-  - model: resnet50
+  - model: mlp
   - method: composer_ewc
 
 exp:
