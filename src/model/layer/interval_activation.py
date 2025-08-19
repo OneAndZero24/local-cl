@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 
+import wandb
+
 
 def _gaussian(x):
     return torch.exp(-x**2)
@@ -52,6 +54,7 @@ class IntervalActivation(nn.Module):
         upper_percentile: float = 0.95,
         act_function: callable = _gaussian,
         bound_multiplier: callable = _hard_bound,
+        log_name: str = None,
     ):
         """
         Initializes the IntervalActivation layer.
@@ -62,6 +65,7 @@ class IntervalActivation(nn.Module):
             upper_percentile (float, optional): Upper percentile for max bound. Defaults to 0.95.
             act_function (callable, optional): Activation function. Defaults to _gaussian.
             bound_multiplier (callable, optional): Function to apply bounds. Defaults to identity.
+            name (str, optional): Name of the layer for wandb logging. Defaults to None.
         """
 
         super().__init__()
@@ -75,12 +79,23 @@ class IntervalActivation(nn.Module):
         self.min = torch.zeros(self.input_shape)
         self.max = torch.zeros(self.input_shape)
         self.dummy_range = True
+        self.log_name = log_name
 
     def reset_range(self):
         """
         Computes min and max bounds for each element from the buffer using percentiles.
         Resets the buffer after calculation.
         """
+
+        if self.log_name is not None and wandb.run is not None:
+            interval_size = self.max - self.min
+            for i in range(self.input_shape):
+                prefix = f"{self.log_name}/neuron_{i}"
+                wandb.log({
+                    f"{prefix}/min": self.min[i].item(),
+                    f"{prefix}/max": self.max[i].item(),
+                    f"{prefix}/interval_size": interval_size[i].item(),
+                })
 
         if len(self.buffer) > 0:
             transposed = [[] for _ in range(len(self.input_shape))] # input_shape flattened x samples
@@ -99,6 +114,8 @@ class IntervalActivation(nn.Module):
             self.max = torch.maximum(self.max, torch.tensor(max_vals))
             self.dummy_range = False
         self.buffer = []
+
+
 
     def forward(self, x):
         """
