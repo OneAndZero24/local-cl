@@ -6,6 +6,18 @@ import numpy as np
 def _gaussian(x):
     return torch.exp(-x**2)
 
+def _relu_hill(x):
+    return torch.where(
+        x < -1, torch.zeros_like(x),
+        torch.where(
+            x < 0, x + 1,
+            torch.where(
+                x < 1, 1 - x,
+                torch.zeros_like(x)
+            )
+        )
+    )
+
 def _hard_bound(lower_bound, upper_bound, x):
     return torch.where((lower_bound < x) & (x < upper_bound), torch.zeros_like(x), x)
 
@@ -58,7 +70,11 @@ class IntervalActivation(nn.Module):
         self.bound_multiplier = bound_multiplier if bound_multiplier is not None else lambda lower_bound, upper_bound, x: x
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
-        self.reset_range()
+        
+        self.buffer = [] # samples x input_shape flattened
+        self.min = torch.zeros(self.input_shape)
+        self.max = torch.zeros(self.input_shape)
+        self.dummy_range = True
 
     def reset_range(self):
         """
@@ -66,11 +82,7 @@ class IntervalActivation(nn.Module):
         Resets the buffer after calculation.
         """
 
-        if not hasattr(self, 'buffer'):
-            self.buffer = [] # samples x input_shape flattened
-            self.min = torch.zeros(self.input_shape)
-            self.max = torch.zeros(self.input_shape)
-        else:
+        if len(self.buffer) > 0:
             transposed = [[] for _ in range(len(self.input_shape))] # input_shape flattened x samples
             for sample in self.buffer:
                 for i, val in enumerate(sample):
@@ -83,9 +95,10 @@ class IntervalActivation(nn.Module):
                 u_idx = int(len(sorted_buf) * self.upper_percentile)
                 min_vals.append(sorted_buf[l_idx])
                 max_vals.append(sorted_buf[u_idx])
-            self.min = torch.tensor(min_vals)
-            self.max = torch.tensor(max_vals)
-            self.buffer = []
+            self.min = torch.minimum(self.min, torch.tensor(min_vals))
+            self.max = torch.maximum(self.max, torch.tensor(max_vals))
+            self.dummy_range = False
+        self.buffer = []
 
     def forward(self, x):
         """
