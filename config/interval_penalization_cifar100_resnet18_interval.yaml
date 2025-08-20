@@ -3,7 +3,7 @@ defaults:
   - dataset: cifar100
   - scenario: class_inc
   - model: resnet18_interval
-  - method: composer_naive
+  - method: composer_interval_penalization
 
 exp:
   run_func:
@@ -19,7 +19,6 @@ exp:
   calc_bwt: False
   calc_fwt: False
   acc_table: False
-
 
 fabric:
   _target_: lightning.Fabric

@@ -66,18 +66,21 @@ class IntervalPenalization(MethodPluginABC):
         """
 
         oobsum = 0
-        for layer in self.module:
+        batch_size = x.shape[0]
+        for layer in self.module.layers+[self.module.head, self.module.neck if hasattr(self, 'neck') else None]:
             if isinstance(layer, IntervalActivation):
                 lower_bound = layer.min
                 upper_bound = layer.max
                 middle = (lower_bound + upper_bound) / 2
-                oobsum += torch.sum(
-                    torch.where(
-                        (preds < upper_bound) & (preds > lower_bound),
-                        torch.square(preds - middle),
-                        torch.zeros_like(preds)
+                for i in range(batch_size):
+                    activation = layer.buffer[-(i+1)]  # Get from last to last-batch_size
+                    oobsum += torch.sum(
+                        torch.where(
+                            (activation < upper_bound) & (activation > lower_bound),
+                            (middle-lower_bound)-torch.square(activation - middle),
+                            torch.zeros_like(activation)
+                        )
                     )
-                )
 
         loss += self.alpha*oobsum
         return loss, preds

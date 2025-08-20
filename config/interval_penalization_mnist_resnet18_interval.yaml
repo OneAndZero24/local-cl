@@ -1,9 +1,9 @@
 defaults:
   - _self_
-  - dataset: cifar100
+  - dataset: mnist
   - scenario: class_inc
   - model: resnet18_interval
-  - method: composer_naive
+  - method: composer_interval_penalization
 
 exp:
   run_func:
@@ -11,7 +11,7 @@ exp:
   seed: 42
   log_dir: # set during runtime to automatically created dir
   batch_size: 32
-  epochs: 10
+  epochs: 1
   gen_cm: False
   log_per_batch: False
   detect_anomaly: False
@@ -19,7 +19,6 @@ exp:
   calc_bwt: False
   calc_fwt: False
   acc_table: False
-
 
 fabric:
   _target_: lightning.Fabric
