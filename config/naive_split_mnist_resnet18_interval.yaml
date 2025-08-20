@@ -2,20 +2,23 @@ defaults:
   - _self_
   - dataset: mnist
   - scenario: class_inc
-  - model: mlp
-  - method: composer_ewc
+  - model: resnet18_interval
+  - method: composer_naive
 
 exp:
   run_func:
     _target_: experiment.experiment
-  seed: 1
+  seed: 42
   log_dir: # set during runtime to automatically created dir
-  batch_size: 512
+  batch_size: 32
   epochs: 1
   gen_cm: False
   log_per_batch: False
   detect_anomaly: False
   cleanup: True
+  calc_bwt: False
+  calc_fwt: False
+  acc_table: False
 
 fabric:
   _target_: lightning.Fabric

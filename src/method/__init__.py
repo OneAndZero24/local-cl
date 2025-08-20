@@ -8,3 +8,4 @@ from .reg_rbf_neuron_outputs import RBFNeuronOutReg
 from .penultimate_layer_reg import PenultimateLayerReg
 from .dreaming import Dreaming
 from .dynamic_loss_scaling import DynamicScaling
+from .interval_penalization import IntervalPenalization

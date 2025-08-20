@@ -5,3 +5,4 @@ from .lenet import LeNet
 from .mlp import MLP
 from .big_model import BigModel
 from .densenet import DenseNet
+from .resnet18_interval import ResNet18Interval

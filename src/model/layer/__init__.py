@@ -9,6 +9,7 @@ from .local import LocalLayer
 from .local_conv2d import LocalConv2DLayer
 from .local_module import LocalModule
 from .local_head import LocalHead
+from .interval_activation import IntervalActivation
 
 class LayerType(Enum):
     """
