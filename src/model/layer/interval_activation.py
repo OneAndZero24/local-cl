@@ -98,20 +98,15 @@ class IntervalActivation(nn.Module):
                 })
 
         if len(self.buffer) > 0:
-            transposed = [[] for _ in range(len(self.input_shape))] # input_shape flattened x samples
-            for sample in self.buffer:
-                for i, val in enumerate(sample):
-                    transposed[i].append(val)
-            min_vals = []
-            max_vals = []
-            for element in transposed:
-                sorted_buf = sorted(element)
-                l_idx = int(len(sorted_buf) * self.lower_percentile)
-                u_idx = int(len(sorted_buf) * self.upper_percentile)
-                min_vals.append(sorted_buf[l_idx])
-                max_vals.append(sorted_buf[u_idx])
-            self.min = torch.minimum(self.min, torch.tensor(min_vals))
-            self.max = torch.maximum(self.max, torch.tensor(max_vals))
+            transposed = torch.stack(self.buffer, dim=-1) # input_shape flattened x samples
+            sorted_buf, _ = torch.sort(transposed, dim=-1)
+            n = sorted_buf.size(-1)
+            l_idx = int(n * self.lower_percentile)
+            u_idx = int(n * self.upper_percentile)
+            min_vals = sorted_buf[..., l_idx]
+            max_vals = sorted_buf[..., u_idx]
+            self.min = torch.minimum(self.min, min_vals)
+            self.max = torch.maximum(self.max, max_vals)
             self.dummy_range = False
         self.buffer = []
 
@@ -134,5 +129,5 @@ class IntervalActivation(nn.Module):
             self.max.repeat(x.shape[0]), 
             output_flat
         )
-        self.buffer.append(output.detach().cpu())
+        self.buffer.extend(list(output.view(x.shape[0], -1).detach().cpu()))
         return output.view(x.shape)
