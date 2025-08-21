@@ -189,7 +189,8 @@ class Composer:
         if len(self.plugins) == 0:
             self.use_dynamic_alpha = False
 
-        self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta, self.dynamic_alpha_clamp)
+        if self.use_dynamic_alpha:
+            self.dynamic_scaling = DynamicScaling(self.module, self.ema_scale, self.beta, self.dynamic_alpha_clamp)
 
 
     def forward(self, x, y, task_id):
