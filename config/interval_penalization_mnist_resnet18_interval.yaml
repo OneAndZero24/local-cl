@@ -2,7 +2,7 @@ defaults:
   - _self_
   - dataset: mnist
   - scenario: class_inc
-  - model: resnet18_interval
+  - model: resnet18_interval_id
   - method: composer_interval_penalization
 
 exp:

@@ -27,6 +27,10 @@ def _soft_bound(lower_bound, upper_bound, x):
     middle = (lower_bound + upper_bound) / 2
     return torch.where((lower_bound < x) & (x < upper_bound), (x - middle)**2, x)
 
+def no_bound():
+    def _no_bound(lower_bound, upper_bound, x):
+        return x
+
 class IntervalActivation(nn.Module):
     """
     A neural network module that applies a custom activation function and bounds each element independently based on percentiles.
