@@ -71,13 +71,12 @@ class IntervalPenalization(MethodPluginABC):
             if isinstance(layer, IntervalActivation):
                 lower_bound = layer.min
                 upper_bound = layer.max
-                middle = (lower_bound + upper_bound) / 2
                 for i in range(batch_size):
                     activation = layer.buffer[-(i+1)]  # Get from last to last-batch_size
                     oobsum += torch.sum(
                         torch.where(
                             (activation < upper_bound) & (activation > lower_bound),
-                            (middle-lower_bound)-torch.square(activation - middle),
+                            (-1) * (activation - lower_bound) * (activation - upper_bound),
                             torch.zeros_like(activation)
                         )
                     )
