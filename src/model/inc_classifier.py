@@ -2,7 +2,6 @@ import torch
 from torch import nn
 
 from model.layer import instantiate, LayerType, LocalModule
-import torch.nn.functional as F
 
 
 class IncrementalClassifier(nn.Module):

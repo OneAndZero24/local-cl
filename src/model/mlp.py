@@ -84,11 +84,6 @@ class MLP(CLModuleABC):
             )
         )
 
-        if interval_neck:
-            self.neck = IntervalActivation(
-                input_shape=sizes[-1],
-            )
-
         layers = []
         N = len(sizes)-1
         for i in range(N):                    
@@ -97,8 +92,12 @@ class MLP(CLModuleABC):
             lt = layer_types[i]
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
             layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
-            if lt == LayerType.NORMAL:
-                layers.append(activation)
+            # TODO: Do not forget about this!!!
+            # if lt == LayerType.NORMAL:
+            #     layers.append(activation)
+        
+        layers.append(IntervalActivation(input_shape=sizes[-1]))
+
         self.layers = nn.ModuleList(layers)
        
     def forward(self, x):
@@ -117,7 +116,6 @@ class MLP(CLModuleABC):
         x = torch.flatten(x, start_dim=1)
         for layer in self.layers:
             x = layer(x)
-            self.add_activation(layer, x)
-        if hasattr(self, 'neck'):
-            x = self.neck(x)
+            if not isinstance(layer, IntervalActivation):
+                self.add_activation(layer, x)     
         return self.head(x)

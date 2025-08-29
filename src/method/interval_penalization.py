@@ -66,20 +66,19 @@ class IntervalPenalization(MethodPluginABC):
         """
 
         oobsum = 0
-        batch_size = x.shape[0]
-        for layer in self.module.layers+[self.module.head, self.module.neck if hasattr(self, 'neck') else None]:
-            if isinstance(layer, IntervalActivation):
-                lower_bound = layer.min
-                upper_bound = layer.max
-                for i in range(batch_size):
-                    activation = layer.buffer[-(i+1)]  # Get from last to last-batch_size
-                    oobsum += torch.sum(
-                        torch.where(
-                            (activation < upper_bound) & (activation > lower_bound),
-                            (-1) * (activation - lower_bound) * (activation - upper_bound),
-                            torch.zeros_like(activation)
-                        )
-                    )
+        layers = self.module.layers + [self.module.head]
 
-        loss += self.alpha*oobsum
+        if self.task_id > 0:
+            for layer in layers:
+                if not isinstance(layer, IntervalActivation):
+                    continue
+
+                lb, ub = layer.min, layer.max
+                # Gather the last `batch_size` activations in one tensor
+                acts = torch.stack(layer.curr_task_act_buffer[-x.shape[0]:])  # shape (batch, ...)
+                mask = (acts > lb) & (acts < ub)
+                penalty = -(acts - lb) * (acts - ub) * mask
+                oobsum = oobsum + torch.mean(penalty)
+
+            loss = loss + self.alpha * oobsum
         return loss, preds
