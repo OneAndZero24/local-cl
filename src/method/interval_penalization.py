@@ -3,7 +3,7 @@ import logging
 import torch
 
 from src.method.method_plugin_abc import MethodPluginABC
-from model.layer.interval_activation import IntervalActivation
+from src.model.layer.interval_layer import IntervalLayer
 
 
 log = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ log.setLevel(logging.INFO)
 
 class IntervalPenalization(MethodPluginABC):
     """
-    A method plugin that penalizes predictions inside learned interval bounds from IntervalActivation layers.
+    A method plugin that minimizes variance across predictions from IntervalLayer layers.
 
     Attributes:
         alpha (float): Weight for the penalization term.
@@ -65,20 +65,16 @@ class IntervalPenalization(MethodPluginABC):
             tuple: (loss, preds) with penalization added to loss.
         """
 
-        oobsum = 0
         layers = self.module.layers + [self.module.head]
 
         if self.task_id > 0:
             for layer in layers:
-                if not isinstance(layer, IntervalActivation):
+                if not type(layer).__name__ == "IntervalLayer":
                     continue
 
-                lb, ub = layer.min, layer.max
-                # Gather the last `batch_size` activations in one tensor
-                acts = torch.stack(layer.curr_task_act_buffer[-x.shape[0]:])  # shape (batch, ...)
-                mask = (acts > lb) & (acts < ub)
-                penalty = -(acts - lb) * (acts - ub) * mask
-                oobsum = oobsum + torch.mean(penalty)
+                acts = layer.curr_task_last_batch
+                acts_flat = acts.view(acts.size(0), -1)
+                batch_var = acts_flat.var(dim=0, unbiased=False).mean()          
 
-            loss = loss + self.alpha * oobsum
+            loss = loss + self.alpha * batch_var
         return loss, preds
