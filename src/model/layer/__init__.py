@@ -8,12 +8,11 @@ from .rbf_head import SingleRBFHeadLayer
 from .local import LocalLayer
 from .local_conv2d import LocalConv2DLayer
 from .local_module import LocalModule
-from .local_head import LocalHead
-from .interval_activation import IntervalActivation
+from .interval_layer import IntervalLayer
 
 class LayerType(Enum):
     """
-    enum = (LOCAL, NORMAL, RBF)
+    enum = (LOCAL, NORMAL, RBF, INTERVAL)
     """
 
     LOCAL = "Local"
@@ -21,6 +20,7 @@ class LayerType(Enum):
     RBF = "RBF"
     SingleRBFHead = "SingleRBFHead"
     MultiRBFHead = "MultiRBFHead"
+    INTERVAL = "Interval"
 
 
 def _instantiate(
@@ -40,7 +40,8 @@ instantiate = partial(_instantiate, {
     LayerType.RBF: RBFLayer,
     LayerType.NORMAL: nn.Linear,
     LayerType.SingleRBFHead: SingleRBFHeadLayer,
-    LayerType.MultiRBFHead: RBFLayer
+    LayerType.MultiRBFHead: RBFLayer,
+    LayerType.INTERVAL: IntervalLayer
 })
 
 

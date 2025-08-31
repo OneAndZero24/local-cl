@@ -1,9 +1,6 @@
 import logging
 
-import torch
-
 from src.method.method_plugin_abc import MethodPluginABC
-from src.model.layer.interval_layer import IntervalLayer
 
 
 log = logging.getLogger(__name__)

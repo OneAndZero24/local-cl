@@ -2,15 +2,15 @@ import logging
 from typing import Optional
 from copy import deepcopy
 
-import torch
 from torch import nn
 from torch import optim
+import torch
 
 import wandb
 
 from model.cl_module_abc import CLModuleABC
 from model.layer.rbf import RBFLayer
-from model.layer.interval_activation import IntervalActivation
+from src.model.layer.interval_layer import IntervalLayer
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
@@ -64,6 +64,7 @@ class Composer:
         clipgrad: Optional[float]=None,
         retaingraph: Optional[bool]=False,
         log_reg: Optional[bool]=False,
+        constraint_tol: Optional[float]=1e-7,
         plugins: Optional[list[MethodPluginABC]]=[]
     ):
         """
@@ -88,6 +89,7 @@ class Composer:
             clipgrad (Optional[float], optional): Maximum gradient norm for gradient clipping. Defaults to None.
             retaingraph (Optional[bool], optional): Whether to retain the computation graph during backpropagation. Defaults to False.
             log_reg (Optional[bool], optional): Whether to log the regularization loss during training. Defaults to False.
+            constraint_tol (Optional[float]): Tolerance value for gradient constraint update.
             plugins (Optional[list[MethodPluginABC]], optional): List of method plugins to extend the training process. Defaults to an empty list.
         """
 
@@ -110,6 +112,7 @@ class Composer:
         self.use_dynamic_alpha = use_dynamic_alpha
         self.dynamic_alpha_clamp = dynamic_alpha_clamp
         self.beta = beta
+        self.constraint_tol = constraint_tol
         
         if self.task_heads:
             self.heads = []
@@ -173,8 +176,8 @@ class Composer:
                 self.heads.append(tmp_head)
             self.module.head = self.heads[task_id]
 
-        for layer in self.module.layers+[self.module.head, self.module.neck if hasattr(self, 'neck') else None]:
-            if isinstance(layer, IntervalActivation):
+        for layer in self.module.layers+[self.module.head]:
+            if type(layer).__name__ == "IntervalLayer":
                 layer.reset_range()
 
         if self.reset_rbf_mask and task_id > 0:
@@ -243,9 +246,51 @@ class Composer:
         3. Optionally clips the gradients to prevent exploding gradients.
         4. Updates the model parameters using the optimizer.
         """
-
+        
         self.optimizer.zero_grad()
         loss.backward(retain_graph=self.retaingraph)
+
+        arch = self.module._forward_module  # unwrap Fabric
+        interval_layer = None
+        
+        # Get interval layer from layers list
+        for m in arch.layers:
+            if type(m).__name__ == "IntervalLayer":
+                interval_layer = m
+                break
+       
+        if interval_layer is None:
+            self.optimizer.step()
+            return
+
+        lb, ub = interval_layer.min, interval_layer.max
+        Wg, bg = interval_layer.weight.grad, interval_layer.bias.grad
+
+        if Wg is None or (lb == ub).all():
+            self.optimizer.step()
+            return
+
+        # Expand bounds for broadcasting: (out_features, in_features)
+        lb = lb.unsqueeze(0).expand_as(Wg)
+        ub = ub.unsqueeze(0).expand_as(Wg)
+
+        # Interval arithmetic (vectorized):
+        # If w >= 0 -> contributes [w*lb, w*ub]
+        # If w < 0  -> contributes [w*ub, w*lb]
+        contrib_min = torch.where(Wg >= 0, Wg * lb, Wg * ub)
+        contrib_max = torch.where(Wg >= 0, Wg * ub, Wg * lb)
+
+        row_min = contrib_min.sum(dim=1) + (bg if bg is not None else 0.0)
+        row_max = contrib_max.sum(dim=1) + (bg if bg is not None else 0.0)
+
+        # Mask neurons violating the condition
+        mask = (row_min >= -self.constraint_tol) & (row_max <= self.constraint_tol)
+
+        # Apply mask efficiently
+        Wg[~mask, :] = 0.0
+        if bg is not None:
+            bg[~mask] = 0.0
+
         if self.clipgrad is not None:
             nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()

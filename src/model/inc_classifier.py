@@ -133,6 +133,9 @@ class IncrementalClassifier(nn.Module):
                 else:
                     param.data = state_dict[name]
 
+            for param in self.classifier.parameters():
+                param.requires_grad = False
+
     def forward(self, x):
         """
         Perform a forward pass through the classifier.

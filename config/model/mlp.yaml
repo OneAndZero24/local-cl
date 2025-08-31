@@ -1,7 +1,7 @@
 _target_: model.MLP
 initial_out_features: 2
-sizes: [1024, 100, 100]
-layers: ["Normal", "Interval"]
+sizes: [1024, 400, 400]
+layers: ["Interval"]
 head_type: Normal
 activation: 
   _target_: torch.nn.LeakyReLU
