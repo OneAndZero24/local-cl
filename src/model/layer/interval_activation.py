@@ -81,7 +81,6 @@ class IntervalActivation(nn.Module):
 
         self.min = torch.minimum(self.min.to(device), min_vals)
         self.max = torch.maximum(self.max.to(device), max_vals)
-
         self.test_act_buffer = []
 
         if self.log_name is not None and wandb.run is not None:

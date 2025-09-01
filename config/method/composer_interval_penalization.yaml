@@ -9,4 +9,4 @@ use_dynamic_alpha: False
 criterion_scale: 1.0
 plugins:
   - _target_: method.interval_penalization.IntervalPenalization
-    alpha: 10.0
+    alpha: 1000.0
