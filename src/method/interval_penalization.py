@@ -1,5 +1,6 @@
 import logging
 from copy import deepcopy
+from typing import Tuple
 
 import torch
 
@@ -11,10 +12,12 @@ log.setLevel(logging.INFO)
 
 class IntervalPenalization(MethodPluginABC):
     """
-    A method plugin that minimizes variance across predictions from IntervalActivation layers.
+    A method plugin that minimizes variance across predictions from IntervalActivation layers, and
+    preserves outputs from those layers.
 
     Attributes:
-        alpha (float): Weight for the penalization term.
+        var_scale (float): Weight for the variance term.
+        output_reg_scale (float): Weight for output preservation.
         task_id (int or None): Current task identifier.
         params_buffer (dict): Optimal parameters from the last task.
 
@@ -26,20 +29,25 @@ class IntervalPenalization(MethodPluginABC):
     """
 
     def __init__(self,
-            alpha: float = 0.01,
+            var_scale: float = 0.01,
+            output_reg_scale: float = 1.0
         ):
         """
         Initializes the IntervalPenalization plugin.
 
         Args:
-            alpha (float, optional): Weight for the penalization term. Defaults to 0.01.
+            var_scale (optional, float): Weight for output preservation.
+            output_reg_scale (optional, float): Weight for output preservation.
+
         """
         
         super().__init__()
         self.task_id = None
-        log.info(f"IntervalPenalization initialized with alpha={alpha}")
+        log.info(f"IntervalPenalization initialized with var_scale={var_scale} and output_reg_scale={output_reg_scale}")
 
-        self.alpha = alpha
+        self.var_scale = var_scale
+        self.output_reg_scale = output_reg_scale
+        self.input_shape = None
         self.params_buffer = {}
 
 
@@ -57,12 +65,20 @@ class IntervalPenalization(MethodPluginABC):
             for name, p in deepcopy(list(self.module.named_parameters())):
                 if p.requires_grad:
                     p.requires_grad = False
-                    self.params_buffer[name] = p     
-
-
-    def forward(self, x, y, loss, preds):
+                    self.params_buffer[name] = p 
+            
+            # To debug: If those layers are frozen, BUT
+            # a classification head is unfrozen, then we have
+            # zero forgetting!
+            # for layer in self.module.layers:
+            #     if type(layer).__name__ == "Linear":
+            #         layer.weight.requires_grad = False
+            #         layer.bias.requires_grad = False
+                    
+    def forward(self, x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, 
+                preds: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
         """
-        Adds penalization to the loss for predictions outside interval bounds.
+        Adds interval regularization.
 
         Args:
             x (torch.Tensor): Input tensor.
@@ -74,6 +90,8 @@ class IntervalPenalization(MethodPluginABC):
             tuple: (loss, preds) with penalization added to loss.
         """
 
+        self.input_shape = x.flatten(start_dim=1).shape
+
         layers = self.module.layers + [self.module.head]
         var_loss = 0.0
         output_reg_loss = 0.0
@@ -82,18 +100,15 @@ class IntervalPenalization(MethodPluginABC):
             if not type(layer).__name__ == "IntervalActivation":
                 continue
             
-            # Calculate variance
             acts = layer.curr_task_last_batch
             acts_flat = acts.view(acts.size(0), -1)
             batch_var = acts_flat.var(dim=0, unbiased=False).mean()
             var_loss += batch_var
 
             if self.task_id > 0:
-                # Regularize head outpus
                 lb = layer.min
                 ub = layer.max
 
-                # Regularization of the *next* layer (weights on top of IntervalActivation)
                 next_layer = layers[idx + 1]
                 if hasattr(next_layer, "classifier"):
                     lower_bound_reg = 0.0
@@ -117,5 +132,5 @@ class IntervalPenalization(MethodPluginABC):
 
                 output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
     
-        loss = loss + self.alpha * (batch_var + output_reg_loss)
+        loss = loss + self.var_scale * var_loss + self.output_reg_scale * output_reg_loss
         return loss, preds
