@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 from torchvision import models
 from .cl_module_abc import CLModuleABC
-from .layer.interval_layer import IntervalLayer
+from .layer.interval_activation import IntervalActivation
 from .inc_classifier import IncrementalClassifier
 
 
 class ResNet18Interval(CLModuleABC):
     """
-    ResNet18 with IntervalLayer layers inserted between each layer.
+    ResNet18 with IntervalActivation layers inserted between each layer.
     """
 
     def __init__(
@@ -27,7 +27,7 @@ class ResNet18Interval(CLModuleABC):
             initial_out_features (int): Initial number of output classes
             pretrained (bool): Whether to use pretrained weights
             frozen (bool): Whether to freeze the backbone
-            interval_layer_kwargs (dict): Arguments for IntervalLayer layers
+            interval_layer_kwargs (dict): Arguments for IntervalActivation layers
             head_type (str): Type of incremental classifier head
             head_kwargs (dict): Additional arguments for the head
         """
@@ -67,34 +67,34 @@ class ResNet18Interval(CLModuleABC):
             base_model.bn1,
             base_model.relu,
             base_model.maxpool,
-            IntervalLayer((64, H, W), log_name='interval_stem', **interval_layer_kwargs)
+            IntervalActivation((64, H, W), log_name='interval_stem', **interval_layer_kwargs)
         ])
         
         # Layer1 (64 channels) - maintains resolution
         layers.extend([
             base_model.layer1,
-            IntervalLayer((64, H, W), log_name='interval_layer1', **interval_layer_kwargs)
+            IntervalActivation((64, H, W), log_name='interval_layer1', **interval_layer_kwargs)
         ])
         
         # Layer2 (128 channels) - halves resolution
         H, W = H//2, W//2  # 4x4
         layers.extend([
             base_model.layer2,
-            IntervalLayer((128, H, W), log_name='interval_layer2', **interval_layer_kwargs)
+            IntervalActivation((128, H, W), log_name='interval_layer2', **interval_layer_kwargs)
         ])
         
         # Layer3 (256 channels) - halves resolution
         H, W = H//2, W//2  # 2x2
         layers.extend([
             base_model.layer3,
-            IntervalLayer((256, H, W), log_name='interval_layer3', **interval_layer_kwargs)
+            IntervalActivation((256, H, W), log_name='interval_layer3', **interval_layer_kwargs)
         ])
         
         # Layer4 (512 channels) - halves resolution
         H, W = H//2, W//2  # 1x1
         layers.extend([
             base_model.layer4,
-            IntervalLayer((512, H, W), log_name='interval_layer4', **interval_layer_kwargs)
+            IntervalActivation((512, H, W), log_name='interval_layer4', **interval_layer_kwargs)
         ])
         
         # Final layers
@@ -124,7 +124,7 @@ class ResNet18Interval(CLModuleABC):
         
         for layer in self.layers:
             x = layer(x)
-            if isinstance(layer, IntervalLayer):
+            if isinstance(layer, IntervalActivation):
                 self.add_activation(layer, x)
                 
         return self.head(x)

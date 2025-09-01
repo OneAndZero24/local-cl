@@ -54,6 +54,7 @@ class IncrementalClassifier(nn.Module):
             mask_value (int): Value used for masking.
             mul (float): Multiplier value, initialized to 1.0.
             old_nclasses (None): Placeholder for old number of classes, initialized to None.
+            last_logits (None): Stores the last classifier output.
             get_classifier (function): Lambda function to instantiate the classifier layer.
             classifier (nn.Module): The instantiated classifier layer.
             active_units (torch.Tensor): Buffer to keep track of active units, initialized to zeros.
@@ -64,6 +65,7 @@ class IncrementalClassifier(nn.Module):
         self.mask_value = mask_value
 
         self.old_nclasses = None
+        self.last_logits = None
 
         self.get_classifier = (lambda in_features, out_features: 
             instantiate(
@@ -133,9 +135,6 @@ class IncrementalClassifier(nn.Module):
                 else:
                     param.data = state_dict[name]
 
-            for param in self.classifier.parameters():
-                param.requires_grad = False
-
     def forward(self, x):
         """
         Perform a forward pass through the classifier.
@@ -155,4 +154,7 @@ class IncrementalClassifier(nn.Module):
         if self.masking and self.training:
             mask = torch.logical_not(self.active_units)
             out = out.masked_fill(mask=mask, value=self.mask_value)
+        
+        self.last_logits = out
+
         return out

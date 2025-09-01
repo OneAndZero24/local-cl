@@ -8,7 +8,7 @@ log.setLevel(logging.INFO)
 
 class IntervalPenalization(MethodPluginABC):
     """
-    A method plugin that minimizes variance across predictions from IntervalLayer layers.
+    A method plugin that minimizes variance across predictions from IntervalActivation layers.
 
     Attributes:
         alpha (float): Weight for the penalization term.
@@ -66,7 +66,7 @@ class IntervalPenalization(MethodPluginABC):
 
         if self.task_id > 0:
             for layer in layers:
-                if not type(layer).__name__ == "IntervalLayer":
+                if not type(layer).__name__ == "IntervalActivation":
                     continue
 
                 acts = layer.curr_task_last_batch

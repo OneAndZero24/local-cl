@@ -10,7 +10,7 @@ import wandb
 
 from model.cl_module_abc import CLModuleABC
 from model.layer.rbf import RBFLayer
-from src.model.layer.interval_layer import IntervalLayer
+from src.model.layer.interval_activation import IntervalActivation
 from method.regularization import regularization
 from method.method_plugin_abc import MethodPluginABC
 from classification_loss_functions import LossCriterion
@@ -177,7 +177,7 @@ class Composer:
             self.module.head = self.heads[task_id]
 
         for layer in self.module.layers+[self.module.head]:
-            if type(layer).__name__ == "IntervalLayer":
+            if type(layer).__name__ == "IntervalActivation":
                 layer.reset_range()
 
         if self.reset_rbf_mask and task_id > 0:
@@ -247,50 +247,125 @@ class Composer:
         4. Updates the model parameters using the optimizer.
         """
         
+        eps = 1e-7
+
+        # 0) clear current grads (we will compute grads from masked grad_outputs)
         self.optimizer.zero_grad()
-        loss.backward(retain_graph=self.retaingraph)
 
-        arch = self.module._forward_module  # unwrap Fabric
-        interval_layer = None
+        # 1) find forward module (Fabric wrapper handling)
+        module = getattr(self.module, "_forward_module", self.module)
+
+        # 2) locate penultimate IntervalLayer and head linear
+        pen_layer = None
+        head_linear = None
+
+        # find last IntervalLayer in forward module (penultimate)
+        for m in module.modules():
+            if type(m).__name__ == "IntervalActivation":
+                pen_layer = m
         
-        # Get interval layer from layers list
-        for m in arch.layers:
-            if type(m).__name__ == "IntervalLayer":
-                interval_layer = m
-                break
+        # find classifier linear inside head
+        if hasattr(module, "head") and hasattr(module.head, "classifier"):
+            head_cand = module.head.classifier
+            if isinstance(head_cand, nn.Linear):
+                head_linear = head_cand
+            else:
+                # if classifier is wrapped, try to find a Linear inside it
+                for sub in module.head.modules():
+                    if isinstance(sub, nn.Linear):
+                        head_linear = sub
+                        break
        
-        if interval_layer is None:
+        # if prerequisites missing, fallback to normal backward -> step
+        if pen_layer is None or head_linear is None:
+            # no interval protection possible; do plain backward
+            loss.backward()
+            if self.clipgrad is not None:
+                nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
+            self.optimizer.step()
+            return
+        
+        # 3) retrieve saved tensors
+        # penult activations must be the inputs to head, shape [B, in_features]
+        penult = pen_layer.curr_task_last_batch
+        logits = getattr(module.head, "last_logits", None)  # model must set this in forward
+       
+        if penult is None or logits is None:
+            # cannot perform masked backward -> fallback
+            loss.backward()
+            if self.clipgrad is not None:
+                nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
+            self.optimizer.step()
+            return
+        
+        # ensure shapes and devices
+        device = next(head_linear.parameters()).device
+        penult = penult.to(device)
+        logits = logits.to(device)
+        loss = loss.to(device)
+
+        # 4) compute dL/dlogits (vectorized). retain_graph so we can use autograd.backward later
+        dL_dlogits = torch.autograd.grad(loss, logits, retain_graph=True, only_inputs=True)[0]  # [B, out_features]
+
+        # 5) compute raw head gradients that would be produced from dL_dlogits:
+        # For Linear: gW_raw = dL_dlogits^T @ penult  -> shape [out, in]
+        #             gb_raw = dL_dlogits.sum(dim=0)   -> shape [out]
+        gW_raw = dL_dlogits.transpose(0, 1) @ penult   # (out, in)
+        gb_raw = dL_dlogits.sum(dim=0)                 # (out,)
+
+        # Note: if you use mini-batch averaging elsewhere (dividing by batch size), ensure consistent scaling:
+        # If your training uses mean reduction, PyTorch's autograd already computes appropriate scaling.
+        # Here gW_raw matches autograd's gradient shape (no manual division).
+
+        # 6) get penultimate interval bounds (lb, ub) (per input feature)
+        lb = pen_layer.min.to(device)
+        ub = pen_layer.max.to(device)
+        # if min/max are all zero (not set), then no protection -> do normal backward
+        if lb is None or ub is None or (lb.abs().sum().item() == 0 and ub.abs().sum().item() == 0):
+            loss.backward()
+            if self.clipgrad is not None:
+                nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
             self.optimizer.step()
             return
 
-        lb, ub = interval_layer.min, interval_layer.max
-        Wg, bg = interval_layer.weight.grad, interval_layer.bias.grad
+        # 7) interval arithmetic: compute contribution interval for each output row
+        # Vectorized:
+        # contrib_min = where(gW_raw >= 0, gW_raw * lb, gW_raw * ub)
+        # contrib_max = where(gW_raw >= 0, gW_raw * ub, gW_raw * lb)
+        lb_row = lb.unsqueeze(0).expand_as(gW_raw)   # (out, in)
+        ub_row = ub.unsqueeze(0).expand_as(gW_raw)
 
-        if Wg is None or (lb == ub).all():
-            self.optimizer.step()
-            return
+        contrib_min = torch.where(gW_raw >= 0.0, gW_raw * lb_row, gW_raw * ub_row)  # (out, in)
+        contrib_max = torch.where(gW_raw >= 0.0, gW_raw * ub_row, gW_raw * lb_row)  # (out, in)
 
-        # Expand bounds for broadcasting: (out_features, in_features)
-        lb = lb.unsqueeze(0).expand_as(Wg)
-        ub = ub.unsqueeze(0).expand_as(Wg)
+        row_min = contrib_min.sum(dim=1) + gb_raw    # (out,)
+        row_max = contrib_max.sum(dim=1) + gb_raw    # (out,)
 
-        # Interval arithmetic (vectorized):
-        # If w >= 0 -> contributes [w*lb, w*ub]
-        # If w < 0  -> contributes [w*ub, w*lb]
-        contrib_min = torch.where(Wg >= 0, Wg * lb, Wg * ub)
-        contrib_max = torch.where(Wg >= 0, Wg * ub, Wg * lb)
+        # 8) decide safety mask per output: interval must be within [-eps, +eps]
+        safe_mask = (row_min >= -eps) & (row_max <= eps)   # True = safe (allow), False = unsafe (block)
 
-        row_min = contrib_min.sum(dim=1) + (bg if bg is not None else 0.0)
-        row_max = contrib_max.sum(dim=1) + (bg if bg is not None else 0.0)
+        # 9) create masked dL/dlogits: zero columns (output dims) that are unsafe
+        # dL_dlogits shape (B, out). We want to zero the entire column j if unsafe.
+        mask_expand = safe_mask.unsqueeze(0).to(dL_dlogits.dtype)  # (1, out)
+        masked_grad_outputs = dL_dlogits * mask_expand  # (B, out) - zeros out unsafe outputs
 
-        # Mask neurons violating the condition
-        mask = (row_min >= -self.constraint_tol) & (row_max <= self.constraint_tol)
+        # 10) Now compute final parameter gradients by backpropagating with masked_grad_outputs.
+        # First clear any grads computed earlier (we used autograd.grad earlier but didn't modify .grad fields)
+        self.optimizer.zero_grad()
 
-        # Apply mask efficiently
-        Wg[~mask, :] = 0.0
-        if bg is not None:
-            bg[~mask] = 0.0
+        # Backprop with provided gradient at logits -> this computes head and upstream grads correctly
+        torch.autograd.backward(logits, grad_tensors=masked_grad_outputs, retain_graph=False)
 
+        # 11) (Optional) zero the head weight rows / bias for unsafe outputs explicitly (defensive)
+        # After autograd.backward, head_linear.weight.grad and bias.grad are populated.
+        if head_linear.weight.grad is not None:
+            # ensure dtype/device
+            mask_rows = safe_mask.to(head_linear.weight.grad.device)
+            head_linear.weight.grad[~mask_rows, :] = 0.0
+            if head_linear.bias is not None and head_linear.bias.grad is not None:
+                head_linear.bias.grad[~mask_rows] = 0.0
+
+        # 12) clip & step
         if self.clipgrad is not None:
             nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()
