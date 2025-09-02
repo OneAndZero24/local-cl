@@ -14,9 +14,7 @@ class IntervalActivation(nn.Module):
         input_shape (tuple or int): Shape of the input tensor (flattened size).
         lower_percentile (float): Lower percentile for min bound calculation.
         upper_percentile (float): Upper percentile for max bound calculation.
-        act_function (callable): Activation function applied to each element.
-        bound_multiplier (callable): Function to apply bounds to each element.
-        buffer (list): Stores output samples for percentile calculation.
+        test_act_buffer (list): Stores output samples for percentile calculation.
         min (torch.Tensor): Minimum bounds for each element.
         max (torch.Tensor): Maximum bounds for each element.
 
@@ -40,9 +38,7 @@ class IntervalActivation(nn.Module):
             input_shape (tuple): Shape of the input tensor.
             lower_percentile (float, optional): Lower percentile for min bound. Defaults to 0.05.
             upper_percentile (float, optional): Upper percentile for max bound. Defaults to 0.95.
-            act_function (callable, optional): Activation function. Defaults to _gaussian.
-            bound_multiplier (callable, optional): Function to apply bounds. Defaults to identity.
-            name (str, optional): Name of the layer for wandb logging. Defaults to None.
+            log_name (str, optional): Name of the layer for wandb logging. Defaults to None.
         """
 
         super().__init__()
