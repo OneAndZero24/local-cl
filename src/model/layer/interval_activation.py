@@ -13,7 +13,7 @@ class IntervalActivation(nn.Module):
     This layer applies a Leaky ReLU activation and tracks the range of activations 
     across batches. It defines a [lb, ub] hypercube per neuron, which can be used 
     to enforce that activations within this cube remain unchanged when learning 
-    new tasks. This is implemented via gradient projection hooks.
+    new tasks.
 
     Attributes:
         input_shape (tuple or int): Flattened size of input tensor.
@@ -22,9 +22,7 @@ class IntervalActivation(nn.Module):
         test_act_buffer (list): Stores activations for percentile computation in eval mode.
         min (torch.Tensor): Lower bound per neuron (updated via reset_range).
         max (torch.Tensor): Upper bound per neuron (updated via reset_range).
-        last_mask (torch.Tensor): Binary mask indicating which activations are inside [lb, ub].
         curr_task_last_batch (torch.Tensor): Stores last batch activations during training.
-        param_hooks (list): Stores handles to gradient hooks for cube preservation.
 
     Methods:
         reset_range():
@@ -32,10 +30,6 @@ class IntervalActivation(nn.Module):
             from test_act_buffer. Updates self.min and self.max.
         forward(x):
             Computes Leaky ReLU activation, saves batch activations and mask.
-        register_projection_hooks(model):
-            Registers hooks on model parameters to project out the gradient components
-            that would modify activations inside the [lb, ub] hypercube. Ensures that
-            learning outside the cube does not alter stored representations.
     """
 
     def __init__(self,
@@ -65,10 +59,7 @@ class IntervalActivation(nn.Module):
         self.dummy_range = True
         self.log_name = log_name
 
-        self.last_mask = None
         self.curr_task_last_batch = None
-
-        self.param_hooks = []
 
     def reset_range(self):
         """
@@ -121,7 +112,6 @@ class IntervalActivation(nn.Module):
 
         During training:
             - Stores batch activations in curr_task_last_batch.
-            - Computes last_mask indicating activations inside the [min, max] hypercube.
         
         During evaluation:
             - Stores activations in test_act_buffer for later percentile computation.
@@ -134,64 +124,10 @@ class IntervalActivation(nn.Module):
         """
         x_flat = x.view(x.shape[0], -1)
         out = F.leaky_relu(x_flat)
-        device = x_flat.device
 
         if self.training:
             self.curr_task_last_batch = out
-            self.last_mask = ((out >= self.min.to(device)) & (out <= self.max.to(device))).float().requires_grad_(True)
-            def act_hook(g):
-                # block gradients for inside-cube entries; outside passes through
-                return g * (1.0 - self.last_mask)
-            out.register_hook(act_hook)
         else:
             self.test_act_buffer.extend(list(out.detach().cpu()))
 
         return out
-    
-    def register_projection_hooks(self, model: nn.Module) -> None:
-        """
-        Registers gradient hooks to preserve activations within [lb, ub].
-
-        Logic:
-            1. Computes acts_in_cube = curr_task_last_batch * last_mask.
-            2. Computes a scalar sum of acts_in_cube (a_sum).
-            3. Computes gradients of a_sum w.r.t. all model parameters (J_grads).
-            4. Registers a hook per parameter that projects out the gradient component
-               along J_grads, so updates do not change activations inside the cube.
-            5. Removes any previously registered hooks before adding new ones.
-
-        Args:
-            model (nn.Module): Full model containing this IntervalActivation layer.
-        """
-        if self.last_mask is None or self.curr_task_last_batch is None:
-            return
-
-        # Clear previous hooks
-        for handle in self.param_hooks:
-            handle.remove()
-        self.param_hooks = []
-
-        acts_in_cube = self.curr_task_last_batch * self.last_mask
-        a_sum = acts_in_cube.sum()
-
-        J_grads = torch.autograd.grad(
-            a_sum,
-            [p for p in model.parameters() if p.requires_grad],
-            retain_graph=True,
-            allow_unused=True
-        )
-
-        def make_hook(J):
-            norm2 = J.norm()**2 + 1e-8
-            def hook(grad):
-                if grad is None or norm2 < 1e-10:
-                    return grad
-                dot = (grad * J).sum()
-                proj = (dot / norm2) * J
-                return grad - proj
-            return hook
-
-        for p, J in zip(model.parameters(), J_grads):
-            if p.requires_grad and J is not None:
-                handle = p.register_hook(make_hook(J.detach()))
-                self.param_hooks.append(handle)

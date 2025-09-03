@@ -3,6 +3,7 @@ from typing import Optional
 from copy import deepcopy
 
 from torch import optim
+import torch.nn as nn
 
 import wandb
 
@@ -243,10 +244,9 @@ class Composer:
         3. Optionally clips the gradients to prevent exploding gradients.
         4. Updates the model parameters using the optimizer.
         """
-        
+
         self.optimizer.zero_grad()
-        for layer in self.module.layers:
-            if type(layer).__name__ == "IntervalActivation":
-                layer.register_projection_hooks(self.module)
-        loss.backward(retain_graph=self.retaingraph)
+        loss.backward(retain_graph=True)
+        if self.clipgrad is not None:
+            nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()
