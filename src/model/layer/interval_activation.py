@@ -43,7 +43,7 @@ class IntervalActivation(nn.Module):
         lower_percentile: float = 0.05,
         upper_percentile: float = 0.95,
         log_name: str = None,
-    ):
+    ) -> None:
         """
         Initializes the IntervalActivation layer.
 
