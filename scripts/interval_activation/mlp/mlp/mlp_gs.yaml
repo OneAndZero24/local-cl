@@ -80,7 +80,7 @@ parameters:
   method.plugins.0.var_scale: 
     distribution: uniform
     min: 0.0
-    max: 1.0
+    max: 10.0
   method.plugins.0.output_reg_scale: 
     distribution: uniform
     min: 0.0

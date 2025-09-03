@@ -11,5 +11,5 @@ retaingraph: True
 plugins:
   - _target_: method.interval_penalization.IntervalPenalization
     var_scale: 0.01
-    output_reg_scale: 1.0
-    interval_drift_reg_scale: 1.0
+    output_reg_scale: 1000.0
+    interval_drift_reg_scale: 1000.0

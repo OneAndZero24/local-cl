@@ -112,7 +112,6 @@ class IntervalActivation(nn.Module):
 
         During training:
             - Stores batch activations in curr_task_last_batch.
-            - Block gradients for inside-cube entries; outside passes through.
         
         During evaluation:
             - Stores activations in test_act_buffer for later percentile computation.
@@ -127,11 +126,7 @@ class IntervalActivation(nn.Module):
         out = F.leaky_relu(x_flat)
 
         if self.training:
-            self.curr_task_last_batch = out
-            mask = ((out >= self.min.to(out.device)) & (out <= self.max.to(out.device))).float()
-            def act_hook(g):
-                return g * (1.0 - mask)
-            out.register_hook(act_hook)
+            self.curr_task_last_batch = out           
         else:
             self.test_act_buffer.extend(list(out.detach().cpu()))
 

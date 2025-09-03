@@ -194,7 +194,7 @@ class IntervalPenalization(MethodPluginABC):
                 ub = layer.max.to(x.device)
 
                 y_old = self.forward_with_snapshot(x)
-                mask = ((acts < lb) | (acts > ub)).float()
+                mask = ((acts >= lb) & (acts <= ub)).float()
 
                 interval_drift_loss += ((mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8))
 
