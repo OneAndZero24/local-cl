@@ -134,10 +134,11 @@ class IntervalActivation(nn.Module):
         """
         x_flat = x.view(x.shape[0], -1)
         out = F.leaky_relu(x_flat)
+        device = x_flat.device
 
         if self.training:
             self.curr_task_last_batch = out
-            self.last_mask = ((out >= self.min) & (out <= self.max)).float().requires_grad_(True)
+            self.last_mask = ((out >= self.min.to(device)) & (out <= self.max.to(device))).float().requires_grad_(True)
         else:
             self.test_act_buffer.extend(list(out.detach().cpu()))
 

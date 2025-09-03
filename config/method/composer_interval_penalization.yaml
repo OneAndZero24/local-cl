@@ -2,7 +2,7 @@ _partial_: True
 _target_: method.Composer
 criterion: CrossEntropyLoss
 first_lr: 0.001  
-lr: 0.1      
+lr: 0.001      
 ema_scale: 0.95
 beta: 0.1
 use_dynamic_alpha: False

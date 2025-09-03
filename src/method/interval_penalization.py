@@ -159,6 +159,7 @@ class IntervalPenalization(MethodPluginABC):
               - preds (torch.Tensor): Unmodified predictions.
         """
 
+        device = x.device
         x = x.flatten(start_dim=1)
         self.input_shape = x.shape
 
@@ -178,8 +179,8 @@ class IntervalPenalization(MethodPluginABC):
 
             if self.task_id > 0:
 
-                lb = layer.min
-                ub = layer.max
+                lb = layer.min.to(device)
+                ub = layer.max.to(device)
             
                 # Regularization of learnable parameters above the IntervalActivation layer
                 next_layer = layers[idx + 1]
