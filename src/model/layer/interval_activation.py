@@ -8,21 +8,34 @@ import wandb
 
 class IntervalActivation(nn.Module):
     """
-    A neural network module that applies a custom activation function and bounds each element independently based on percentiles.
+    IntervalActivation layer for preserving learned representations within a hypercube.
+
+    This layer applies a Leaky ReLU activation and tracks the range of activations 
+    across batches. It defines a [lb, ub] hypercube per neuron, which can be used 
+    to enforce that activations within this cube remain unchanged when learning 
+    new tasks. This is implemented via gradient projection hooks.
 
     Attributes:
-        input_shape (tuple or int): Shape of the input tensor (flattened size).
-        lower_percentile (float): Lower percentile for min bound calculation.
-        upper_percentile (float): Upper percentile for max bound calculation.
-        test_act_buffer (list): Stores output samples for percentile calculation.
-        min (torch.Tensor): Minimum bounds for each element.
-        max (torch.Tensor): Maximum bounds for each element.
+        input_shape (tuple or int): Flattened size of input tensor.
+        lower_percentile (float): Lower percentile for min bound computation.
+        upper_percentile (float): Upper percentile for max bound computation.
+        test_act_buffer (list): Stores activations for percentile computation in eval mode.
+        min (torch.Tensor): Lower bound per neuron (updated via reset_range).
+        max (torch.Tensor): Upper bound per neuron (updated via reset_range).
+        last_mask (torch.Tensor): Binary mask indicating which activations are inside [lb, ub].
+        curr_task_last_batch (torch.Tensor): Stores last batch activations during training.
+        param_hooks (list): Stores handles to gradient hooks for cube preservation.
 
     Methods:
         reset_range():
-            Computes min and max bounds for each element from the buffer using percentiles.
+            Computes per-feature min and max bounds using collected activations
+            from test_act_buffer. Updates self.min and self.max.
         forward(x):
-            Applies the activation function and bounds to each element independently, updates buffer.
+            Computes Leaky ReLU activation, saves batch activations and mask.
+        register_projection_hooks(model):
+            Registers hooks on model parameters to project out the gradient components
+            that would modify activations inside the [lb, ub] hypercube. Ensures that
+            learning outside the cube does not alter stored representations.
     """
 
     def __init__(self,
@@ -46,7 +59,7 @@ class IntervalActivation(nn.Module):
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
         
-        self.test_act_buffer = [] # samples x input_shape flattened
+        self.test_act_buffer = []
         self.min = torch.zeros(self.input_shape, requires_grad=True)
         self.max = torch.zeros(self.input_shape, requires_grad=True)
         self.dummy_range = True
@@ -55,11 +68,18 @@ class IntervalActivation(nn.Module):
         self.last_mask = None
         self.curr_task_last_batch = None
 
-        self.param_hooks = []  # Store hook handles
+        self.param_hooks = []
 
     def reset_range(self):
         """
-        Compute per-feature percentiles from collected activations and update min/max.
+        Updates the [min, max] hypercube for each neuron using collected activations.
+
+        Steps:
+            1. Concatenates stored activations in test_act_buffer.
+            2. Sorts activations and selects lower and upper percentiles.
+            3. Updates self.min and self.max by taking element-wise min/max.
+            4. Clears the test_act_buffer.
+            5. Optionally logs per-neuron min, max, and interval size to wandb.
         """
         if len(self.test_act_buffer) == 0:
             return
@@ -97,13 +117,20 @@ class IntervalActivation(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Computes activation and saves in buffers.
+        Computes activation for input x.
+
+        During training:
+            - Stores batch activations in curr_task_last_batch.
+            - Computes last_mask indicating activations inside the [min, max] hypercube.
+        
+        During evaluation:
+            - Stores activations in test_act_buffer for later percentile computation.
 
         Args:
-            x (torch.Tensor): Input tensor.
-        
+            x (torch.Tensor): Input tensor of shape (batch, ...).
+
         Returns:
-            out (torch.Tensor): Transformed input.
+            torch.Tensor: Activated tensor of shape (batch, flattened input_shape).
         """
         x_flat = x.view(x.shape[0], -1)
         out = F.leaky_relu(x_flat)
@@ -116,7 +143,21 @@ class IntervalActivation(nn.Module):
 
         return out
     
-    def register_projection_hooks(self, model):
+    def register_projection_hooks(self, model: nn.Module) -> None:
+        """
+        Registers gradient hooks to preserve activations within [lb, ub].
+
+        Logic:
+            1. Computes acts_in_cube = curr_task_last_batch * last_mask.
+            2. Computes a scalar sum of acts_in_cube (a_sum).
+            3. Computes gradients of a_sum w.r.t. all model parameters (J_grads).
+            4. Registers a hook per parameter that projects out the gradient component
+               along J_grads, so updates do not change activations inside the cube.
+            5. Removes any previously registered hooks before adding new ones.
+
+        Args:
+            model (nn.Module): Full model containing this IntervalActivation layer.
+        """
         if self.last_mask is None or self.curr_task_last_batch is None:
             return
 
