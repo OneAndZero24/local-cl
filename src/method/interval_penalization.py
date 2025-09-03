@@ -18,7 +18,6 @@ class IntervalPenalization(MethodPluginABC):
     Attributes:
         var_scale (float): Weight for the variance term.
         output_reg_scale (float): Weight for output preservation.
-        interval_drift_reg_scale (float): Weight for interval representation drift.
         task_id (int or None): Current task identifier.
         params_buffer (dict): Optimal parameters from the last task.
 
@@ -32,7 +31,6 @@ class IntervalPenalization(MethodPluginABC):
     def __init__(self,
             var_scale: float = 0.01,
             output_reg_scale: float = 1.0,
-            interval_drift_reg_scale: float = 1.0
         ):
         """
         Initializes the IntervalPenalization plugin.
@@ -40,7 +38,6 @@ class IntervalPenalization(MethodPluginABC):
         Args:
             var_scale (optional, float): Weight for output preservation.
             output_reg_scale (optional, float): Weight for output preservation.
-            interval_drift_reg_scale (optional, float): Weight for interval representation drift.
 
         """
         
@@ -50,7 +47,6 @@ class IntervalPenalization(MethodPluginABC):
 
         self.var_scale = var_scale
         self.output_reg_scale = output_reg_scale
-        self.interval_drift_reg_scale = interval_drift_reg_scale
 
         self.input_shape = None
         self.params_buffer = {}
@@ -115,10 +111,10 @@ class IntervalPenalization(MethodPluginABC):
             # To debug: If those layers are frozen, BUT
             # a classification head is unfrozen, then we have
             # zero forgetting!
-            # for layer in self.module.layers:
-            #     if type(layer).__name__ == "Linear":
-            #         layer.weight.requires_grad = False
-            #         layer.bias.requires_grad = False
+            for layer in self.module.layers:
+                if type(layer).__name__ == "Linear":
+                    layer.weight.requires_grad = False
+                    layer.bias.requires_grad = False
                     
     def forward(self, x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, 
                 preds: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
@@ -142,7 +138,6 @@ class IntervalPenalization(MethodPluginABC):
 
         var_loss = 0.0
         output_reg_loss = 0.0
-        interval_drift_loss = 0.0
 
         for idx, layer in enumerate(layers):
             if not type(layer).__name__ == "IntervalActivation":
@@ -157,16 +152,7 @@ class IntervalPenalization(MethodPluginABC):
 
                 lb = layer.min
                 ub = layer.max
-
-                middle = (lb + ub) / 2
-                r = (ub - lb) / 2
-
-                y_old = self.forward_with_snapshot(x)
-                mask = ((acts >= lb) & (acts <= ub))
-                drift_weight = torch.exp(-((acts - middle) ** 2) / r) * mask
-
-                interval_drift_loss = interval_drift_loss + (drift_weight * (y_old.detach() - acts).pow(2)).mean()
-
+            
                 # Regularization of learnable parameters above the IntervalActivation layer
                 next_layer = layers[idx + 1]
                 if hasattr(next_layer, "classifier"):
@@ -191,8 +177,6 @@ class IntervalPenalization(MethodPluginABC):
 
                 output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
     
-        loss = loss \
-            + self.var_scale * var_loss \
-                + self.output_reg_scale * output_reg_loss \
-                + self.interval_drift_reg_scale * interval_drift_loss
+        loss = loss + self.var_scale * var_loss \
+                + self.output_reg_scale * output_reg_loss
         return loss, preds

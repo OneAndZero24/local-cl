@@ -47,10 +47,13 @@ class IntervalActivation(nn.Module):
         self.upper_percentile = upper_percentile
         
         self.test_act_buffer = [] # samples x input_shape flattened
-        self.min = torch.zeros(self.input_shape)
-        self.max = torch.zeros(self.input_shape)
+        self.min = torch.zeros(self.input_shape, requires_grad=True)
+        self.max = torch.zeros(self.input_shape, requires_grad=True)
         self.dummy_range = True
         self.log_name = log_name
+
+        self.last_mask = None
+        self.curr_task_last_batch = None
 
     def reset_range(self):
         """
@@ -74,9 +77,10 @@ class IntervalActivation(nn.Module):
 
         min_vals = sorted_buf[l_idx]
         max_vals = sorted_buf[u_idx]
-
-        self.min = torch.minimum(self.min.to(device), min_vals)
-        self.max = torch.maximum(self.max.to(device), max_vals)
+        
+        self.min = torch.minimum(self.min, min_vals)
+        self.max = torch.maximum(self.max, max_vals)
+        
         self.test_act_buffer = []
 
         if self.log_name is not None and wandb.run is not None:
@@ -102,10 +106,37 @@ class IntervalActivation(nn.Module):
         x_flat = x.view(x.shape[0], -1)
         out = F.leaky_relu(x_flat)
 
-        if not self.training:
-            self.test_act_buffer.extend(list(out.detach().cpu()))
-
         if self.training:
             self.curr_task_last_batch = out
+            self.last_mask = ((out >= self.min) & (out <= self.max)).float().requires_grad_(True)
+        else:
+            self.test_act_buffer.extend(list(out.detach().cpu()))
 
         return out
+    
+    def register_projection_hooks(self, model):
+        if self.last_mask is None or self.curr_task_last_batch is None:
+            return
+
+        acts_in_cube = self.curr_task_last_batch * self.last_mask
+        a_sum = acts_in_cube.sum()
+
+        J_grads = torch.autograd.grad(
+            a_sum,
+            [p for p in model.parameters() if p.requires_grad],
+            retain_graph=True,
+            allow_unused=True
+        )
+
+        def make_hook(J):
+            def hook(grad):
+                if grad is None or J is None:
+                    return grad
+                dot = (grad * J).sum()
+                proj = dot / (J.norm()**2 + 1e-8) * J
+                return grad - proj
+            return hook
+
+        for p, J in zip(model.parameters(), J_grads):
+            if p.requires_grad and J is not None:
+                p.register_hook(make_hook(J.detach()))

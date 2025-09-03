@@ -11,4 +11,3 @@ plugins:
   - _target_: method.interval_penalization.IntervalPenalization
     var_scale: 0.01
     output_reg_scale: 10.0
-    interval_drift_reg_scale: 1.0
