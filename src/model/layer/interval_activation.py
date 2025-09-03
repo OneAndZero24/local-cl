@@ -139,6 +139,10 @@ class IntervalActivation(nn.Module):
         if self.training:
             self.curr_task_last_batch = out
             self.last_mask = ((out >= self.min.to(device)) & (out <= self.max.to(device))).float().requires_grad_(True)
+            def act_hook(g):
+                # block gradients for inside-cube entries; outside passes through
+                return g * (1.0 - self.last_mask)
+            out.register_hook(act_hook)
         else:
             self.test_act_buffer.extend(list(out.detach().cpu()))
 
