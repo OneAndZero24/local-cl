@@ -245,9 +245,8 @@ class Composer:
         """
         
         self.optimizer.zero_grad()
-
-        for layer in self.module.modules():
+        for layer in self.module.layers:
             if type(layer).__name__ == "IntervalActivation":
                 layer.register_projection_hooks(self.module)
-        loss.backward(retain_graph=True)
+        loss.backward(retain_graph=self.retaingraph)
         self.optimizer.step()

@@ -55,6 +55,8 @@ class IntervalActivation(nn.Module):
         self.last_mask = None
         self.curr_task_last_batch = None
 
+        self.param_hooks = []  # Store hook handles
+
     def reset_range(self):
         """
         Compute per-feature percentiles from collected activations and update min/max.
@@ -118,6 +120,11 @@ class IntervalActivation(nn.Module):
         if self.last_mask is None or self.curr_task_last_batch is None:
             return
 
+        # Clear previous hooks
+        for handle in self.param_hooks:
+            handle.remove()
+        self.param_hooks = []
+
         acts_in_cube = self.curr_task_last_batch * self.last_mask
         a_sum = acts_in_cube.sum()
 
@@ -129,14 +136,16 @@ class IntervalActivation(nn.Module):
         )
 
         def make_hook(J):
+            norm2 = J.norm()**2 + 1e-8
             def hook(grad):
-                if grad is None or J is None:
+                if grad is None or norm2 < 1e-10:
                     return grad
                 dot = (grad * J).sum()
-                proj = dot / (J.norm()**2 + 1e-8) * J
+                proj = (dot / norm2) * J
                 return grad - proj
             return hook
 
         for p, J in zip(model.parameters(), J_grads):
             if p.requires_grad and J is not None:
-                p.register_hook(make_hook(J.detach()))
+                handle = p.register_hook(make_hook(J.detach()))
+                self.param_hooks.append(handle)
