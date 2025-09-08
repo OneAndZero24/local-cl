@@ -40,7 +40,9 @@ parameters:
   model.head_type: 
     value: Normal
   model.layers: 
-    value: ["Normal"]    
+    value: ["Normal"]
+  model.activation: 
+    value: IntervalActivation
 
   # Scenario configuration
   scenario._partial_:

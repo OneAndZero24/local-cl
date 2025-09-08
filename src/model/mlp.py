@@ -6,7 +6,8 @@ import torch.nn as nn
 
 from model.cl_module_abc import CLModuleABC
 from model.inc_classifier import IncrementalClassifier
-from model.layer import instantiate, LayerType, IntervalActivation
+from model.layer import instantiate, LayerType
+from model.layer.interval_activation import IntervalActivation
 
 
 class MLP(CLModuleABC):
@@ -18,7 +19,6 @@ class MLP(CLModuleABC):
         sizes (list[int]): A list of integers representing the sizes of each layer.
         layers (list[str]): A list of strings representing the type of each layer.
         head_type (str, optional): The type of the head layer. Defaults to "Normal".
-        interval_neck (bool): If True, uses an interval neck. Defaults to False.
         activation (nn.Module, optional): The activation function to use between layers. Defaults to nn.Tanh().
         **kwargs: Additional keyword arguments for layer instantiation.
 
@@ -40,7 +40,6 @@ class MLP(CLModuleABC):
         layers: list[str],
         head_type: str="Normal",
         activation: nn.Module=nn.Tanh(),
-        interval_neck: bool=False,
         config: Union[dict, list[dict], ListConfig]={},
     ):
         """
@@ -52,7 +51,6 @@ class MLP(CLModuleABC):
             layers (list[str]): A list of strings representing the types of each layer.
             head_type (str, optional): The type of the head layer. Defaults to "Normal".
             activation (nn.Module, optional): The activation function to use between layers. Defaults to nn.Tanh().
-            interval_neck (bool): If True, uses an interval neck. Defaults to False.
             config (Union[dict, list[dict]]): Additional keyword arguments for layer instantiation. 
             If dict passed will get applied to each layer, if list of dicts will apply to each layer in order, head=0. 
             If length of dict shorter than number of layers will use last dict for remaining layers.
@@ -67,7 +65,8 @@ class MLP(CLModuleABC):
 
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
-        self.interval_neck = interval_neck
+
+        activation = globals()[activation] if isinstance(activation, str) else activation
 
         list_config = isinstance(config, (list, ListConfig))
 
@@ -94,13 +93,12 @@ class MLP(CLModuleABC):
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
             layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
             if lt == LayerType.NORMAL and i < N-1:
-                layers.append(activation)
-
-        if self.interval_neck:
-            layers.append(IntervalActivation(sizes[-1]))
+                layers.append(activation(out_size))
+            else:
+                layers.append(IntervalActivation(out_size))
 
         self.layers = nn.ModuleList(layers)
-       
+            
     def forward(self, x):
         """
         Perform a forward pass through the network.
