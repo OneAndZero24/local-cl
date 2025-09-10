@@ -246,7 +246,7 @@ class Composer:
         """
 
         self.optimizer.zero_grad()
-        loss.backward(retain_graph=True)
+        loss.backward(retain_graph=self.retaingraph)
         if self.clipgrad is not None:
             nn.utils.clip_grad_norm_(self.module.parameters(), self.clipgrad)
         self.optimizer.step()
