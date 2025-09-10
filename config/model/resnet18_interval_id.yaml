@@ -5,7 +5,5 @@ frozen: false
 interval_layer_kwargs:
   lower_percentile: 0.05
   upper_percentile: 0.95
-  bound_multiplier: 
-    _target_: src.model.layer.interval_activation.no_bound
 head_type: Normal
 head_kwargs: {}

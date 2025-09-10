@@ -8,5 +8,4 @@ Continual learning methods.
 - `mas.py` - Memory Aware Synapses
 - `si.py` - Synaptic Intelligence
 - `sharpening.py` - Sharpening https://cdn.aaai.org/Symposia/Spring/1993/SS-93-06/SS93-06-007.pdf
-- `reg_rbf_neuron_outputs.py` - Regularization of RBF neuron outputs
-- `interval_penalization.py` - Penalization of activations outside of IntervalActivation bounds
+- `interval_penalization.py` - Adds regularization to preserve learned representations inside neuron-specific hypercubes and minimize activation variance, preventing drift when learning new tasks.

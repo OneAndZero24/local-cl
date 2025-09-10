@@ -1,12 +1,15 @@
 _partial_: True
 _target_: method.Composer
 criterion: CrossEntropyLoss
-first_lr: 0.001  
-lr: 0.001      
+first_lr: 0.01  
+lr: 0.01     
 ema_scale: 0.95
 beta: 0.1
 use_dynamic_alpha: False
 criterion_scale: 1.0
+retaingraph: True
 plugins:
   - _target_: method.interval_penalization.IntervalPenalization
-    alpha: 0.01
+    var_scale: 0.01
+    output_reg_scale: 1000000000.0
+    interval_drift_reg_scale: 100000000.0
