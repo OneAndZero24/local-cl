@@ -1,132 +1,147 @@
-import torch
 import torch.nn as nn
-from timm import create_model
+from torch import Tensor
+from typing import Optional, Tuple
 
 from model.cl_module_abc import CLModuleABC
+from model.vit_utils import VisionTransformer
 
 
-class PromptBasedModels(CLModuleABC):
+class PromptViT(CLModuleABC):
     """
-    Continual learning wrapper around timm.create_model with support for prompt-based models.
+    Vision Transformer (ViT) model with optional prompt-based conditioning.
+
+    This class wraps a `VisionTransformer` backbone and applies a custom head 
+    to the CLS token embedding. It supports prompt tuning, task conditioning, 
+    and pretrained weight loading.
 
     Args:
-        head (nn.Module): Custom head module for classification.
-        model_name (str): Timm model name (supports prompt args).
-        pretrained (bool): Whether to load pretrained weights. Default: True.
-        frozen (bool): Whether to freeze the backbone. Default: False.
-        size (tuple[int]): Input image size. Default: (224, 224).
-        drop_rate (float): Dropout rate. Default: 0.0.
-        drop_path_rate (float): Drop path rate. Default: 0.0.
-        drop_block_rate (float|None): Drop block rate. Default: None.
-        prompt_length (int): Prompt length.
-        embedding_key (str): Which embedding to prompt.
-        prompt_init (str): How to initialize prompt keys.
-        prompt_pool (bool): Whether to use a prompt pool.
-        prompt_key (bool): Whether to use prompt keys.
-        pool_size (int): Size of prompt pool.
-        top_k (int): Top-k selection of prompts.
-        batchwise_prompt (bool): Use batchwise prompts.
-        prompt_key_init (str): Initialization of prompt keys.
-        head_type (str): Head type to use in backbone.
-        use_prompt_mask (bool): Whether to mask prompts.
+        head (nn.Module): 
+            Head module applied on top of the CLS embedding.
+        img_size (int, optional): 
+            Input image size. Defaults to 224.
+        patch_size (int, optional): 
+            Patch size for ViT. Defaults to 16.
+        in_chans (int, optional): 
+            Number of input channels. Defaults to 3.
+        embed_dim (int, optional): 
+            Embedding dimension of transformer. Defaults to 768.
+        depth (int, optional): 
+            Number of transformer blocks. Defaults to 12.
+        num_heads (int, optional): 
+            Number of attention heads. Defaults to 12.
+        mlp_ratio (float, optional): 
+            MLP expansion ratio in each block. Defaults to 4.0.
+        qkv_bias (bool, optional): 
+            If True, add bias to QKV projections. Defaults to True.
+        qk_scale (float, optional): 
+            Override default QK scaling factor. Defaults to None.
+        drop_rate (float, optional): 
+            Dropout rate. Defaults to 0.0.
+        attn_drop_rate (float, optional): 
+            Attention dropout rate. Defaults to 0.0.
+        drop_path_rate (float, optional): 
+            Stochastic depth rate. Defaults to 0.0.
+        norm_layer (nn.Module, optional): 
+            Normalization layer. Defaults to None.
+
+    Attributes:
+        vit (VisionTransformer): 
+            The ViT backbone.
+        output_dim (int): 
+            Dimensionality of the CLS token embedding.
+        c_head (nn.Module): 
+            The final head module applied on top of CLS embeddings.
+        layers (nn.Module or None): 
+            Extra layers provided by the head (if any).
+        size (tuple[int, int]): 
+            Input image size as (height, width).
+
+    Methods:
+        forward(x, register_blk=-1, prompt=None, q=None, train=False, task_id=None):
+            Run a forward pass through the model and return the head output 
+            and optional prompt loss.
     """
 
-    def __init__(
+    def __init__(self,
+                 head: nn.Module,
+                 img_size: int = 224,
+                 patch_size: int = 16,
+                 in_chans: int = 3,
+                 embed_dim: int = 768,
+                 depth: int = 12,
+                 num_heads: int = 12,
+                 mlp_ratio: float = 4.0,
+                 qkv_bias: bool = True,
+                 qk_scale: Optional[float] = None,
+                 drop_rate: float = 0.0,
+                 attn_drop_rate: float = 0.0,
+                 drop_path_rate: float = 0.0,
+                 norm_layer: Optional[nn.Module] = None) -> None:
+
+        c_head = getattr(head, "head", head)
+        super().__init__(c_head)
+
+        self.vit = VisionTransformer(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+            depth=depth,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            qkv_bias=qkv_bias,
+            qk_scale=qk_scale,
+            drop_rate=drop_rate,
+            attn_drop_rate=attn_drop_rate,
+            drop_path_rate=drop_path_rate,
+            norm_layer=norm_layer,
+        )
+
+        self.output_dim = embed_dim
+        self.c_head = c_head
+        self.layers = getattr(head, "layers", None)
+        self.size = (img_size, img_size)
+
+    def forward(
         self,
-        head: nn.Module,
-        model_name: str,
-        pretrained: bool = True,
-        frozen: bool = False,
-        size: tuple[int] = (224, 224),
-        drop_rate: float = 0.0,
-        drop_path_rate: float = 0.0,
-        drop_block_rate: float | None = None,
-        prompt_length: int = 0,
-        embedding_key: str = "cls",
-        prompt_init: str = "normal",
-        prompt_pool: bool = False,
-        prompt_key: bool = False,
-        pool_size: int = 0,
-        top_k: int = 1,
-        batchwise_prompt: bool = False,
-        prompt_key_init: str = "uniform",
-        head_type: str = "linear",
-        use_prompt_mask: bool = False,
-    ):
-        super().__init__(head.head)
-
-        self.flatten_output = False
-        self.frozen = frozen
-        self.size = size
-
-        # Model to extract keys
-        self.original_model = create_model(
-            model_name,
-            pretrained=pretrained,
-            num_classes=0,
-            drop_rate=drop_rate,
-            drop_path_rate=drop_path_rate,
-            drop_block_rate=None,
-        )
-
-        self.original_model.eval()
-
-        # Model to process prompts
-        self.model = create_model(
-            model_name,
-            pretrained=pretrained,
-            num_classes=0,
-            drop_rate=drop_rate,
-            drop_path_rate=drop_path_rate,
-            drop_block_rate=drop_block_rate,
-            prompt_length=prompt_length,
-            embedding_key=embedding_key,
-            prompt_init=prompt_init,
-            prompt_pool=prompt_pool,
-            prompt_key=prompt_key,
-            pool_size=pool_size,
-            top_k=top_k,
-            batchwise_prompt=batchwise_prompt,
-            prompt_key_init=prompt_key_init,
-            head_type=head_type,
-            use_prompt_mask=use_prompt_mask,
-        )
-
-        # Classification head
-        self.c_head = head
-        self.layers = head.layers
-
-        if frozen:
-            # All parameters are frozen for original vit model
-            for p in self.original_model.parameters():
-                p.requires_grad = False
-        
-        # Freeze blocks, patch_embed, cls_token parameters
-        for n, p in self.model.named_parameters():
-            if n.startswith(tuple(frozen)):
-                p.requires_grad = False
-
-    def forward(self, x: torch.Tensor, task_id: int, set_training_mode: bool = True) -> torch.Tensor:
+        x: Tensor,
+        register_blk: int = -1,
+        prompt: Optional[Tensor] = None,
+        q: Optional[Tensor] = None,
+        train: bool = False,
+        task_id: Optional[int] = None,
+    ) -> Tuple[Tensor, Tensor]:
         """
-        Performs a forward pass through the prompt-based model.
+        Run a forward pass through the ViT and apply the custom head.
+
         Args:
-            x (torch.Tensor): Input tensor to the model.
-            task_id (int): Identifier for the current task, used for task-specific processing.
-            set_training_mode (bool, optional): If True, sets the model to training mode during the forward pass. Defaults to True.
+            x (Tensor): Input image tensor of shape (B, C, H, W).
+            register_blk (int, optional): 
+                If >= 0, registers activations from a specific block. Defaults to -1.
+            prompt (Tensor, optional): 
+                Prompt embeddings for prompt-based learning. Defaults to None.
+            q (Tensor, optional): 
+                Query tensor for prompt conditioning. Defaults to None.
+            train (bool, optional): 
+                Training mode flag (may affect prompt logic). Defaults to False.
+            task_id (int, optional): 
+                Task identifier (for multi-task setups). Defaults to None.
+
         Returns:
-            torch.Tensor: Output tensor after passing through the classification head.
+            Tuple[Tensor, Tensor]: 
+                Head output tensor and a scalar tensor representing prompt loss.
         """
-        
         self.reset_activations()
 
-        with torch.no_grad():
-            if self.original_model is not None:
-                output = self.original_model(x)
-                cls_features = output['pre_logits']
-            else:
-                cls_features = None
+        seq, _ = self.vit(
+            x,
+            register_blk=register_blk,
+            prompt=prompt,
+            q=q,
+            train=train,
+            task_id=task_id,
+        )
 
-        output = self.model(x, task_id=task_id, cls_features=cls_features, train=set_training_mode)
-        logits = output['logits']
-
-        return self.c_head(logits)
+        cls = seq[:, 0, :]  # CLS token embedding
+        out = self.c_head(cls)
+        return out
