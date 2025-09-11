@@ -3,8 +3,8 @@ from torch import Tensor
 from typing import Optional, Tuple
 
 from model.cl_module_abc import CLModuleABC
-from model.vit_utils import VisionTransformer
-
+from src.model.vit_utils import VisionTransformer
+        
 
 class PromptViT(CLModuleABC):
     """
@@ -81,7 +81,7 @@ class PromptViT(CLModuleABC):
         c_head = getattr(head, "head", head)
         super().__init__(c_head)
 
-        self.vit = VisionTransformer(
+        self.feat = VisionTransformer(
             img_size=img_size,
             patch_size=patch_size,
             in_chans=in_chans,
@@ -96,6 +96,14 @@ class PromptViT(CLModuleABC):
             drop_path_rate=drop_path_rate,
             norm_layer=norm_layer,
         )
+
+        from timm.models.vision_transformer import vit_base_patch16_224
+
+        load_dict = vit_base_patch16_224(pretrained=True).state_dict()
+        del load_dict['head.weight']
+        del load_dict['head.bias']
+        self.feat.load_state_dict(load_dict)
+
 
         self.output_dim = embed_dim
         self.c_head = c_head
