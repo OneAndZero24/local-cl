@@ -1,6 +1,6 @@
-'''
+"""
 Source file: https://github.com/Ethanhuhuhu/KAC/blob/main/models/vit.py
-'''
+"""
 
 import torch
 import torch.nn as nn
