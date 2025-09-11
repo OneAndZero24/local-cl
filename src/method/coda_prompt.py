@@ -243,4 +243,16 @@ class CodaPrompt(MethodPluginABC):
         return p_return, loss, x_block
     
     def forward(self, x: Tensor, y: Tensor, loss: Tensor, preds: Tensor) -> Tensor:
-        pass
+
+        with torch.no_grad():
+            q, _ = self.module.feat(x)
+            q = q[:,0,:]
+        out, prompt_loss = self.module.feat(x, prompt=self.prompt_forward, q=q, train=self.module.training, task_id=self.task_id)
+        out = out[:,0,:]
+       
+        out = out.view(out.size(0), -1)
+        out = self.module.c_head(out)
+
+        loss += prompt_loss
+
+        return out, loss

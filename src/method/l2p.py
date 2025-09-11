@@ -3,6 +3,8 @@ Source code: https://github.com/GT-RIPL/CODA-Prompt/blob/main/models/zoo.py
 """
 
 from typing import List
+
+import torch
 from torch import Tensor
 
 from method.dual_prompt import DualPrompt
@@ -63,4 +65,16 @@ class L2P(DualPrompt):
         self.e_pool_size = int(prompt_param[0])
 
     def forward(self, x: Tensor, y: Tensor, loss: Tensor, preds: Tensor) -> Tensor:
-        pass
+
+        with torch.no_grad():
+            q, _ = self.module.feat(x)
+            q = q[:,0,:]
+        out, prompt_loss = self.module.feat(x, prompt=self.prompt_forward, q=q, train=self.module.training, task_id=self.task_id)
+        out = out[:,0,:]
+       
+        out = out.view(out.size(0), -1)
+        out = self.module.c_head(out)
+
+        loss += prompt_loss
+
+        return out, loss
