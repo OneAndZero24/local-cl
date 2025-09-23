@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/interval_activation/mnist/mlp/reg_whole_cls_outputs_min_var_gs"
+run_sweep_and_agent "scripts/interval_activation/mnist/reg_whole_cls_outputs_min_var/reg_whole_cls_outputs_min_var_gs"

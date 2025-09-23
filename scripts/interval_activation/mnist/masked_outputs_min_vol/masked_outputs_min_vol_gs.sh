@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/interval_activation/mnist/mlp/masked_outputs_min_vol_gs"
+run_sweep_and_agent "scripts/interval_activation/mnist/masked_outputs_min_vol/masked_outputs_min_vol_gs"
