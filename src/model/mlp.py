@@ -40,6 +40,7 @@ class MLP(CLModuleABC):
         layers: list[str],
         head_type: str="Normal",
         activation: nn.Module=nn.Tanh(),
+        mask_past_classifier_neurons: bool = True,
         config: Union[dict, list[dict], ListConfig]={},
     ):
         """
@@ -80,6 +81,7 @@ class MLP(CLModuleABC):
                 sizes[-1], 
                 initial_out_features,
                 head_type,
+                mask_past_classifier_neurons=mask_past_classifier_neurons,
                 **head_kwargs
             )
         )

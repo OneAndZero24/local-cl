@@ -36,6 +36,7 @@ class IncrementalClassifier(nn.Module):
         layer_type: LayerType=LayerType.NORMAL,
         masking: bool=False,
         mask_value: int=-1000,
+        mask_past_classifier_neurons: bool = False,
         **kwargs,
     ):
         """
@@ -63,6 +64,7 @@ class IncrementalClassifier(nn.Module):
         super().__init__()
         self.masking = masking
         self.mask_value = mask_value
+        self.mask_past_classifier_neurons = mask_past_classifier_neurons
 
         self.old_nclasses = None
         self.last_logits = None
@@ -154,7 +156,9 @@ class IncrementalClassifier(nn.Module):
         if self.masking and self.training:
             mask = torch.logical_not(self.active_units)
             out = out.masked_fill(mask=mask, value=self.mask_value)
-        
+
+        if self.mask_past_classifier_neurons and self.old_nclasses is not None and self.training:
+            out[:, :self.old_nclasses] = -float('inf')
         self.last_logits = out
 
         return out

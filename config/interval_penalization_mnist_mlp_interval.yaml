@@ -11,7 +11,7 @@ exp:
   seed: 42
   log_dir: # set during runtime to automatically created dir
   batch_size: 32
-  epochs: 1
+  epochs: 3
   gen_cm: False
   log_per_batch: False
   detect_anomaly: False

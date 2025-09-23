@@ -54,7 +54,10 @@ class IntervalPenalization(MethodPluginABC):
     def __init__(self,
             var_scale: float = 0.01,
             output_reg_scale: float = 1.0,
-            interval_drift_reg_scale: float = 1.0
+            interval_drift_reg_scale: float = 1.0,
+            min_var: bool = True,
+            regularize_past_classifier_outputs: bool = False,
+            regularize_classifier: bool = False,
         ) -> None:
         """
         Initialize the interval penalization plugin.
@@ -77,6 +80,10 @@ class IntervalPenalization(MethodPluginABC):
 
         self.input_shape = None
         self.params_buffer = {}
+
+        self.min_var = min_var
+        self.regularize_past_classifier_outputs = regularize_past_classifier_outputs
+        self.regularize_classifier = regularize_classifier
 
     def forward_with_snapshot(self, x: torch.Tensor, stop_at: str="IntervalActivation") -> torch.Tensor:
         """
@@ -181,10 +188,17 @@ class IntervalPenalization(MethodPluginABC):
         interval_drift_loss = 0.0
 
         for idx, layer in enumerate(interval_act_layers):
-            acts = layer.curr_task_last_batch
-            acts_flat = acts.view(acts.size(0), -1)
-            batch_var = acts_flat.var(dim=0, unbiased=False).mean()
-            var_loss += batch_var
+
+            if self.min_var:
+                acts = layer.curr_task_last_batch
+                acts_flat = acts.view(acts.size(0), -1)
+                batch_var = acts_flat.var(dim=0, unbiased=False).mean()
+                var_loss += batch_var
+            else:
+                acts = layer.curr_task_last_batch
+                acts_min = torch.min(acts, dim=0).values
+                acts_max = torch.max(acts, dim=0).values
+                var_loss += ((acts_max - acts_min)**2).mean()
 
             if self.task_id > 0:
                 lb = layer.min.to(x.device)
@@ -201,7 +215,10 @@ class IntervalPenalization(MethodPluginABC):
                 # Output reg at this interval (first and all above)
                 # In pattern [Linear, Interval, Linear, Interval, ...],
                 # the *next* Linear belongs to this Interval
-                next_layer = layers[2*idx+2]  
+                next_layer = layers[2*idx+2]
+
+                if hasattr(next_layer, "classifier") and not self.regularize_classifier:
+                    continue
 
                 if hasattr(next_layer, "classifier"):
                     target_module = next_layer.classifier
@@ -218,7 +235,10 @@ class IntervalPenalization(MethodPluginABC):
                             if mod_param is p and mod_name in self.params_buffer:
                                 prev_param = self.params_buffer[mod_name]
                                 if "weight" in name:
-                                    weight_diff = p - prev_param
+                                    if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
+                                        weight_diff = (p - prev_param)[:next_layer.old_nclasses, :]
+                                    else:
+                                        weight_diff = p - prev_param
 
                                     weight_diff_pos = torch.relu(weight_diff)
                                     weight_diff_neg = torch.relu(-weight_diff)
@@ -227,8 +247,13 @@ class IntervalPenalization(MethodPluginABC):
                                     upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
 
                                 elif "bias" in name:
-                                    lower_bound_reg += p - prev_param
-                                    upper_bound_reg += p - prev_param
+                                    if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
+                                        bias_diff = (p - prev_param)[:next_layer.old_nclasses]
+                                    else:
+                                        bias_diff = p - prev_param
+
+                                    lower_bound_reg += bias_diff
+                                    upper_bound_reg += bias_diff
 
                     output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
 
