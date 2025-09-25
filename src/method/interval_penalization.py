@@ -198,26 +198,21 @@ class IntervalPenalization(MethodPluginABC):
             var_loss += batch_var
 
             if self.task_id > 0:
-                
-                for hypercube in layer.hypercubes:
-                    lb = hypercube[0].to(x.device)
-                    ub = hypercube[1].to(x.device)
-                    
-                    # Drift only at the FIRST IntervalActivation
-                    if idx == 0:
-                        y_old = self.forward_with_snapshot(x)
-                        mask = ((acts >= lb) & (acts <= ub)).float()
-                        interval_drift_loss += (
-                            (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
-                        )
+                lb = layer.min.to(x.device)
+                ub = layer.max.to(x.device)
 
-                    # Output reg at this interval (first and all above)
-                    # In pattern [Linear, Interval, Linear, Interval, ...],
-                    # the *next* Linear belongs to this Interval
-                    next_layer = layers[2*idx+2]
+                # Drift only at the FIRST IntervalActivation
+                if idx == 0:
+                    y_old = self.forward_with_snapshot(x)
+                    mask = ((acts >= lb) & (acts <= ub)).float()
+                    interval_drift_loss += (
+                        (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
+                    )
 
-                    if hasattr(next_layer, "classifier") and not self.regularize_classifier:
-                        continue
+                # Output reg at this interval (first and all above)
+                # In pattern [Linear, Interval, Linear, Interval, ...],
+                # the *next* Linear belongs to this Interval
+                next_layer = layers[2*idx+2]
 
                 if isinstance(next_layer, torch.nn.Linear):
                     target_module = next_layer
@@ -234,21 +229,19 @@ class IntervalPenalization(MethodPluginABC):
                                 if "weight" in name:
                                     weight_diff = p - prev_param
 
-                                        lower_bound_reg += weight_diff_pos @ lb - weight_diff_neg @ ub
-                                        upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
+                                    weight_diff_pos = torch.relu(weight_diff)
+                                    weight_diff_neg = torch.relu(-weight_diff)
 
-                                    elif "bias" in name:
-                                        if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
-                                            bias_diff = (p - prev_param)[:next_layer.old_nclasses]
-                                        else:
-                                            bias_diff = p - prev_param
+                                    lower_bound_reg += weight_diff_pos @ lb - weight_diff_neg @ ub
+                                    upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
 
                                 elif "bias" in name:
                                     bias_diff = p - prev_param
 
-                        output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
+                                    lower_bound_reg += bias_diff
+                                    upper_bound_reg += bias_diff
 
-                output_reg_loss = output_reg_loss / max(1, len(layer.hypercubes))
+                    output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
 
                 if self.use_hypercube_dist_loss:
                     prev_hypercube_center = (ub + lb) / 2.0
