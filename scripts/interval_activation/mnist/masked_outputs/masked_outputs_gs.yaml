@@ -93,11 +93,7 @@ parameters:
     distribution: uniform
     min: 0.0
     max: 1000.0
-  method.plugins.0.min_var:
-    value: True
-  method.plugins.0.regularize_past_classifier_outputs:
-    value: False
-  method.plugins.0.regularize_classifier:
+  method.plugins.0.use_hypercube_dist_loss:
     value: False
   
 

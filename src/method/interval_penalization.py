@@ -29,6 +29,9 @@ class IntervalPenalization(MethodPluginABC):
       Penalizes deviations of new activations from old-task activations 
       inside the same hypercube, with a stronger penalty near the cube center.
 
+    - **Hypercube distance loss (`hypercube_dist_loss`)**
+      Penalizes distance between representations learned within hypercubes.
+
     Together, these terms reduce representation drift inside protected regions, 
     while still allowing free adaptation outside.
 
@@ -39,6 +42,8 @@ class IntervalPenalization(MethodPluginABC):
         task_id (int): Identifier of the current task.
         params_buffer (dict): Snapshot of frozen parameters from the previous task.
         old_state (dict): Full parameter/buffer snapshot used for drift comparison.
+        use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
+                                                      representations close to each other. 
 
     Methods:
         setup_task(task_id):
@@ -55,9 +60,7 @@ class IntervalPenalization(MethodPluginABC):
             var_scale: float = 0.01,
             output_reg_scale: float = 1.0,
             interval_drift_reg_scale: float = 1.0,
-            min_var: bool = True,
-            regularize_past_classifier_outputs: bool = False,
-            regularize_classifier: bool = False,
+            use_hypercube_dist_loss: bool = True
         ) -> None:
         """
         Initialize the interval penalization plugin.
@@ -66,6 +69,8 @@ class IntervalPenalization(MethodPluginABC):
             var_scale (float, optional): Weight of the variance penalty. Default: 0.01.
             output_reg_scale (float, optional): Weight of the output preservation penalty. Default: 1.0.
             interval_drift_reg_scale (float, optional): Weight of the interval drift penalty. Default: 1.0.
+            use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
+                                                      representations close to each other.
         """
         
         super().__init__()
@@ -77,13 +82,10 @@ class IntervalPenalization(MethodPluginABC):
         self.var_scale = var_scale
         self.output_reg_scale = output_reg_scale
         self.interval_drift_reg_scale = interval_drift_reg_scale
+        self.use_hypercube_dist_loss = use_hypercube_dist_loss
 
         self.input_shape = None
         self.params_buffer = {}
-
-        self.min_var = min_var
-        self.regularize_past_classifier_outputs = regularize_past_classifier_outputs
-        self.regularize_classifier = regularize_classifier
 
     def forward_with_snapshot(self, x: torch.Tensor, stop_at: str="IntervalActivation") -> torch.Tensor:
         """
@@ -186,19 +188,14 @@ class IntervalPenalization(MethodPluginABC):
         var_loss = 0.0
         output_reg_loss = 0.0
         interval_drift_loss = 0.0
+        hypercube_dist_loss = 0.0
 
         for idx, layer in enumerate(interval_act_layers):
 
-            if self.min_var:
-                acts = layer.curr_task_last_batch
-                acts_flat = acts.view(acts.size(0), -1)
-                batch_var = acts_flat.var(dim=0, unbiased=False).mean()
-                var_loss += batch_var
-            else:
-                acts = layer.curr_task_last_batch
-                acts_min = torch.min(acts, dim=0).values
-                acts_max = torch.max(acts, dim=0).values
-                var_loss += ((acts_max - acts_min)**2).mean()
+            acts = layer.curr_task_last_batch
+            acts_flat = acts.view(acts.size(0), -1)
+            batch_var = acts_flat.var(dim=0, unbiased=False).mean()
+            var_loss += batch_var
 
             if self.task_id > 0:
                 lb = layer.min.to(x.device)
@@ -217,12 +214,7 @@ class IntervalPenalization(MethodPluginABC):
                 # the *next* Linear belongs to this Interval
                 next_layer = layers[2*idx+2]
 
-                if hasattr(next_layer, "classifier") and not self.regularize_classifier:
-                    continue
-
-                if hasattr(next_layer, "classifier"):
-                    target_module = next_layer.classifier
-                elif isinstance(next_layer, torch.nn.Linear):
+                if isinstance(next_layer, torch.nn.Linear):
                     target_module = next_layer
                 else:
                     target_module = None
@@ -235,10 +227,7 @@ class IntervalPenalization(MethodPluginABC):
                             if mod_param is p and mod_name in self.params_buffer:
                                 prev_param = self.params_buffer[mod_name]
                                 if "weight" in name:
-                                    if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
-                                        weight_diff = (p - prev_param)[:next_layer.old_nclasses, :]
-                                    else:
-                                        weight_diff = p - prev_param
+                                    weight_diff = p - prev_param
 
                                     weight_diff_pos = torch.relu(weight_diff)
                                     weight_diff_neg = torch.relu(-weight_diff)
@@ -247,20 +236,28 @@ class IntervalPenalization(MethodPluginABC):
                                     upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
 
                                 elif "bias" in name:
-                                    if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
-                                        bias_diff = (p - prev_param)[:next_layer.old_nclasses]
-                                    else:
-                                        bias_diff = p - prev_param
+                                    bias_diff = p - prev_param
 
                                     lower_bound_reg += bias_diff
                                     upper_bound_reg += bias_diff
 
                     output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
 
+                prev_hypercube_center = (ub + lb) / 2.0
+                prev_hypercube_radii = (ub - lb) / 2.0
+                
+                lb_prev_hypercube = prev_hypercube_center - prev_hypercube_radii
+                ub_prev_hypercube = prev_hypercube_center + prev_hypercube_radii
+
+                acts_center = acts_flat.mean(dim=0)
+                hypercube_dist_loss = torch.relu(lb_prev_hypercube - acts_center) + torch.relu(acts_center - ub_prev_hypercube)
+                hypercube_dist_loss = hypercube_dist_loss.mean()
+
         loss = (
             loss
             + self.var_scale * var_loss
             + self.output_reg_scale * output_reg_loss
             + self.interval_drift_reg_scale * interval_drift_loss
+            + hypercube_dist_loss
         )
         return loss, preds
