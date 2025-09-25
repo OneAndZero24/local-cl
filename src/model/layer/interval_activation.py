@@ -55,7 +55,8 @@ class IntervalActivation(nn.Module):
         self.upper_percentile = upper_percentile
         
         self.test_act_buffer = []
-        self.hypercubes = []
+        self.min = None
+        self.max = None
         self.log_name = log_name
 
         self.curr_task_last_batch = None
@@ -72,11 +73,12 @@ class IntervalActivation(nn.Module):
             5. Clears the test_act_buffer.
             6. Optionally logs per-neuron min, max, and interval size to wandb.
         """
+        
         if len(self.test_act_buffer) == 0:
             return
 
         activations = torch.stack(self.test_act_buffer, dim=0).to(self.test_act_buffer[0].device)  # shape: [n_samples, d]
-        sorted_buf, _ = torch.sort(activations, dim=1)
+        sorted_buf, _ = torch.sort(activations, dim=0)
       
         n = sorted_buf.size(0)
         if n == 0:
@@ -87,6 +89,13 @@ class IntervalActivation(nn.Module):
 
         min_vals = sorted_buf[l_idx]   # shape (d,)
         max_vals = sorted_buf[u_idx]   # shape (d,)
+        
+        if not hasattr(self, "min") or self.min is None:
+            self.min = min_vals.clone()
+            self.max = max_vals.clone()
+        else:
+            self.min = torch.min(self.min, min_vals)
+            self.max = torch.max(self.max, max_vals)
         
         if not hasattr(self, "min") or self.min is None:
             self.min = min_vals.clone()
