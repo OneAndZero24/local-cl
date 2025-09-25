@@ -201,61 +201,65 @@ class IntervalPenalization(MethodPluginABC):
                 var_loss += ((acts_max - acts_min)**2).mean()
 
             if self.task_id > 0:
-                lb = layer.min.to(x.device)
-                ub = layer.max.to(x.device)
+                
+                for hypercube in layer.hypercubes:
+                    lb = hypercube[0].to(x.device)
+                    ub = hypercube[1].to(x.device)
+                    
+                    # Drift only at the FIRST IntervalActivation
+                    if idx == 0:
+                        y_old = self.forward_with_snapshot(x)
+                        mask = ((acts >= lb) & (acts <= ub)).float()
+                        interval_drift_loss += (
+                            (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
+                        )
 
-                # Drift only at the FIRST IntervalActivation
-                if idx == 0:
-                    y_old = self.forward_with_snapshot(x)
-                    mask = ((acts >= lb) & (acts <= ub)).float()
-                    interval_drift_loss += (
-                        (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
-                    )
+                    # Output reg at this interval (first and all above)
+                    # In pattern [Linear, Interval, Linear, Interval, ...],
+                    # the *next* Linear belongs to this Interval
+                    next_layer = layers[2*idx+2]
 
-                # Output reg at this interval (first and all above)
-                # In pattern [Linear, Interval, Linear, Interval, ...],
-                # the *next* Linear belongs to this Interval
-                next_layer = layers[2*idx+2]
+                    if hasattr(next_layer, "classifier") and not self.regularize_classifier:
+                        continue
 
-                if hasattr(next_layer, "classifier") and not self.regularize_classifier:
-                    continue
+                    if hasattr(next_layer, "classifier"):
+                        target_module = next_layer.classifier
+                    elif isinstance(next_layer, torch.nn.Linear):
+                        target_module = next_layer
+                    else:
+                        target_module = None
 
-                if hasattr(next_layer, "classifier"):
-                    target_module = next_layer.classifier
-                elif isinstance(next_layer, torch.nn.Linear):
-                    target_module = next_layer
-                else:
-                    target_module = None
+                    if target_module is not None:
+                        lower_bound_reg = 0.0
+                        upper_bound_reg = 0.0
+                        for name, p in target_module.named_parameters():
+                            for mod_name, mod_param in self.module.named_parameters():
+                                if mod_param is p and mod_name in self.params_buffer:
+                                    prev_param = self.params_buffer[mod_name]
+                                    if "weight" in name:
+                                        if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
+                                            weight_diff = (p - prev_param)[:next_layer.old_nclasses, :]
+                                        else:
+                                            weight_diff = p - prev_param
 
-                if target_module is not None:
-                    lower_bound_reg = 0.0
-                    upper_bound_reg = 0.0
-                    for name, p in target_module.named_parameters():
-                        for mod_name, mod_param in self.module.named_parameters():
-                            if mod_param is p and mod_name in self.params_buffer:
-                                prev_param = self.params_buffer[mod_name]
-                                if "weight" in name:
-                                    if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
-                                        weight_diff = (p - prev_param)[:next_layer.old_nclasses, :]
-                                    else:
-                                        weight_diff = p - prev_param
+                                        weight_diff_pos = torch.relu(weight_diff)
+                                        weight_diff_neg = torch.relu(-weight_diff)
 
-                                    weight_diff_pos = torch.relu(weight_diff)
-                                    weight_diff_neg = torch.relu(-weight_diff)
+                                        lower_bound_reg += weight_diff_pos @ lb - weight_diff_neg @ ub
+                                        upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
 
-                                    lower_bound_reg += weight_diff_pos @ lb - weight_diff_neg @ ub
-                                    upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
+                                    elif "bias" in name:
+                                        if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
+                                            bias_diff = (p - prev_param)[:next_layer.old_nclasses]
+                                        else:
+                                            bias_diff = p - prev_param
 
-                                elif "bias" in name:
-                                    if self.regularize_past_classifier_outputs and hasattr(next_layer, "classifier"):
-                                        bias_diff = (p - prev_param)[:next_layer.old_nclasses]
-                                    else:
-                                        bias_diff = p - prev_param
+                                        lower_bound_reg += bias_diff
+                                        upper_bound_reg += bias_diff
 
-                                    lower_bound_reg += bias_diff
-                                    upper_bound_reg += bias_diff
+                        output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
 
-                    output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
+                output_reg_loss = output_reg_loss / max(1, len(layer.hypercubes))
 
         loss = (
             loss

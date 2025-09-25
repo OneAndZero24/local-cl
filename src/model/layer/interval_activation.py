@@ -20,8 +20,9 @@ class IntervalActivation(nn.Module):
         lower_percentile (float): Lower percentile for min bound computation.
         upper_percentile (float): Upper percentile for max bound computation.
         test_act_buffer (list): Stores activations for percentile computation in eval mode.
-        min (torch.Tensor): Lower bound per neuron (updated via reset_range).
-        max (torch.Tensor): Upper bound per neuron (updated via reset_range).
+        min (torch.Tensor): Per-neuron minimum activation values from the last task.
+        max (torch.Tensor): Per-neuron maximum activation values from the last task.
+        hypercubes (list): List of (min, max) tuples for each task (updated via reset_range).
         curr_task_last_batch (torch.Tensor): Stores last batch activations during training.
 
     Methods:
@@ -54,33 +55,29 @@ class IntervalActivation(nn.Module):
         self.upper_percentile = upper_percentile
         
         self.test_act_buffer = []
-        self.min = torch.zeros(self.input_shape, requires_grad=True)
-        self.max = torch.zeros(self.input_shape, requires_grad=True)
-        self.dummy_range = True
+        self.hypercubes = []
         self.log_name = log_name
 
         self.curr_task_last_batch = None
 
     def reset_range(self):
         """
-        Updates the [min, max] hypercube for each neuron using collected activations.
+        Updates the [min, max] hypercube for all neurons using collected activations.
 
         Steps:
             1. Concatenates stored activations in test_act_buffer.
             2. Sorts activations and selects lower and upper percentiles.
             3. Updates self.min and self.max by taking element-wise min/max.
-            4. Clears the test_act_buffer.
-            5. Optionally logs per-neuron min, max, and interval size to wandb.
+            4. Stores the new hypercube as a (2, d) tensor.
+            5. Clears the test_act_buffer.
+            6. Optionally logs per-neuron min, max, and interval size to wandb.
         """
         if len(self.test_act_buffer) == 0:
             return
 
-        activations = torch.cat(self.test_act_buffer, dim=0)
-        device = activations.device
-        activations = activations.to(device)
-
-        sorted_buf, _ = torch.sort(activations, dim=0)
-
+        activations = torch.stack(self.test_act_buffer, dim=0).to(self.test_act_buffer[0].device)  # shape: [n_samples, d]
+        sorted_buf, _ = torch.sort(activations, dim=1)
+      
         n = sorted_buf.size(0)
         if n == 0:
             return
@@ -88,12 +85,19 @@ class IntervalActivation(nn.Module):
         l_idx = int(np.clip(int(n * self.lower_percentile), 0, n - 1))
         u_idx = int(np.clip(int(n * self.upper_percentile), 0, n - 1))
 
-        min_vals = sorted_buf[l_idx]
-        max_vals = sorted_buf[u_idx]
+        min_vals = sorted_buf[l_idx]   # shape (d,)
+        max_vals = sorted_buf[u_idx]   # shape (d,)
         
-        self.min = torch.minimum(self.min, min_vals)
-        self.max = torch.maximum(self.max, max_vals)
-        
+        if not hasattr(self, "min") or self.min is None:
+            self.min = min_vals.clone()
+            self.max = max_vals.clone()
+        else:
+            self.min = torch.min(self.min, min_vals)
+            self.max = torch.max(self.max, max_vals)
+       
+        cube = torch.stack([min_vals, max_vals], dim=0)  # shape (2, d)
+        self.hypercubes.append(cube)
+       
         self.test_act_buffer = []
 
         if self.log_name is not None and wandb.run is not None:
@@ -105,6 +109,7 @@ class IntervalActivation(nn.Module):
                     f"{prefix}/max": float(self.max[i].cpu().item()),
                     f"{prefix}/interval_size": float(interval_size[i].item()),
                 })
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
