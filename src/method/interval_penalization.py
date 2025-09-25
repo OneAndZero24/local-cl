@@ -243,15 +243,16 @@ class IntervalPenalization(MethodPluginABC):
 
                     output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
 
-                prev_hypercube_center = (ub + lb) / 2.0
-                prev_hypercube_radii = (ub - lb) / 2.0
-                
-                lb_prev_hypercube = prev_hypercube_center - prev_hypercube_radii
-                ub_prev_hypercube = prev_hypercube_center + prev_hypercube_radii
+                if self.use_hypercube_dist_loss:
+                    prev_hypercube_center = (ub + lb) / 2.0
+                    prev_hypercube_radii = (ub - lb) / 2.0
+                    
+                    lb_prev_hypercube = prev_hypercube_center - prev_hypercube_radii
+                    ub_prev_hypercube = prev_hypercube_center + prev_hypercube_radii
 
-                acts_center = acts_flat.mean(dim=0)
-                hypercube_dist_loss = torch.relu(lb_prev_hypercube - acts_center) + torch.relu(acts_center - ub_prev_hypercube)
-                hypercube_dist_loss = hypercube_dist_loss.mean()
+                    acts_center = acts_flat.mean(dim=0)
+                    hypercube_dist_loss = torch.relu(lb_prev_hypercube - acts_center) + torch.relu(acts_center - ub_prev_hypercube)
+                    hypercube_dist_loss = hypercube_dist_loss.mean()
 
         loss = (
             loss
