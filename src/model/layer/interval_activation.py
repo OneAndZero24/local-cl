@@ -88,12 +88,12 @@ class IntervalActivation(nn.Module):
         min_vals = sorted_buf[l_idx]   # shape (d,)
         max_vals = sorted_buf[u_idx]   # shape (d,)
         
-        if not hasattr(self, "min") or self.min is None:
+        if self.min is None or self.max is None:
             self.min = min_vals.clone()
             self.max = max_vals.clone()
         else:
-            self.min = torch.min(self.min, min_vals)
-            self.max = torch.max(self.max, max_vals)
+            self.min = torch.minimum(self.min, min_vals)
+            self.max = torch.maximum(self.max, max_vals)
         
         self.test_act_buffer = []
 
