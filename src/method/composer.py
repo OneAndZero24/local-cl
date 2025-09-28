@@ -174,10 +174,6 @@ class Composer:
                 self.heads.append(tmp_head)
             self.module.head = self.heads[task_id]
 
-        for layer in self.module.layers+[self.module.head]:
-            if type(layer).__name__ == "IntervalActivation":
-                layer.reset_range()
-
         if self.reset_rbf_mask and task_id > 0:
             for layer in self.module.layers+[self.module.head]:
                 if isinstance(layer, RBFLayer) and layer.growing_mask:

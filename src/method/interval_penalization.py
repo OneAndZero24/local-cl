@@ -43,7 +43,8 @@ class IntervalPenalization(MethodPluginABC):
         params_buffer (dict): Snapshot of frozen parameters from the previous task.
         old_state (dict): Full parameter/buffer snapshot used for drift comparison.
         use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
-                                                      representations close to each other. 
+                                                      representations close to each other.
+        data_buffer (set): A buffer to store data samples.
 
     Methods:
         setup_task(task_id):
@@ -86,6 +87,7 @@ class IntervalPenalization(MethodPluginABC):
 
         self.input_shape = None
         self.params_buffer = {}
+        self.data_buffer = set()
 
     def forward_with_snapshot(self, x: torch.Tensor, stop_at: str="IntervalActivation") -> torch.Tensor:
         """
@@ -142,9 +144,10 @@ class IntervalPenalization(MethodPluginABC):
         """
         Prepare the plugin for a new task.  
 
-        - On task 0: only sets task id.  
-        - On later tasks: freezes parameters, saves previous params to `params_buffer`,
-          and snapshots full state into `old_state`.
+        - Task 0: only sets `task_id`.  
+        - Task >0: freezes trainable parameters, saves a snapshot in `old_state`,
+        collects activations from all IntervalActivation layers over `self.data_buffer`,
+        and resets their intervals.  
 
         Args:
             task_id (int): Identifier for the current task.
@@ -158,6 +161,35 @@ class IntervalPenalization(MethodPluginABC):
                     p.requires_grad = False
                     self.params_buffer[name] = p.detach().clone()
             self.old_state = self.snapshot_state()
+
+            activation_buffers = {}
+            hook_handles = []
+
+            for idx, layer in enumerate(self.module.layers + [self.module.head]):
+                if type(layer).__name__ == "IntervalActivation":
+                    activation_buffers[idx] = []
+
+                    def hook(module, input, output, idx=idx):
+                        activation_buffers[idx].append(output.detach())
+                    
+                    handle = layer.register_forward_hook(hook)
+                    hook_handles.append(handle)
+
+            self.module.eval()
+            with torch.no_grad():
+                for x in self.data_buffer:
+                    x = x.to(next(self.module.parameters()).device)
+                    _ = self.module(x)
+
+            for idx, layer in enumerate(self.module.layers + [self.module.head]):
+                if type(layer).__name__ == "IntervalActivation":
+                    layer.reset_range(activation_buffers[idx])
+
+            for handle in hook_handles:
+                handle.remove()
+
+        self.module.train()
+        self.data_buffer = set()
                     
     def forward(self, x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, 
                 preds: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
@@ -178,6 +210,8 @@ class IntervalPenalization(MethodPluginABC):
         Returns:
             (loss, preds): Updated loss with added penalties, predictions unchanged.
         """
+
+        self.data_buffer.add(x)
 
         x = x.flatten(start_dim=1)
         self.input_shape = x.shape
