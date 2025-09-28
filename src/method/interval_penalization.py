@@ -185,10 +185,11 @@ class IntervalPenalization(MethodPluginABC):
         layers = self.module.layers + [self.module.head]
         interval_act_layers = [layer for layer in layers if type(layer).__name__ == "IntervalActivation"]
 
-        var_loss = 0.0
-        output_reg_loss = 0.0
-        interval_drift_loss = 0.0
-        hypercube_dist_loss = 0.0
+        var_loss = torch.tensor(0.0, device=x.device)
+        output_reg_loss = torch.tensor(0.0, device=x.device)
+        interval_drift_loss = torch.tensor(0.0, device=x.device)
+        hypercube_dist_loss = torch.tensor(0.0, device=x.device)
+
 
         for idx, layer in enumerate(interval_act_layers):
 
@@ -244,15 +245,22 @@ class IntervalPenalization(MethodPluginABC):
                     output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
 
                 if self.use_hypercube_dist_loss:
-                    prev_hypercube_center = (ub + lb) / 2.0
-                    prev_hypercube_radii = (ub - lb) / 2.0
+                    prev_center = (ub + lb) / 2.0
+                    prev_radii  = (ub - lb) / 2.0
                     
-                    lb_prev_hypercube = prev_hypercube_center - prev_hypercube_radii
-                    ub_prev_hypercube = prev_hypercube_center + prev_hypercube_radii
+                    lb_prev_hypercube = prev_center - prev_radii
+                    ub_prev_hypercube = prev_center + prev_radii
 
-                    acts_center = acts_flat.mean(dim=0)
-                    hypercube_dist_loss = torch.relu(lb_prev_hypercube - acts_center) + torch.relu(acts_center - ub_prev_hypercube)
-                    hypercube_dist_loss = hypercube_dist_loss.mean()
+                    new_lb, _ = acts_flat.min(dim=0)
+                    new_ub, _ = acts_flat.max(dim=0)
+
+                    non_overlap_mask = (new_lb > ub_prev_hypercube) | (new_ub < lb_prev_hypercube)
+                    new_center = (new_ub + new_lb) / 2.0
+
+                    center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
+
+                    hypercube_dist_loss = center_loss / (prev_radii.mean() + 1e-8)
+
 
         loss = (
             loss
