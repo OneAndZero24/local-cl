@@ -50,7 +50,7 @@ class MAS(MethodPluginABC):
         Attributes:
             task_id (None): An attribute to store the task ID, initialized to None.
             alpha (float): Stores the value of the alpha parameter.
-            data_buffer (list): A list to buffer data, initialized as an empty list.
+            data_buffer (set): A set to buffer data, initialized as an empty set.
             params_buffer (dict): A dictionary to buffer parameters, initialized as an empty dictionary.
             importance (dict): A dictionary to store importance values, initialized as an empty dictionary.
         """
