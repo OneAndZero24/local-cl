@@ -20,7 +20,7 @@ class MAS(MethodPluginABC):
     Attributes:
         alpha (float): A hyperparameter that balances the importance of the new task loss and the parameter change loss.
         task_id (int): The identifier for the current task.
-        data_buffer (list): A buffer to store data samples.
+        data_buffer (set): A buffer to store data samples.
         params_buffer (dict): A buffer to store the parameters of the model.
         importance (dict): A dictionary to store the importance of each parameter.
         head_opt (bool): A flag to indicate whether EWC should be applied to the incremental head.
