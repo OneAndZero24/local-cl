@@ -1,0 +1,6 @@
+_target_: scenario.get_permuted_class_inc_scenario
+nb_classes: 10
+increment: 2
+transformations: 
+  _target_: util.resize_transform
+  size: 32
