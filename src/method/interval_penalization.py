@@ -162,6 +162,12 @@ class IntervalPenalization(MethodPluginABC):
                     self.params_buffer[name] = p.detach().clone()
             self.old_state = self.snapshot_state()
 
+            if hasattr(self.module, "fe"):
+                self.old_fe = deepcopy(self.module.fe)
+                for p in self.old_fe.parameters():
+                    p.requires_grad = False
+                self.old_fe.eval()
+
             activation_buffers = {}
             hook_handles = []
 
@@ -213,9 +219,6 @@ class IntervalPenalization(MethodPluginABC):
 
         self.data_buffer.add(x)
 
-        x = x.flatten(start_dim=1)
-        self.input_shape = x.shape
-
         layers = self.module.layers + [self.module.head]
         interval_act_layers = [layer for layer in layers if type(layer).__name__ == "IntervalActivation"]
 
@@ -238,16 +241,22 @@ class IntervalPenalization(MethodPluginABC):
 
                 # Drift only at the FIRST IntervalActivation
                 if idx == 0:
-                    y_old = self.forward_with_snapshot(x)
+
+                    if hasattr(self.module, "fe"):
+                        y_old = self.old_fe(x)
+                    else:
+                        x = x.flatten(start_dim=1)
+                        y_old = self.forward_with_snapshot(x)
                     mask = ((acts >= lb) & (acts <= ub)).float()
                     interval_drift_loss += (
                         (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
                     )
-
-                # Output reg at this interval (first and all above)
-                # In pattern [Linear, Interval, Linear, Interval, ...],
-                # the *next* Linear belongs to this Interval
-                next_layer = layers[2*idx+2]
+                
+                # Regularize all layers above
+                if hasattr(self.module, "fe"):
+                    next_layer = layers[2*idx+1]
+                else:
+                    next_layer = layers[2*idx+2]
 
                 if isinstance(next_layer, torch.nn.Linear):
                     target_module = next_layer

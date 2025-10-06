@@ -29,10 +29,10 @@ class ResNet18Interval(CLModuleABC):
     def __init__(
         self,
         initial_out_features: int,
-        pretrained: bool = True,
         frozen: bool = False,
         interval_layer_kwargs: dict = None,
         head_type: str = "Normal",
+        mask_past_classifier_neurons: bool = True,
         head_kwargs: dict = {}
     ) -> None:
         """
@@ -40,20 +40,23 @@ class ResNet18Interval(CLModuleABC):
 
         Args:
             initial_out_features (int): Number of output classes for the classifier.
-            pretrained (bool): If True, load pretrained ResNet18 weights. Default is True.
             frozen (bool): If True, freeze the backbone (ResNet18) parameters. Default is False.
             interval_layer_kwargs (dict): Arguments for IntervalActivation layers 
                                           (e.g., {'lower_percentile': 0.05, 'upper_percentile': 0.95}).
             head_type (str): Type of incremental classifier head. Default is "Normal".
+            mask_past_classifier_neurons (boolk): Flag to indicate whether mask classifier neurons for old classes.
+                                                    Default is True.
             head_kwargs (dict): Additional keyword arguments for the incremental classifier.
         """
         
-        dim_hidden = 100
+        self.frozen = frozen
+        dim_hidden = 400
 
         head = IncrementalClassifier(
             in_features=dim_hidden,  
             initial_out_features=initial_out_features,
             head_type=head_type,
+            mask_past_classifier_neurons=mask_past_classifier_neurons,
             **head_kwargs
         )
         super().__init__(head) 
@@ -75,7 +78,7 @@ class ResNet18Interval(CLModuleABC):
         ]
         self.layers = nn.ModuleList(mlp_layers)
                 
-        if frozen:
+        if self.frozen:
             self.freeze_backbone()
 
     def freeze_backbone(self) -> None:
@@ -85,9 +88,8 @@ class ResNet18Interval(CLModuleABC):
 
         Only the parameters in the MLP and the IncrementalClassifier head remain trainable.
         """
-        for layer in self.fe: 
-             for param in layer.parameters():
-                param.requires_grad = False
+        for param in self.fe.parameters():
+            param.requires_grad = False
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
