@@ -1,14 +1,29 @@
-import torch
 import torch.nn as nn
+import torch
 from torchvision import models
+
 from .cl_module_abc import CLModuleABC
 from .layer.interval_activation import IntervalActivation
 from .inc_classifier import IncrementalClassifier
 
 
+
 class ResNet18Interval(CLModuleABC):
     """
-    ResNet18 with IntervalActivation layers inserted between each layer.
+    ResNet18 backbone augmented with IntervalActivation layers and an MLP head.
+
+    This model uses a standard ResNet18 feature extractor and inserts two
+    `IntervalActivation` layers:
+        1. After the feature extraction and flattening (end of reducer).
+        2. After a hidden linear layer in the MLP before the classifier.
+
+    The final classification is performed via an `IncrementalClassifier` head.
+
+    Attributes:
+        fe_layers (list[nn.Module]): List of ResNet18 feature extraction layers.
+        mlp_layers (list[nn.Module]): List of MLP layers including hidden Linear and IntervalActivation layers.
+        layers (nn.ModuleList): Combined feature extractor and MLP layers.
+        head (IncrementalClassifier): Incremental classifier head.
     """
 
     def __init__(
@@ -19,26 +34,29 @@ class ResNet18Interval(CLModuleABC):
         interval_layer_kwargs: dict = None,
         head_type: str = "Normal",
         head_kwargs: dict = {}
-    ):
+    ) -> None:
         """
-        Initialize ResNet18 with interval activation layers.
+        Initialize ResNet18Interval model.
 
         Args:
-            initial_out_features (int): Initial number of output classes
-            pretrained (bool): Whether to use pretrained weights
-            frozen (bool): Whether to freeze the backbone
-            interval_layer_kwargs (dict): Arguments for IntervalActivation layers
-            head_type (str): Type of incremental classifier head
-            head_kwargs (dict): Additional arguments for the head
+            initial_out_features (int): Number of output classes for the classifier.
+            pretrained (bool): If True, load pretrained ResNet18 weights. Default is True.
+            frozen (bool): If True, freeze the backbone (ResNet18) parameters. Default is False.
+            interval_layer_kwargs (dict): Arguments for IntervalActivation layers 
+                                          (e.g., {'lower_percentile': 0.05, 'upper_percentile': 0.95}).
+            head_type (str): Type of incremental classifier head. Default is "Normal".
+            head_kwargs (dict): Additional keyword arguments for the incremental classifier.
         """
-        super().__init__(
-            IncrementalClassifier(
-                in_features=512,  # ResNet18's final feature dimension
-                initial_out_features=initial_out_features,
-                head_type=head_type,
-                **head_kwargs
-            )
+        
+        dim_hidden = 100
+
+        head = IncrementalClassifier(
+            in_features=dim_hidden,  
+            initial_out_features=initial_out_features,
+            head_type=head_type,
+            **head_kwargs
         )
+        super().__init__(head) 
         
         if interval_layer_kwargs is None:
             interval_layer_kwargs = {
@@ -46,85 +64,55 @@ class ResNet18Interval(CLModuleABC):
                 'upper_percentile': 0.95
             }
 
-        base_model = models.resnet18(pretrained=pretrained)
-        
-        layers = []
-        
-        # Calculate feature map sizes based on input
-        H = W = 32  # MNIST/CIFAR input size
-        
-        # Initial conv: stride=2, kernel=7, padding=3
-        H = (H + 2*3 - 7)//2 + 1  # 16
-        W = (W + 2*3 - 7)//2 + 1  # 16
-        
-        # Maxpool: stride=2, kernel=3, padding=1
-        H = (H + 2*1 - 3)//2 + 1  # 8
-        W = (W + 2*1 - 3)//2 + 1  # 8
-        
-        # Initial convolution block
-        layers.extend([
-            base_model.conv1,
-            base_model.bn1,
-            base_model.relu,
-            base_model.maxpool,
-            IntervalActivation((64, H, W), log_name='interval_stem', **interval_layer_kwargs)
-        ])
-        
-        # Layer1 (64 channels) - maintains resolution
-        layers.extend([
-            base_model.layer1,
-            IntervalActivation((64, H, W), log_name='interval_layer1', **interval_layer_kwargs)
-        ])
-        
-        # Layer2 (128 channels) - halves resolution
-        H, W = H//2, W//2  # 4x4
-        layers.extend([
-            base_model.layer2,
-            IntervalActivation((128, H, W), log_name='interval_layer2', **interval_layer_kwargs)
-        ])
-        
-        # Layer3 (256 channels) - halves resolution
-        H, W = H//2, W//2  # 2x2
-        layers.extend([
-            base_model.layer3,
-            IntervalActivation((256, H, W), log_name='interval_layer3', **interval_layer_kwargs)
-        ])
-        
-        # Layer4 (512 channels) - halves resolution
-        H, W = H//2, W//2  # 1x1
-        layers.extend([
-            base_model.layer4,
-            IntervalActivation((512, H, W), log_name='interval_layer4', **interval_layer_kwargs)
-        ])
-        
-        # Final layers
-        layers.extend([
-            base_model.avgpool,
-            nn.Flatten()
-        ])
-        
-        self.layers = nn.ModuleList(layers)
-        
+        self.fe = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        # Remove the final fully-connected (classification) layer from the ResNet model
+        self.fe.fc = nn.Identity() 
+    
+        mlp_layers = [
+            IntervalActivation(512, **interval_layer_kwargs),
+            nn.Linear(512, dim_hidden),
+            IntervalActivation(dim_hidden, **interval_layer_kwargs) 
+        ]
+        self.layers = nn.ModuleList(mlp_layers)
+                
         if frozen:
             self.freeze_backbone()
 
-    def freeze_backbone(self):
-        """Freeze all parameters except the final classifier layer."""
-        for name, param in self.named_parameters():
-            if not name.startswith('head'):
+    def freeze_backbone(self) -> None:
+        """
+        Freeze all parameters in the ResNet18 backbone to prevent them from updating
+        during training.
+
+        Only the parameters in the MLP and the IncrementalClassifier head remain trainable.
+        """
+        for layer in self.fe: 
+             for param in layer.parameters():
                 param.requires_grad = False
 
-    def forward(self, x):
-        """Forward pass with interval activations between layers."""
-        self.reset_activations()
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the network.
+
+        The input `x` passes sequentially through:
+            1. The ResNet18 feature extractor (`fe_layers`).
+            2. The MLP layers with IntervalActivation (`mlp_layers`).
+            3. The IncrementalClassifier head (`self.head`).
+
+        Grayscale images (1-channel) are automatically repeated to 3 channels.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width).
+
+        Returns:
+            torch.Tensor: Output logits from the classifier head.
+        """
         
         # Handle grayscale images by repeating the channel
         if x.size(1) == 1:
             x = x.repeat(1, 3, 1, 1)
         
+        x = self.fe(x)
         for layer in self.layers:
             x = layer(x)
-            if isinstance(layer, IntervalActivation):
-                self.add_activation(layer, x)
                 
         return self.head(x)
