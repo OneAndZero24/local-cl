@@ -29,6 +29,7 @@ class ResNet18Interval(CLModuleABC):
     def __init__(
         self,
         initial_out_features: int,
+        dim_hidden: int,
         frozen: bool = False,
         interval_layer_kwargs: dict = None,
         head_type: str = "Normal",
@@ -40,6 +41,7 @@ class ResNet18Interval(CLModuleABC):
 
         Args:
             initial_out_features (int): Number of output classes for the classifier.
+            dim_hidden (int): Number of hidden units in the MLP layer following the ResNet18 backbone.
             frozen (bool): If True, freeze the backbone (ResNet18) parameters. Default is False.
             interval_layer_kwargs (dict): Arguments for IntervalActivation layers 
                                           (e.g., {'lower_percentile': 0.05, 'upper_percentile': 0.95}).
@@ -50,7 +52,6 @@ class ResNet18Interval(CLModuleABC):
         """
         
         self.frozen = frozen
-        dim_hidden = 400
 
         head = IncrementalClassifier(
             in_features=dim_hidden,  
