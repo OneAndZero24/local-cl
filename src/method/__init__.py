@@ -4,7 +4,6 @@ from .ewc import EWC
 from .mas import MAS
 from .si import SI
 from .sharpening import Sharpening
-from .penultimate_layer_reg import PenultimateLayerReg
 from .dreaming import Dreaming
 from .dynamic_loss_scaling import DynamicScaling
 from .interval_penalization import IntervalPenalization

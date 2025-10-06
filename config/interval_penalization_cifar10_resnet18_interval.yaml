@@ -1,9 +1,9 @@
 defaults:
   - _self_
-  - dataset: mnist
+  - dataset: cifar10
   - scenario: class_inc
-  - model: mlp_rbf
-  - method: composer_rbf_penultimate_layer_reg
+  - model: resnet18_interval
+  - method: composer_interval_penalization
 
 exp:
   run_func:
@@ -11,11 +11,14 @@ exp:
   seed: 42
   log_dir: # set during runtime to automatically created dir
   batch_size: 32
-  epochs: 5
+  epochs: 1
   gen_cm: False
   log_per_batch: False
   detect_anomaly: False
   cleanup: True
+  calc_bwt: False
+  calc_fwt: False
+  acc_table: False
 
 fabric:
   _target_: lightning.Fabric
