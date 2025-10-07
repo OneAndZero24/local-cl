@@ -6,8 +6,6 @@ from .cl_module_abc import CLModuleABC
 from .layer.interval_activation import IntervalActivation
 from .inc_classifier import IncrementalClassifier
 
-
-
 class ResNet18Interval(CLModuleABC):
     """
     ResNet18 backbone augmented with IntervalActivation layers and an MLP head.
@@ -20,9 +18,8 @@ class ResNet18Interval(CLModuleABC):
     The final classification is performed via an `IncrementalClassifier` head.
 
     Attributes:
-        fe_layers (list[nn.Module]): List of ResNet18 feature extraction layers.
-        mlp_layers (list[nn.Module]): List of MLP layers including hidden Linear and IntervalActivation layers.
-        layers (nn.ModuleList): Combined feature extractor and MLP layers.
+        fe (nn.Module): ResNet18 feature extractor (up to the last fully connected layer).
+        layers (nn.ModuleList): MLP with two IntervalActivation layers.
         head (IncrementalClassifier): Incremental classifier head.
     """
 
@@ -30,7 +27,6 @@ class ResNet18Interval(CLModuleABC):
         self,
         initial_out_features: int,
         dim_hidden: int,
-        frozen: bool = False,
         interval_layer_kwargs: dict = None,
         head_type: str = "Normal",
         mask_past_classifier_neurons: bool = True,
@@ -42,17 +38,12 @@ class ResNet18Interval(CLModuleABC):
         Args:
             initial_out_features (int): Number of output classes for the classifier.
             dim_hidden (int): Number of hidden units in the MLP layer following the ResNet18 backbone.
-            frozen (bool): If True, freeze the backbone (ResNet18) parameters. Default is False.
             interval_layer_kwargs (dict): Arguments for IntervalActivation layers 
                                           (e.g., {'lower_percentile': 0.05, 'upper_percentile': 0.95}).
             head_type (str): Type of incremental classifier head. Default is "Normal".
-            mask_past_classifier_neurons (boolk): Flag to indicate whether mask classifier neurons for old classes.
-                                                    Default is True.
+            mask_past_classifier_neurons (bool): Whether to mask classifier neurons for old classes.
             head_kwargs (dict): Additional keyword arguments for the incremental classifier.
         """
-        
-        self.frozen = frozen
-
         head = IncrementalClassifier(
             in_features=dim_hidden,  
             initial_out_features=initial_out_features,
@@ -68,29 +59,28 @@ class ResNet18Interval(CLModuleABC):
                 'upper_percentile': 0.95
             }
 
+        # Load pretrained ResNet18
         self.fe = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-        # Remove the final fully-connected (classification) layer from the ResNet model
         self.fe.fc = nn.Identity() 
-    
+
         mlp_layers = [
             IntervalActivation(512, **interval_layer_kwargs),
             nn.Linear(512, dim_hidden),
-            IntervalActivation(dim_hidden, **interval_layer_kwargs) 
+            IntervalActivation(dim_hidden, **interval_layer_kwargs)
         ]
         self.layers = nn.ModuleList(mlp_layers)
-                
-        if self.frozen:
-            self.freeze_backbone()
+
+        # Freeze everything except the last ResNet block
+        self.freeze_backbone()
 
     def freeze_backbone(self) -> None:
         """
-        Freeze all parameters in the ResNet18 backbone to prevent them from updating
-        during training.
-
-        Only the parameters in the MLP and the IncrementalClassifier head remain trainable.
+        Freeze all parameters in the ResNet18 backbone except the final block (`layer4`).
+        This keeps low-level features stable while allowing high-level adaptation.
         """
-        for param in self.fe.parameters():
-            param.requires_grad = False
+        for name, param in self.fe.named_parameters():
+            if not name.startswith("layer4"):
+                param.requires_grad = False
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
