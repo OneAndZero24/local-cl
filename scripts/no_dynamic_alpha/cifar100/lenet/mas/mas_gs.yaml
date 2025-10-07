@@ -47,10 +47,7 @@ parameters:
     value: CrossEntropyLoss
   method.use_dynamic_alpha: 
     value: False
-  method.first_lr: 
-    distribution: log_uniform_values
-    min: 0.0001
-    max: 0.01
+  
   method.criterion_scale:
     value: 1.0
   method.lr: 

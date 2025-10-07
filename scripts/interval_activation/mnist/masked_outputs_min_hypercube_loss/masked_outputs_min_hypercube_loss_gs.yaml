@@ -65,10 +65,7 @@ parameters:
     value: CrossEntropyLoss
   method.criterion_scale:
     value: 1.0
-  method.first_lr: 
-    distribution: log_uniform_values
-    min: 0.0001
-    max: 0.01
+  
   method.retaingraph:
     value: True
   method.lr: 

@@ -119,7 +119,6 @@ def experiment(config: DictConfig):
                     method_tmp = Composer(
                         deepcopy(method.module), 
                         config.method.criterion, 
-                        method.first_lr,
                         method.lr,
                         method.criterion_scale,
                         method.reg_type,

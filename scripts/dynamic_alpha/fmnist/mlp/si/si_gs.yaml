@@ -57,10 +57,7 @@ parameters:
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
-  method.first_lr: 
-    distribution: log_uniform_values
-    min: 0.0001
-    max: 0.01
+  
   method.criterion_scale:
     value: 1.0
   method.use_dynamic_alpha:

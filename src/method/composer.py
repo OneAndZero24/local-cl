@@ -25,7 +25,6 @@ class Composer:
         module (CLModuleABC): The module to be trained.
         criterion (LossCriterion): The loss function.
         optimizer (Optional[optim.Optimizer]): The optimizer for training.
-        first_lr (float): The learning rate for the first task.
         lr (float): The learning rate for subsequent tasks.
         criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
         ema_scale (float): The EMA scale for dynamic scaling.
@@ -48,7 +47,6 @@ class Composer:
     def __init__(self, 
         module: CLModuleABC,
         criterion: str, 
-        first_lr: float, 
         lr: float,
         criterion_scale: float,
         ema_scale: float,
@@ -71,7 +69,6 @@ class Composer:
         Args:
             module (CLModuleABC): The continual learning module to be trained.
             criterion (str): The name of the loss function to be used.
-            first_lr (float): The learning rate for the first task.
             lr (float): The learning rate for subsequent tasks.
             criterion_scale (float): Scaling factor for the criterion loss when training on subsequent tasks.
             ema_scale (float): Exponential moving average scale for dynamic loss scaling.
@@ -95,7 +92,6 @@ class Composer:
 
         self.criterion = LossCriterion(criterion)
         self.optimizer = None
-        self.first_lr = first_lr
         self.lr = lr
         self.criterion_scale = criterion_scale
         self.ema_scale = ema_scale
@@ -128,7 +124,7 @@ class Composer:
         Sets up the optimizer for the model.
         This method initializes the optimizer with the model parameters that require
         gradients. It uses the Adam optimizer with a learning rate that depends on
-        the task ID. If the task ID is 0, it uses `first_lr`, otherwise it uses `lr`.
+        the task ID.
 
         Args:
             task_id (int): The ID of the current task. Determines the learning rate to use.
@@ -136,7 +132,7 @@ class Composer:
 
         params = list(self.module.parameters())
         params = filter(lambda p: p.requires_grad, params)
-        lr = self.first_lr if task_id == 0 else self.lr
+        lr = self.lr
         self.optimizer = optim.Adam(params, lr=lr)
 
 
