@@ -119,15 +119,11 @@ class Composer:
             log.info('Dynamic scaling is enabled')
 
 
-    def _setup_optim(self, task_id: int):
+    def _setup_optim(self):
         """
         Sets up the optimizer for the model.
         This method initializes the optimizer with the model parameters that require
-        gradients. It uses the Adam optimizer with a learning rate that depends on
-        the task ID.
-
-        Args:
-            task_id (int): The ID of the current task. Determines the learning rate to use.
+        gradients. It uses the Adam optimizer.
         """
 
         params = list(self.module.parameters())
@@ -175,7 +171,7 @@ class Composer:
                 if isinstance(layer, RBFLayer) and layer.growing_mask:
                     layer.mask = layer.init_group_mask()
 
-        self._setup_optim(task_id)
+        self._setup_optim()
         for plugin in self.plugins:
             plugin.setup_task(task_id)
 
