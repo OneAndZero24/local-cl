@@ -67,8 +67,6 @@ class MLP(CLModuleABC):
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
 
-        activation = globals()[activation] if isinstance(activation, str) else activation
-
         list_config = isinstance(config, (list, ListConfig))
 
         head_kwargs = config
@@ -95,9 +93,11 @@ class MLP(CLModuleABC):
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
             layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
             if lt == LayerType.NORMAL and i < N-1:
-                layers.append(activation(out_size))
-            else:
-                layers.append(IntervalActivation(out_size))
+                if activation == "IntervalActivation":
+                    activation = globals()[activation] if isinstance(activation, str) else activation
+                    layers.append(activation(out_size))
+                else:
+                    layers.append(activation)
 
         self.layers = nn.ModuleList(layers)
             

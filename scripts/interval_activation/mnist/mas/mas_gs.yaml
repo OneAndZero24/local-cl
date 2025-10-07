@@ -49,8 +49,8 @@ parameters:
     value: Normal
   model.layers: 
     value: ["Normal", "Normal"]
-  model.activation: 
-    value: nn.ReLU
+  model.activation._target_: 
+    value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
     value: True 
 
