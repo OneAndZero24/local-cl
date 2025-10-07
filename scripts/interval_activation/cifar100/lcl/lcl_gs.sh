@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_cifar10_resnet18_lcl
+#SBATCH --job-name=local_cl_split_cifar100_resnet18_lcl
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/interval_activation/cifar10/lcl/lcl_gs"
+run_sweep_and_agent "scripts/interval_activation/cifar100/lcl/lcl_gs"

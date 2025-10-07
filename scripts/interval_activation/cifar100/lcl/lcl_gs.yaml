@@ -18,7 +18,7 @@ parameters:
   exp.batch_size:
     values: [128,64,32]     
   exp.epochs: 
-    values: [10, 15]
+    values: [10,20]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -34,7 +34,7 @@ parameters:
   model._target_: 
     value: model.ResNet18Interval
   model.initial_out_features:
-    value: 2          
+    value: 10          
   model.dim_hidden:
     value: 400
   model.mask_past_classifier_neurons:
@@ -46,9 +46,9 @@ parameters:
   scenario._target_: 
     value: scenario.get_permuted_class_inc_scenario
   scenario.increment: 
-    value: 2
-  scenario.nb_classes:
     value: 10
+  scenario.nb_classes:
+    value: 100
 
   # Method configuration
   method._partial_: 
