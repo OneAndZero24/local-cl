@@ -47,13 +47,13 @@ parameters:
     value: True
 
   # Scenario configuration
-  scenario._target_: 
-    value: scenario.get_permuted_class_inc_scenario
-  scenario.increment: 
+  scenario._partial_:
+    value: True
+  scenario._target_:
+    value: continuum.ClassIncremental
+  scenario.increment:
     value: 2
-  scenario.nb_classes:
-    value: 10
-
+    
   # Method configuration
   method._partial_: 
     value: True
@@ -65,7 +65,6 @@ parameters:
     value: CrossEntropyLoss
   method.criterion_scale:
     value: 1.0
-  
   method.retaingraph:
     value: True
   method.lr: 

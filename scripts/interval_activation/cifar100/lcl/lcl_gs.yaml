@@ -8,7 +8,7 @@ parameters:
   dataset:
     value: mnist
   scenario:
-    value: permuted_class_inc
+    value: class_inc
   model:
     value: resnet18_interval
   method:
@@ -43,12 +43,12 @@ parameters:
     value: Normal
 
   # Scenario configuration
-  scenario._target_: 
-    value: scenario.get_permuted_class_inc_scenario
-  scenario.increment: 
+  scenario._partial_:
+    value: True
+  scenario._target_:
+    value: continuum.ClassIncremental
+  scenario.increment:
     value: 10
-  scenario.nb_classes:
-    value: 100
 
   # Method configuration
   method._partial_: 
@@ -95,5 +95,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - interval_penalization_mnist_mlp_interval.yaml
+  - interval_penalization_cifar100_resnet18_interval.yaml
   - ${args_no_hyphens}

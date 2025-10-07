@@ -12,13 +12,13 @@ parameters:
   model:
     value: mlp
   method:
-    value: composer_interval_penalization
+    value: composer_mas
   exp.seed: 
     value: 42      
   exp.batch_size:
-    values: [512, 256, 128]     
+    values: [512, 256, 128]    
   exp.epochs: 
-    values: [10, 5]
+    values: [5, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -42,17 +42,9 @@ parameters:
   model.layers: 
     value: ["Normal", "Normal"]
   model.activation: 
-    value: IntervalActivation
+    value: nn.ReLU
   model.mask_past_classifier_neurons:
-    value: True
-
-  # Scenario configuration
-  scenario._partial_:
-    value: True
-  scenario._target_:
-    value: continuum.ClassIncremental
-  scenario.increment:
-    value: 2
+    value: True 
 
   # Method configuration
   method._partial_: 
@@ -65,39 +57,27 @@ parameters:
     value: CrossEntropyLoss
   method.criterion_scale:
     value: 1.0
-  
-  method.retaingraph:
-    value: True
   method.lr: 
     distribution: log_uniform_values 
     min: 0.0001
     max: 0.01
   method.ema_scale:
-    value: null
-  method.beta:
-    value: null
+    value: 0.95
+
   method.plugins.0._target_:
-    value: method.interval_penalization.IntervalPenalization
-  method.plugins.0.var_scale: 
-    distribution: uniform
-    min: 0.0
-    max: 10.0
-  method.plugins.0.output_reg_scale: 
-    distribution: uniform
-    min: 0.0
-    max: 1000.0
-  method.plugins.0.interval_drift_reg_scale: 
-    distribution: uniform
-    min: 0.0
-    max: 1000.0
-  method.plugins.0.use_hypercube_dist_loss:
+    value: method.MAS
+  method.plugins.0.alpha: 
+    distribution: uniform      
+    min: 0.1
+    max: 1000
+  method.plugins.0.head_opt:
     value: True
-  
+
 
 command:
   - ${env}
   - python
   - ${program}
   - --config-name
-  - interval_penalization_mnist_mlp_interval.yaml
+  - mas_split_mnist_mlp.yaml
   - ${args_no_hyphens}
