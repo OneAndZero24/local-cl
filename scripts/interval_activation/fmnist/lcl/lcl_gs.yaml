@@ -6,9 +6,9 @@ metric:
 
 parameters:
   dataset:
-    value: mnist
+    value: fmnist
   scenario:
-    value: class_inc
+    value: permuted_class_inc
   model:
     value: mlp
   method:
@@ -36,23 +36,23 @@ parameters:
   model.initial_out_features:
     value: 2          
   model.sizes:
-    value: [1024, 400, 400]
+    value: [1024, 400]
   model.head_type: 
     value: Normal
   model.layers: 
-    value: ["Normal", "Normal"]
+    value: ["Normal"]
   model.activation: 
     value: IntervalActivation
   model.mask_past_classifier_neurons:
     value: True
 
   # Scenario configuration
-  scenario._partial_:
-    value: True
   scenario._target_: 
-    value: continuum.ClassIncremental
+    value: scenario.get_permuted_class_inc_scenario
   scenario.increment: 
     value: 2
+  scenario.nb_classes:
+    value: 10
 
   # Method configuration
   method._partial_: 
@@ -91,7 +91,7 @@ parameters:
     min: 0.0
     max: 1000.0
   method.plugins.0.use_hypercube_dist_loss:
-    value: False
+    value: True
   
 
 command:
