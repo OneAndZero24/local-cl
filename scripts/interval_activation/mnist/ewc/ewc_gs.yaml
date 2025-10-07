@@ -28,7 +28,16 @@ parameters:
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True    
+    value: True
+
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_:
+    value: continuum.ClassIncremental
+  scenario.increment:
+    value: 2
 
   # Model configuration
   model._target_: 

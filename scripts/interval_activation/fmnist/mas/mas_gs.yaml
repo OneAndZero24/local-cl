@@ -28,7 +28,15 @@ parameters:
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True    
+    value: True
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_:
+    value: continuum.ClassIncremental
+  scenario.increment:
+    value: 2
 
   # Model configuration
   model._target_: 
@@ -63,7 +71,6 @@ parameters:
     max: 0.01
   method.ema_scale:
     value: 0.95
-
   method.plugins.0._target_:
     value: method.MAS
   method.plugins.0.alpha: 

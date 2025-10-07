@@ -6,7 +6,7 @@ metric:
 
 parameters:
   dataset:
-    value: mnist
+    value: cifar100
   scenario:
     value: class_inc
   model:
