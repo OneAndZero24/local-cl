@@ -1,6 +1,8 @@
 from typing import Union
 from omegaconf import ListConfig
 
+import ast
+import importlib
 import torch
 import torch.nn as nn
 
@@ -63,6 +65,14 @@ class MLP(CLModuleABC):
         """
                 
         assert len(sizes)-1 == len(layers), "Number of sizes and layers must match"
+        
+        if isinstance(activation, str):
+            if "." in activation:  # e.g., "torch.nn.ReLU"
+                module_name, class_name = activation.rsplit(".", 1)
+                module = importlib.import_module(module_name)
+                activation = getattr(module, class_name)()
+            else:
+                activation = getattr(torch.nn, activation)()
 
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
