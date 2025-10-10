@@ -46,7 +46,7 @@ parameters:
   model.dim_hidden:
     value: 400
   model.mask_past_classifier_neurons:
-    value: True
+    value: False
   model.head_type:
     value: Normal
 
