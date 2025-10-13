@@ -46,7 +46,7 @@ parameters:
   model.dim_hidden:
     value: 400
   model.mask_past_classifier_neurons:
-    value: True
+    value: False
   model.head_type:
     value: Normal
 
@@ -61,7 +61,7 @@ parameters:
     value: CrossEntropyLoss
   method.criterion_scale:
     distribution: uniform
-    min: 1e-8
+    min: 0.00000001
     max: 1.0
   method.lr: 
     distribution: log_uniform_values 

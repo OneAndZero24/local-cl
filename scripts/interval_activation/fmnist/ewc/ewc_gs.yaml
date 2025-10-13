@@ -49,7 +49,7 @@ parameters:
     value: Normal
   model.layers: 
     value: ["Normal", "Normal"]
-  model.activation._target_: 
+  model.activation: 
     value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
     value: True 
@@ -63,7 +63,7 @@ parameters:
     value: CrossEntropyLoss
   method.criterion_scale:
     distribution: uniform
-    min: 1e-8
+    min: 0.00000001
     max: 1.0
   
   method.lr: 
