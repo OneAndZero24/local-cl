@@ -6,7 +6,7 @@ metric:
 
 parameters:
   dataset:
-    value: mnist
+    value: cifar10
   scenario:
     value: class_inc
   model:
@@ -18,7 +18,7 @@ parameters:
   exp.batch_size:
     values: [128,64,32]     
   exp.epochs: 
-    values: [10, 15, 20]
+    values: [5, 10, 15]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
