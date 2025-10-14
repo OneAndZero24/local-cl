@@ -1,0 +1,90 @@
+program: src/main.py
+method: bayes
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: cifar10
+  scenario:
+    value: domain_inc
+  model:
+    value: resnet18
+  method:
+    value: composer_ewc
+  exp.seed: 
+    value: 42      
+  exp.batch_size:
+    values: [128,64,32]      
+  exp.epochs: 
+    values: [10, 15, 20]
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu   
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True
+  exp.dil:
+    value: True
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_:
+    value: scenario.DomainIncremental
+  scenario.increment:
+    value: 2
+
+  # Model configuration
+  model._target_: 
+    value: model.ResNet18
+  model.initial_out_features:
+    value: 2          
+  model.dim_hidden:
+    value: 400
+  model.mask_past_classifier_neurons:
+    value: False
+  model.head_type:
+    value: Normal
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method.use_dynamic_alpha: 
+    value: False
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.criterion_scale:
+    distribution: uniform
+    min: 0.00000001
+    max: 1.0
+  method.lr: 
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
+  method.ema_scale:
+    value: 0.95
+  method.plugins.0._target_:
+    value: method.EWC
+  method.plugins.0.alpha: 
+    distribution: uniform      
+    min: 100
+    max: 10000
+  method.plugins.0.head_opt:
+    value: True
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - ewc_cifar10_resnet18.yaml
+  - ${args_no_hyphens}
