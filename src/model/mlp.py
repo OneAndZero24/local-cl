@@ -1,7 +1,6 @@
 from typing import Union
 from omegaconf import ListConfig
 
-import importlib
 import torch
 import torch.nn as nn
 
@@ -65,12 +64,8 @@ class MLP(CLModuleABC):
                 
         assert len(sizes)-1 == len(layers), "Number of sizes and layers must match"
         
-        if isinstance(activation, str):
-            if "." in activation:  # e.g., "torch.nn.ReLU"
-                module_name, class_name = activation.rsplit(".", 1)
-                module = importlib.import_module(module_name)
-                activation = getattr(module, class_name)()
-
+        activation = globals()[activation] if isinstance(activation, str) else activation
+        
         head_type = LayerType(head_type)
         layer_types = list(map(lambda x: LayerType(x), layers))
 
@@ -99,15 +94,13 @@ class MLP(CLModuleABC):
             lt = layer_types[i]
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
             layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
-            if lt == LayerType.NORMAL and i < N-1:
-                if activation == "IntervalActivation":
-                    activation = globals()[activation] if isinstance(activation, str) else activation
-                    layers.append(activation(out_size))
-                else:
-                    layers.append(activation)
-
-        self.layers = nn.ModuleList(layers)
+            try:
+                layers.append(activation(out_size))
+            except TypeError:
+                layers.append(activation)
             
+        self.layers = nn.ModuleList(layers)
+        
     def forward(self, x):
         """
         Perform a forward pass through the network.

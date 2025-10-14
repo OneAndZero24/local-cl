@@ -61,7 +61,8 @@ class IntervalPenalization(MethodPluginABC):
             var_scale: float = 0.01,
             output_reg_scale: float = 1.0,
             interval_drift_reg_scale: float = 1.0,
-            use_hypercube_dist_loss: bool = True
+            use_hypercube_dist_loss: bool = True,
+            dil_mode: bool = False
         ) -> None:
         """
         Initialize the interval penalization plugin.
@@ -72,6 +73,8 @@ class IntervalPenalization(MethodPluginABC):
             interval_drift_reg_scale (float, optional): Weight of the interval drift penalty. Default: 1.0.
             use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
                                                       representations close to each other.
+            dil_mode (bool, optional): If True, the classifier head is also regularized. If False (TIL/CIL scenarios)
+                                        past class neurons should be simply masked without the regularization.
         """
         
         super().__init__()
@@ -86,6 +89,7 @@ class IntervalPenalization(MethodPluginABC):
         self.use_hypercube_dist_loss = use_hypercube_dist_loss
 
         self.input_shape = None
+        self.dil_mode = dil_mode
         self.params_buffer = {}
         self.data_buffer = set()
 
@@ -260,6 +264,8 @@ class IntervalPenalization(MethodPluginABC):
 
                 if isinstance(next_layer, torch.nn.Linear):
                     target_module = next_layer
+                elif self.dil_mode and hasattr(next_layer, "classifier"):
+                    target_module = next_layer.classifier
                 else:
                     target_module = None
 

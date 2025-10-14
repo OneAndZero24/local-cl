@@ -19,7 +19,7 @@ exp:
   calc_bwt: False
   calc_fwt: False
   acc_table: False
-  dil: True
+  dil: False
 
 fabric:
   _target_: lightning.Fabric
