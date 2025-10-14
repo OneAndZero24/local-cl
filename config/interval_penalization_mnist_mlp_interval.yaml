@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - dataset: mnist
-  - scenario: class_inc
+  - scenario: domain_inc
   - model: mlp
   - method: composer_interval_penalization
 
@@ -19,6 +19,7 @@ exp:
   calc_bwt: False
   calc_fwt: False
   acc_table: False
+  dil: True
 
 fabric:
   _target_: lightning.Fabric
