@@ -4,4 +4,4 @@ sizes: [1024, 400, 400]
 layers: ["Normal", "Normal"]
 head_type: Normal
 activation: IntervalActivation
-mask_past_classifier_neurons: True
+mask_past_classifier_neurons: False
