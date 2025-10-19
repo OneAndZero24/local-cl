@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/interval_activation_cil/mnist/si/si_gs"
+run_sweep_and_agent "scripts/seeds/cil/mnist/si/si"
