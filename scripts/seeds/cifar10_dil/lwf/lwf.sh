@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job-name=local_cl_cifar10_dil_resnet18_lwf_seeds
+#SBATCH --qos=big
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --partition=dgx
+
+source scripts/main.sh
+
+run_sweep_and_agent "scripts/seeds/cifar10_dil/lwf/lwf"
