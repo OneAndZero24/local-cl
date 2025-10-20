@@ -7,7 +7,7 @@ metric:
 
 parameters:
   dataset:
-    value: mnist
+    value: fmnist
   scenario:
     value: class_inc
   model:
@@ -15,11 +15,11 @@ parameters:
   method:
     value: composer_si
   exp.seed: 
-    value: [42, 69, 2137, 0, 10]    
+    values: [42, 69, 2137, 0, 10] 
   exp.batch_size:
-    values: 128  
+    values: 512   
   exp.epochs: 
-    values: 5
+    value: 5
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -39,7 +39,7 @@ parameters:
   scenario._target_:
     value: continuum.ClassIncremental
   scenario.increment:
-    value: 2 
+    value: 2
 
   # Model configuration
   model._target_: 
@@ -67,18 +67,17 @@ parameters:
   method.criterion: 
     value: CrossEntropyLoss
   method.criterion_scale:
-    value: 1
+    value: 1.0
+  method.lr: 
+    value: 0.0010336594663931194
   method.ema_scale:
     value: 0.95
-  method.lr: 
-    value: 0.002551576226583207
   method.plugins.0._target_:
     value: method.SI
   method.plugins.0.alpha: 
-    value: 798.5697884837812
+    value: 925.2238399435704
   method.plugins.0.head_opt:
     value: True
-
 
 command:
   - ${env}

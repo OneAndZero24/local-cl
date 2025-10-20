@@ -15,11 +15,11 @@ parameters:
   method:
     value: composer_ewc
   exp.seed: 
-    value: [42, 69, 2137, 0, 10] 
+    values: [42, 69, 2137, 0, 10] 
   exp.batch_size:
-    values: 128
+    value: 128
   exp.epochs: 
-    values: 5
+    value: 5
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -32,7 +32,6 @@ parameters:
     value: True
   exp.dil:
     value: False
-
 
   # Scenario configuration
   scenario._partial_:
@@ -56,7 +55,7 @@ parameters:
   model.activation: 
     value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
-    value: True 
+    value: False 
 
   # Method configuration
   method._partial_: 
@@ -80,7 +79,6 @@ parameters:
     value: True
   method.use_dynamic_alpha:
     value: False
-
 
 command:
   - ${env}
