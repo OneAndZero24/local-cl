@@ -15,11 +15,11 @@ parameters:
   method:
     value: composer_lwf
   exp.seed: 
-    value: [42, 69, 2137, 0, 10]      
+    values: [42, 69, 2137, 0, 10]      
   exp.batch_size:
-    values: 512 
+    value: 512 
   exp.epochs: 
-    values: 10
+    value: 10
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
