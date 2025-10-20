@@ -45,6 +45,7 @@ class IntervalPenalization(MethodPluginABC):
         use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
                                                       representations close to each other.
         data_buffer (set): A buffer to store data samples.
+        regularize_classifier (bool): If True, the classifier head is regularized. Default: False.
 
     Methods:
         setup_task(task_id):
@@ -62,7 +63,8 @@ class IntervalPenalization(MethodPluginABC):
             output_reg_scale: float = 1.0,
             interval_drift_reg_scale: float = 1.0,
             use_hypercube_dist_loss: bool = True,
-            dil_mode: bool = False
+            dil_mode: bool = False,
+            regularize_classifier: bool = False,
         ) -> None:
         """
         Initialize the interval penalization plugin.
@@ -75,6 +77,7 @@ class IntervalPenalization(MethodPluginABC):
                                                       representations close to each other.
             dil_mode (bool, optional): If True, the classifier head is also regularized. If False (TIL/CIL scenarios)
                                         past class neurons should be simply masked without the regularization.
+            regularize_classifier (bool, optional): If True, the classifier head is regularized. Default: False.
         """
         
         super().__init__()
@@ -90,6 +93,7 @@ class IntervalPenalization(MethodPluginABC):
 
         self.input_shape = None
         self.dil_mode = dil_mode
+        self.regularize_classifier = regularize_classifier
         self.params_buffer = {}
         self.data_buffer = set()
 
@@ -264,7 +268,7 @@ class IntervalPenalization(MethodPluginABC):
 
                 if isinstance(next_layer, torch.nn.Linear):
                     target_module = next_layer
-                elif self.dil_mode and hasattr(next_layer, "classifier"):
+                elif (self.regularize_classifier or self.dil_mode) and hasattr(next_layer, "classifier"):
                     target_module = next_layer.classifier
                 else:
                     target_module = None

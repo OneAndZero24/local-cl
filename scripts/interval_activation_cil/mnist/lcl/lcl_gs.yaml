@@ -46,7 +46,7 @@ parameters:
   model.activation: 
     value: IntervalActivation
   model.mask_past_classifier_neurons:
-    value: True
+    value: False
 
   # Scenario configuration
   scenario._partial_:
@@ -95,6 +95,8 @@ parameters:
     value: True
   method.plugins.0.dil_mode:
     value: False
+  method.plugins.0.regularize_classifier:
+    value: True
   
 
 command:
