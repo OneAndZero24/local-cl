@@ -1,28 +1,66 @@
-import torch.nn as nn
 import torch
-from torchvision import models
+import torch.nn as nn
 
 from .cl_module_abc import CLModuleABC
 from .layer.interval_activation import IntervalActivation
 from .inc_classifier import IncrementalClassifier
 
+
+class FlattenedResNet18FE(nn.Module):
+    """A flattened ResNet-18 feature extractor."""
+    def __init__(self) -> None:
+        super().__init__()
+        try:
+            from torchvision.models import resnet18, ResNet18_Weights
+            original_model = resnet18(weights=ResNet18_Weights.DEFAULT)
+        except (ImportError, Exception):
+            print("Could not load pretrained weights. Initializing with random weights.")
+            from torchvision.models import resnet18
+            original_model = resnet18(weights=None)
+
+        # Feature Extractor Layers
+        self.conv1 = original_model.conv1
+        self.bn1 = original_model.bn1
+        self.relu = original_model.relu
+        self.maxpool = original_model.maxpool
+        # Layer 1
+        self.layer1_0_conv1 = original_model.layer1[0].conv1; self.layer1_0_bn1 = original_model.layer1[0].bn1
+        self.layer1_0_conv2 = original_model.layer1[0].conv2; self.layer1_0_bn2 = original_model.layer1[0].bn2
+        self.layer1_1_conv1 = original_model.layer1[1].conv1; self.layer1_1_bn1 = original_model.layer1[1].bn1
+        self.layer1_1_conv2 = original_model.layer1[1].conv2; self.layer1_1_bn2 = original_model.layer1[1].bn2
+        # Layer 2
+        self.layer2_0_conv1 = original_model.layer2[0].conv1; self.layer2_0_bn1 = original_model.layer2[0].bn1
+        self.layer2_0_conv2 = original_model.layer2[0].conv2; self.layer2_0_bn2 = original_model.layer2[0].bn2
+        self.layer2_0_downsample = original_model.layer2[0].downsample
+        self.layer2_1_conv1 = original_model.layer2[1].conv1; self.layer2_1_bn1 = original_model.layer2[1].bn1
+        self.layer2_1_conv2 = original_model.layer2[1].conv2; self.layer2_1_bn2 = original_model.layer2[1].bn2
+        # Layer 3
+        self.layer3_0_conv1 = original_model.layer3[0].conv1; self.layer3_0_bn1 = original_model.layer3[0].bn1
+        self.layer3_0_conv2 = original_model.layer3[0].conv2; self.layer3_0_bn2 = original_model.layer3[0].bn2
+        self.layer3_0_downsample = original_model.layer3[0].downsample
+        self.layer3_1_conv1 = original_model.layer3[1].conv1; self.layer3_1_bn1 = original_model.layer3[1].bn1
+        self.layer3_1_conv2 = original_model.layer3[1].conv2; self.layer3_1_bn2 = original_model.layer3[1].bn2
+        # Layer 4
+        self.layer4_0_conv1 = original_model.layer4[0].conv1; self.layer4_0_bn1 = original_model.layer4[0].bn1
+        self.layer4_0_conv2 = original_model.layer4[0].conv2; self.layer4_0_bn2 = original_model.layer4[0].bn2
+        self.layer4_0_downsample = original_model.layer4[0].downsample
+        self.layer4_1_conv1 = original_model.layer4[1].conv1; self.layer4_1_bn1 = original_model.layer4[1].bn1
+        self.layer4_1_conv2 = original_model.layer4[1].conv2; self.layer4_1_bn2 = original_model.layer4[1].bn2
+        
+        self.avgpool = original_model.avgpool
+        self.final_relu = nn.ReLU(inplace=True)
+        self.relu_int = nn.ReLU(inplace=True)
+    
+
+
 class ResNet18Interval(CLModuleABC):
     """
-    ResNet18 backbone augmented with IntervalActivation layers and an MLP head.
-
-    This model uses a standard ResNet18 feature extractor and inserts two
-    `IntervalActivation` layers:
-        1. After the feature extraction and flattening (end of reducer).
-        2. After a hidden linear layer in the MLP before the classifier.
-
-    The final classification is performed via an `IncrementalClassifier` head.
-
-    Attributes:
-        fe (nn.Module): ResNet18 feature extractor (up to the last fully connected layer).
-        layers (nn.ModuleList): MLP with two IntervalActivation layers.
-        head (IncrementalClassifier): Incremental classifier head.
+    A flattened ResNet-18 backbone augmented with IntervalActivation layers.
+    
+    This implementation uses a non-nested ResNet-18 structure, allowing for
+    the direct insertion of IntervalActivation layers within layer4 and,
+    optionally, between the residual blocks of layer4.
     """
-
     def __init__(
         self,
         initial_out_features: int,
@@ -30,82 +68,130 @@ class ResNet18Interval(CLModuleABC):
         interval_layer_kwargs: dict = None,
         head_type: str = "Normal",
         mask_past_classifier_neurons: bool = True,
-        head_kwargs: dict = {}
+        head_kwargs: dict = {},
+        insert_between_blocks: bool = False,
     ) -> None:
-        """
-        Initialize ResNet18Interval model.
-
-        Args:
-            initial_out_features (int): Number of output classes for the classifier.
-            dim_hidden (int): Number of hidden units in the MLP layer following the ResNet18 backbone.
-            interval_layer_kwargs (dict): Arguments for IntervalActivation layers 
-                                          (e.g., {'lower_percentile': 0.05, 'upper_percentile': 0.95}).
-            head_type (str): Type of incremental classifier head. Default is "Normal".
-            mask_past_classifier_neurons (bool): Whether to mask classifier neurons for old classes.
-            head_kwargs (dict): Additional keyword arguments for the incremental classifier.
-        """
         head = IncrementalClassifier(
-            in_features=dim_hidden,  
+            in_features=dim_hidden,
             initial_out_features=initial_out_features,
             head_type=head_type,
             mask_past_classifier_neurons=mask_past_classifier_neurons,
-            **head_kwargs
+            **head_kwargs,
         )
-        super().__init__(head) 
-        
+        super().__init__(head)
+
+        self.insert_between_blocks = insert_between_blocks
         if interval_layer_kwargs is None:
-            interval_layer_kwargs = {
-                'lower_percentile': 0.05,
-                'upper_percentile': 0.95
-            }
+            interval_layer_kwargs = {"lower_percentile": 0.05, "upper_percentile": 0.95}
 
-        # Load pretrained ResNet18
-        self.fe = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-        self.fe.fc = nn.Identity() 
+        self.fe = FlattenedResNet18FE()
+        self._insert_interval_activations(interval_layer_kwargs)
 
-        mlp_layers = [
-            IntervalActivation(512, **interval_layer_kwargs),
+        self.mlp = nn.Sequential(
             nn.Linear(512, dim_hidden),
-            IntervalActivation(dim_hidden, **interval_layer_kwargs)
-        ]
-        self.layers = nn.ModuleList(mlp_layers)
+            IntervalActivation(**interval_layer_kwargs),
+        )
 
-        # Freeze everything except the last ResNet block
         self.freeze_backbone()
 
+    def _insert_interval_activations(self, kwargs: dict) -> None:
+        """Dynamically adds IntervalActivation layers for use in the forward pass."""
+        # Intervals for the first block of layer4
+        self.interval_l4_0_conv1 = IntervalActivation(**kwargs)
+        self.interval_l4_0_bn1 = IntervalActivation(**kwargs)
+        self.interval_l4_0_conv2 = IntervalActivation(**kwargs)
+        self.interval_l4_0_bn2 = IntervalActivation(**kwargs)
+        self.interval_l4_0_downsample = IntervalActivation(**kwargs)
+        
+        # Intervals for the second block of layer4
+        self.interval_l4_1_conv1 = IntervalActivation(**kwargs)
+        self.interval_l4_1_bn1 = IntervalActivation(**kwargs)
+        self.interval_l4_1_conv2 = IntervalActivation(**kwargs)
+        self.interval_l4_1_bn2 = IntervalActivation(**kwargs)
+
+        if self.insert_between_blocks:
+            self.interval_l4_0_end = IntervalActivation(**kwargs)
+            self.interval_l4_1_end = IntervalActivation(**kwargs)
+
     def freeze_backbone(self) -> None:
-        """
-        Freeze all parameters in the ResNet18 backbone except the final block (`layer4`).
-        This keeps low-level features stable while allowing high-level adaptation.
-        """
+        """Freezes all parameters except those in layer4."""
         for name, param in self.fe.named_parameters():
             if not name.startswith("layer4"):
                 param.requires_grad = False
+       
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the flattened feature extractor."""
+        # --- Standard ResNet Layers ---
+        x = self.fe.conv1(x); x = self.fe.bn1(x); x = self.fe.relu(x); x = self.fe.maxpool(x)
+        # Layer 1
+        identity = x
+        out = self.fe.layer1_0_conv1(x); out = self.fe.layer1_0_bn1(out); out = self.fe.relu_int(out)
+        out = self.fe.layer1_0_conv2(out); out = self.fe.layer1_0_bn2(out)
+        out += identity; out = self.fe.final_relu(out)
+        identity = out
+        out = self.fe.layer1_1_conv1(out); out = self.fe.layer1_1_bn1(out); out = self.fe.relu_int(out)
+        out = self.fe.layer1_1_conv2(out); out = self.fe.layer1_1_bn2(out)
+        out += identity; x = self.fe.final_relu(out)
+        # Layer 2
+        identity = self.fe.layer2_0_downsample(x)
+        out = self.fe.layer2_0_conv1(x); out = self.fe.layer2_0_bn1(out); out = self.fe.relu_int(out)
+        out = self.fe.layer2_0_conv2(out); out = self.fe.layer2_0_bn2(out)
+        out += identity; out = self.fe.final_relu(out)
+        identity = out
+        out = self.fe.layer2_1_conv1(out); out = self.fe.layer2_1_bn1(out); out = self.fe.relu_int(out)
+        out = self.fe.layer2_1_conv2(out); out = self.fe.layer2_1_bn2(out)
+        out += identity; x = self.fe.final_relu(out)
+        # Layer 3
+        identity = self.fe.layer3_0_downsample(x)
+        out = self.fe.layer3_0_conv1(x); out = self.fe.layer3_0_bn1(out); out = self.fe.relu_int(out)
+        out = self.fe.layer3_0_conv2(out); out = self.fe.layer3_0_bn2(out)
+        out += identity; out = self.fe.final_relu(out)
+        identity = out
+        out = self.fe.layer3_1_conv1(out); out = self.fe.layer3_1_bn1(out); out = self.fe.relu_int(out)
+        out = self.fe.layer3_1_conv2(out); out = self.fe.layer3_1_bn2(out)
+        out += identity; x = self.fe.final_relu(out)
+
+        # --- Layer 4 with Interval Activations ---
+        # Block 4.0
+        identity = self.fe.layer4_0_downsample(x)
+        identity = self.interval_l4_0_downsample(identity)
+        out = self.fe.layer4_0_conv1(x)
+        out = self.interval_l4_0_conv1(out)
+        out = self.fe.layer4_0_bn1(out)
+        out = self.interval_l4_0_bn1(out)
+        out = self.fe.layer4_0_conv2(out)
+        out = self.interval_l4_0_conv2(out)
+        out = self.fe.layer4_0_bn2(out)
+        out = self.interval_l4_0_bn2(out)
+        out += identity
+        out = self.fe.final_relu(out)
+        if self.insert_between_blocks:
+            out = self.interval_l4_0_end(out)
+        
+        # Block 4.1
+        identity = out
+        out = self.fe.layer4_1_conv1(out)
+        out = self.interval_l4_1_conv1(out)
+        out = self.fe.layer4_1_bn1(out)
+        out = self.interval_l4_1_bn1(out)
+        out = self.fe.layer4_1_conv2(out)
+        out = self.interval_l4_1_conv2(out)
+        out = self.fe.layer4_1_bn2(out)
+        out = self.interval_l4_1_bn2(out)
+        out += identity
+        x = self.fe.final_relu(out)
+        if self.insert_between_blocks:
+            x = self.interval_l4_1_end(x)
+
+        # --- Final Pooling ---
+        x = self.fe.avgpool(x)
+        x = torch.flatten(x, 1)
+        return x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass through the network.
-
-        The input `x` passes sequentially through:
-            1. The ResNet18 feature extractor (`fe_layers`).
-            2. The MLP layers with IntervalActivation (`mlp_layers`).
-            3. The IncrementalClassifier head (`self.head`).
-
-        Grayscale images (1-channel) are automatically repeated to 3 channels.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width).
-
-        Returns:
-            torch.Tensor: Output logits from the classifier head.
-        """
-        
-        # Handle grayscale images by repeating the channel
         if x.size(1) == 1:
             x = x.repeat(1, 3, 1, 1)
         
-        x = self.fe(x)
-        for layer in self.layers:
-            x = layer(x)
-                
+        x = self.forward_features(x)
+        x = self.mlp(x)
         return self.head(x)
