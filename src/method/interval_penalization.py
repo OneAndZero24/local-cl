@@ -1,10 +1,10 @@
 import logging
 from copy import deepcopy
 from typing import Tuple
-from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from src.method.method_plugin_abc import MethodPluginABC
 
@@ -41,7 +41,7 @@ class IntervalPenalization(MethodPluginABC):
         var_scale (float): Weight of the variance regularizer.
         output_reg_scale (float): Weight of the output preservation term.
         interval_drift_reg_scale (float): Weight of the drift regularizer.
-        task_id (int): Identifier of the current task.
+        task_id (int): Identifier for the current task.
         params_buffer (dict): Snapshot of frozen parameters from the previous task.
         old_state (dict): Full parameter/buffer snapshot used for drift comparison.
         use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
@@ -153,6 +153,8 @@ class IntervalPenalization(MethodPluginABC):
             self.old_interval_to_param = self._map_interval_to_nearest_param(self.old_module)
             self.curr_interval_to_param = self._map_interval_to_nearest_param(self.module)
 
+            self.old_interval_act_layers = [module for _, module in self.old_module.named_modules() if type(module).__name__ == "IntervalActivation"]
+
             interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
 
             activation_buffers = {}
@@ -169,6 +171,8 @@ class IntervalPenalization(MethodPluginABC):
             with torch.no_grad():
                 for x in self.data_buffer:
                     x = x.to(next(self.module.parameters()).device)
+                    if x.size(0) == 1:
+                        x = x.repeat(2, 1, 1, 1)
                     _ = self.module(x)
 
             for idx, layer in enumerate(interval_act_layers):
@@ -233,7 +237,7 @@ class IntervalPenalization(MethodPluginABC):
                 
                 # Output reg for the nearest upper layer
                 curr_target = self.curr_interval_to_param.get(layer, None)
-                old_target = self.old_interval_to_param.get(layer, None)
+                old_target = self.old_interval_to_param.get(self.old_interval_act_layers[idx], None)
 
                 if curr_target is not None and old_target is not None:
 
@@ -254,10 +258,23 @@ class IntervalPenalization(MethodPluginABC):
                                 lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
                                 upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
                             elif isinstance(curr_target, nn.Conv2d):
-                                effective_pos = weight_diff_pos.sum(dim=(2, 3))
-                                effective_neg = weight_diff_neg.sum(dim=(2, 3))
-                                lower_bound_reg += (effective_pos @ lb - effective_neg @ ub).sum()
-                                upper_bound_reg += (effective_pos @ ub - effective_neg @ lb).sum()
+                                lb_view = lb.view(1, -1, 1, 1) if lb.dim() == 1 else lb
+                                ub_view = ub.view(1, -1, 1, 1) if ub.dim() == 1 else ub
+
+                                conv_kwargs = {
+                                            "stride": curr_target.stride,
+                                            "padding": curr_target.padding,
+                                            "dilation": curr_target.dilation,
+                                            "groups": curr_target.groups,
+                                        }
+
+                                lower = F.conv2d(lb_view, weight_diff_pos, None, **conv_kwargs).sum()
+                                lower -= F.conv2d(ub_view, weight_diff_neg, None, **conv_kwargs).sum()
+                                upper = F.conv2d(ub_view, weight_diff_pos, None, **conv_kwargs).sum()
+                                upper -= F.conv2d(lb_view, weight_diff_neg, None, **conv_kwargs).sum()
+
+                                lower_bound_reg += lower
+                                upper_bound_reg += upper
                             elif isinstance(curr_target, nn.BatchNorm2d):
                                 n_lb = (lb - old_target.running_mean) / torch.sqrt(old_target.running_var + old_target.eps)
                                 n_ub = (ub - old_target.running_mean) / torch.sqrt(old_target.running_var + old_target.eps)
@@ -272,22 +289,22 @@ class IntervalPenalization(MethodPluginABC):
 
                     output_reg_loss += lower_bound_reg.pow(2) + upper_bound_reg.pow(2)
 
-                if self.use_hypercube_dist_loss:
-                    prev_center = (ub + lb) / 2.0
-                    prev_radii  = (ub - lb) / 2.0
+                # if self.use_hypercube_dist_loss:
+                #     prev_center = (ub + lb) / 2.0
+                #     prev_radii  = (ub - lb) / 2.0
                     
-                    lb_prev_hypercube = prev_center - prev_radii
-                    ub_prev_hypercube = prev_center + prev_radii
+                #     lb_prev_hypercube = prev_center - prev_radii
+                #     ub_prev_hypercube = prev_center + prev_radii
 
-                    new_lb, _ = acts_flat.min(dim=0)
-                    new_ub, _ = acts_flat.max(dim=0)
+                #     new_lb, _ = acts_flat.min(dim=0)
+                #     new_ub, _ = acts_flat.max(dim=0)
 
-                    non_overlap_mask = (new_lb > ub_prev_hypercube) | (new_ub < lb_prev_hypercube)
-                    new_center = (new_ub + new_lb) / 2.0
+                #     non_overlap_mask = (new_lb > ub_prev_hypercube) | (new_ub < lb_prev_hypercube)
+                #     new_center = (new_ub + new_lb) / 2.0
 
-                    center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
+                #     center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
 
-                    hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
+                #     hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
 
 
         loss = (
