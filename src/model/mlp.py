@@ -17,13 +17,13 @@ class MLP(CLModuleABC):
     Args:
         initial_out_features (int): The number of output features for the initial layer.
         sizes (list[int]): A list of integers representing the sizes of each layer.
-        layers (list[str]): A list of strings representing the type of each layer.
+        mlp (list[str]): A list of strings representing the type of each layer.
         head_type (str, optional): The type of the head layer. Defaults to "Normal".
         activation (nn.Module, optional): The activation function to use between layers. Defaults to nn.Tanh().
         **kwargs: Additional keyword arguments for layer instantiation.
 
     Attributes:
-        layers (nn.ModuleList): A list of instantiated layers.
+        mlp (nn.ModuleList): A list of instantiated layers.
 
     Methods:
         forward(x):
@@ -95,11 +95,11 @@ class MLP(CLModuleABC):
             layer_cfg = (config[i] if i < len(config) else config[-1]) if list_config else config
             layers.append(instantiate(lt, in_size, out_size, **layer_cfg))
             try:
-                layers.append(activation(out_size))
+                layers.append(activation())
             except TypeError:
                 layers.append(activation)
             
-        self.layers = nn.ModuleList(layers)
+        self.mlp = nn.ModuleList(layers)
         
     def forward(self, x):
         """
@@ -115,9 +115,7 @@ class MLP(CLModuleABC):
         self.reset_activations()
 
         x = torch.flatten(x, start_dim=1)
-        for layer in self.layers:
+        for layer in self.mlp:
             x = layer(x)
-            if not isinstance(layer, IntervalActivation):
-                self.add_activation(layer, x) 
 
         return self.head(x)

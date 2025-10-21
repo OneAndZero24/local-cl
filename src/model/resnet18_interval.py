@@ -5,6 +5,7 @@ from .cl_module_abc import CLModuleABC
 from .layer.interval_activation import IntervalActivation
 from .inc_classifier import IncrementalClassifier
 
+from typing import Tuple, Union
 
 class FlattenedResNet18FE(nn.Module):
     """A flattened ResNet-18 feature extractor."""
@@ -50,8 +51,6 @@ class FlattenedResNet18FE(nn.Module):
         self.avgpool = original_model.avgpool
         self.final_relu = nn.ReLU(inplace=True)
         self.relu_int = nn.ReLU(inplace=True)
-    
-
 
 class ResNet18Interval(CLModuleABC):
     """
@@ -88,6 +87,7 @@ class ResNet18Interval(CLModuleABC):
         self._insert_interval_activations(interval_layer_kwargs)
 
         self.mlp = nn.Sequential(
+            IntervalActivation(**interval_layer_kwargs),
             nn.Linear(512, dim_hidden),
             IntervalActivation(**interval_layer_kwargs),
         )
@@ -114,13 +114,33 @@ class ResNet18Interval(CLModuleABC):
             self.interval_l4_1_end = IntervalActivation(**kwargs)
 
     def freeze_backbone(self) -> None:
-        """Freezes all parameters except those in layer4."""
+        """Freezes all parameters except those in layer4 and interval layers."""
         for name, param in self.fe.named_parameters():
             if not name.startswith("layer4"):
                 param.requires_grad = False
-       
-    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the flattened feature extractor."""
+        # Ensure interval layers related to layer4 are trainable
+        for name, param in self.named_parameters():
+            if name.startswith("interval_l4"):
+                 param.requires_grad = True
+
+    def forward_features(
+        self,
+        x: torch.Tensor,
+        return_first_interval_activation: bool = False
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Forward pass through the flattened feature extractor.
+        If `return_first_interval_activation=True`, returns a tuple:
+            (features, first_interval_activation)
+        """
+        first_interval_activation = None
+
+        def capture_interval_activation(tensor):
+            nonlocal first_interval_activation
+            if first_interval_activation is None:
+                first_interval_activation = tensor.detach()
+            return tensor
+
         # --- Standard ResNet Layers ---
         x = self.fe.conv1(x); x = self.fe.bn1(x); x = self.fe.relu(x); x = self.fe.maxpool(x)
         # Layer 1
@@ -154,44 +174,57 @@ class ResNet18Interval(CLModuleABC):
         # --- Layer 4 with Interval Activations ---
         # Block 4.0
         identity = self.fe.layer4_0_downsample(x)
-        identity = self.interval_l4_0_downsample(identity)
+        identity = capture_interval_activation(self.interval_l4_0_downsample(identity))
         out = self.fe.layer4_0_conv1(x)
-        out = self.interval_l4_0_conv1(out)
+        out = capture_interval_activation(self.interval_l4_0_conv1(out))
         out = self.fe.layer4_0_bn1(out)
-        out = self.interval_l4_0_bn1(out)
+        out = capture_interval_activation(self.interval_l4_0_bn1(out))
         out = self.fe.layer4_0_conv2(out)
-        out = self.interval_l4_0_conv2(out)
+        out = capture_interval_activation(self.interval_l4_0_conv2(out))
         out = self.fe.layer4_0_bn2(out)
-        out = self.interval_l4_0_bn2(out)
+        out = capture_interval_activation(self.interval_l4_0_bn2(out))
         out += identity
         out = self.fe.final_relu(out)
         if self.insert_between_blocks:
-            out = self.interval_l4_0_end(out)
+            out = capture_interval_activation(self.interval_l4_0_end(out))
         
         # Block 4.1
         identity = out
         out = self.fe.layer4_1_conv1(out)
-        out = self.interval_l4_1_conv1(out)
+        out = capture_interval_activation(self.interval_l4_1_conv1(out))
         out = self.fe.layer4_1_bn1(out)
-        out = self.interval_l4_1_bn1(out)
+        out = capture_interval_activation(self.interval_l4_1_bn1(out))
         out = self.fe.layer4_1_conv2(out)
-        out = self.interval_l4_1_conv2(out)
+        out = capture_interval_activation(self.interval_l4_1_conv2(out))
         out = self.fe.layer4_1_bn2(out)
-        out = self.interval_l4_1_bn2(out)
+        out = capture_interval_activation(self.interval_l4_1_bn2(out))
         out += identity
         x = self.fe.final_relu(out)
         if self.insert_between_blocks:
-            x = self.interval_l4_1_end(x)
+            x = capture_interval_activation(self.interval_l4_1_end(x))
 
         # --- Final Pooling ---
         x = self.fe.avgpool(x)
         x = torch.flatten(x, 1)
+
+        if return_first_interval_activation:
+            return x, first_interval_activation
         return x
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        return_first_interval_activation: bool = False
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         if x.size(1) == 1:
             x = x.repeat(1, 3, 1, 1)
-        
-        x = self.forward_features(x)
-        x = self.mlp(x)
-        return self.head(x)
+
+        feats = self.forward_features(x, return_first_interval_activation=return_first_interval_activation)
+        if return_first_interval_activation:
+            feats, first_interval_activation = feats
+            feats = self.mlp(feats)
+            out = self.head(feats)
+            return out, first_interval_activation
+        else:
+            feats = self.mlp(feats)
+            return self.head(feats)

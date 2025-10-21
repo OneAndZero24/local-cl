@@ -4,11 +4,13 @@ from typing import Tuple
 from collections import OrderedDict
 
 import torch
+import torch.nn as nn
 
 from src.method.method_plugin_abc import MethodPluginABC
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
+
 
 class IntervalPenalization(MethodPluginABC):
     """
@@ -44,7 +46,7 @@ class IntervalPenalization(MethodPluginABC):
         old_state (dict): Full parameter/buffer snapshot used for drift comparison.
         use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
                                                       representations close to each other.
-        data_buffer (set): A buffer to store data samples.
+        data_buffer (list): A buffer to store data samples.
         regularize_classifier (bool): If True, the classifier head is regularized. Default: False.
 
     Methods:
@@ -95,58 +97,31 @@ class IntervalPenalization(MethodPluginABC):
         self.dil_mode = dil_mode
         self.regularize_classifier = regularize_classifier
         self.params_buffer = {}
-        self.data_buffer = set()
+        self.data_buffer = []
+        self.old_module = None
 
-    def forward_with_snapshot(self, x: torch.Tensor, stop_at: str="IntervalActivation") -> torch.Tensor:
+    def forward_with_snapshot(self, x: torch.Tensor) -> torch.Tensor:
         """
         Runs the model forward using parameters and buffers from the previous task snapshot.  
         Used to compare new activations with old-task activations.
 
         Args:
             x (torch.Tensor): Input tensor.
-            stop_at (str, optional): Layer type name at which to stop the forward pass.
-                                     Default is "IntervalActivation".
 
         Returns:
             torch.Tensor: Activations at the stopping point with old parameters/buffers.
         """
-        saved_param_datas = {name: param.data for name, param in self.module.named_parameters()}
-        saved_buffers = {name: buf for name, buf in self.module.named_buffers()}
-
-        for name, param in self.module.named_parameters():
-            param.data = self.old_state["params"][name].clone()
+        if hasattr(self.old_module, "fe"):
+            with torch.no_grad():
+                _, out = self.old_module.forward(x, return_first_interval_activation=True)
+        else:
+            out = x.flatten(start_dim=1)
+            for layer in self.old_module.mlp:
+                out = layer(out)
+                if type(layer).__name__ == "IntervalActivation":
+                    break
         
-        for name, buf in self.module.named_buffers():
-            self.module._buffers[name] = self.old_state["buffers"][name].clone()
-
-        out = x
-        for layer in self.module.layers:
-            out = layer(out)
-            if type(layer).__name__ == stop_at:
-                break
-
-        for name, param in self.module.named_parameters():
-            param.data = saved_param_datas[name]
-        
-        for name, buf in self.module.named_buffers():
-            self.module._buffers[name] = saved_buffers[name]
-
         return out.detach()
-
-    @torch.no_grad()
-    def snapshot_state(self) -> dict:
-        """
-        Take a full snapshot of the current model state.  
-        Stores both parameters and buffers (detached & cloned).  
-
-        Returns:
-            dict: {"params": OrderedDict, "buffers": OrderedDict}
-        """
-        return {
-            "params": OrderedDict((k, v.detach().clone()) for k, v in self.module.named_parameters()),
-            "buffers": OrderedDict((k, v.detach().clone()) for k, v in self.module.named_buffers()),
-        }
-
 
     def setup_task(self, task_id: int) -> None:
         """
@@ -164,46 +139,45 @@ class IntervalPenalization(MethodPluginABC):
         self.task_id = task_id
         if task_id > 0:
             self.params_buffer = {}
-            for name, p in deepcopy(list(self.module.named_parameters())):
-                if p.requires_grad:
-                    p.requires_grad = False
-                    self.params_buffer[name] = p.detach().clone()
-            self.old_state = self.snapshot_state()
 
-            if hasattr(self.module, "fe"):
-                self.old_fe = deepcopy(self.module.fe)
-                for p in self.old_fe.parameters():
-                    p.requires_grad = False
-                self.old_fe.eval()
+            for module in self.module.modules():
+                if type(module).__name__ == "IntervalActivation":
+                    del module.curr_task_last_batch
+
+            self.old_module = deepcopy(self.module)
+            self.old_module.eval()
+            for name, p in self.old_module.named_parameters():
+                p.requires_grad = False
+                self.params_buffer[name] = p.detach().clone()
+
+            self.old_interval_to_param = self._map_interval_to_nearest_param(self.old_module)
+            self.curr_interval_to_param = self._map_interval_to_nearest_param(self.module)
+
+            interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
 
             activation_buffers = {}
             hook_handles = []
+            for idx, layer in enumerate(interval_act_layers):
+                activation_buffers[idx] = []
 
-            for idx, layer in enumerate(self.module.layers + [self.module.head]):
-                if type(layer).__name__ == "IntervalActivation":
-                    activation_buffers[idx] = []
+                def hook(module, input, output, idx=idx):
+                    activation_buffers[idx].append(output.detach())
+                
+                handle = layer.register_forward_hook(hook)
+                hook_handles.append(handle)
 
-                    def hook(module, input, output, idx=idx):
-                        activation_buffers[idx].append(output.detach())
-                    
-                    handle = layer.register_forward_hook(hook)
-                    hook_handles.append(handle)
-
-            self.module.eval()
             with torch.no_grad():
                 for x in self.data_buffer:
                     x = x.to(next(self.module.parameters()).device)
                     _ = self.module(x)
 
-            for idx, layer in enumerate(self.module.layers + [self.module.head]):
-                if type(layer).__name__ == "IntervalActivation":
-                    layer.reset_range(activation_buffers[idx])
+            for idx, layer in enumerate(interval_act_layers):
+                layer.reset_range(activation_buffers[idx])
 
             for handle in hook_handles:
                 handle.remove()
 
-        self.module.train()
-        self.data_buffer = set()
+        self.data_buffer = []
                     
     def forward(self, x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, 
                 preds: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
@@ -225,10 +199,9 @@ class IntervalPenalization(MethodPluginABC):
             (loss, preds): Updated loss with added penalties, predictions unchanged.
         """
 
-        self.data_buffer.add(x)
+        self.data_buffer.append(x.detach())
 
-        layers = self.module.layers + [self.module.head]
-        interval_act_layers = [layer for layer in layers if type(layer).__name__ == "IntervalActivation"]
+        interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
 
         var_loss = torch.tensor(0.0, device=x.device)
         output_reg_loss = torch.tensor(0.0, device=x.device)
@@ -249,53 +222,55 @@ class IntervalPenalization(MethodPluginABC):
 
                 # Drift only at the FIRST IntervalActivation
                 if idx == 0:
-
                     if hasattr(self.module, "fe"):
-                        y_old = self.old_fe(x)
-                    else:
-                        x = x.flatten(start_dim=1)
                         y_old = self.forward_with_snapshot(x)
+                    else:
+                        y_old = self.forward_with_snapshot(x.flatten(start_dim=1))
                     mask = ((acts >= lb) & (acts <= ub)).float()
                     interval_drift_loss += (
                         (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
                     )
                 
-                # Regularize all layers above
-                if hasattr(self.module, "fe"):
-                    next_layer = layers[2*idx+1]
-                else:
-                    next_layer = layers[2*idx+2]
+                # Output reg for the nearest upper layer
+                curr_target = self.curr_interval_to_param.get(layer, None)
+                old_target = self.old_interval_to_param.get(layer, None)
 
-                if isinstance(next_layer, torch.nn.Linear):
-                    target_module = next_layer
-                elif (self.regularize_classifier or self.dil_mode) and hasattr(next_layer, "classifier"):
-                    target_module = next_layer.classifier
-                else:
-                    target_module = None
+                if curr_target is not None and old_target is not None:
 
-                if target_module is not None:
+                    # Handle classifier if applicable
+                    if (self.regularize_classifier or self.dil_mode) and hasattr(curr_target, "classifier"):
+                        curr_target = curr_target.classifier
+                        old_target = old_target.classifier
+
                     lower_bound_reg = 0.0
                     upper_bound_reg = 0.0
-                    for name, p in target_module.named_parameters():
-                        for mod_name, mod_param in self.module.named_parameters():
-                            if mod_param is p and mod_name in self.params_buffer:
-                                prev_param = self.params_buffer[mod_name]
-                                if "weight" in name:
-                                    weight_diff = p - prev_param
+                    for (param_name, p_curr), (_, p_old) in zip(curr_target.named_parameters(), old_target.named_parameters()):
+                        weight_diff = p_curr - p_old
+                        weight_diff_pos = torch.relu(weight_diff)
+                        weight_diff_neg = torch.relu(-weight_diff)
 
-                                    weight_diff_pos = torch.relu(weight_diff)
-                                    weight_diff_neg = torch.relu(-weight_diff)
+                        if "weight" in param_name:
+                            if isinstance(curr_target, nn.Linear):
+                                lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
+                                upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
+                            elif isinstance(curr_target, nn.Conv2d):
+                                effective_pos = weight_diff_pos.sum(dim=(2, 3))
+                                effective_neg = weight_diff_neg.sum(dim=(2, 3))
+                                lower_bound_reg += (effective_pos @ lb - effective_neg @ ub).sum()
+                                upper_bound_reg += (effective_pos @ ub - effective_neg @ lb).sum()
+                            elif isinstance(curr_target, nn.BatchNorm2d):
+                                n_lb = (lb - old_target.running_mean) / torch.sqrt(old_target.running_var + old_target.eps)
+                                n_ub = (ub - old_target.running_mean) / torch.sqrt(old_target.running_var + old_target.eps)
+                                pos = weight_diff_pos.squeeze()
+                                neg = weight_diff_neg.squeeze()
+                                lower_bound_reg += (pos * n_lb - neg * n_ub).sum()
+                                upper_bound_reg += (pos * n_ub - neg * n_lb).sum()
+                        elif "bias" in param_name:
+                            bias_diff = p_curr - p_old
+                            lower_bound_reg += bias_diff.sum()
+                            upper_bound_reg += bias_diff.sum()
 
-                                    lower_bound_reg += weight_diff_pos @ lb - weight_diff_neg @ ub
-                                    upper_bound_reg += weight_diff_pos @ ub - weight_diff_neg @ lb
-
-                                elif "bias" in name:
-                                    bias_diff = p - prev_param
-
-                                    lower_bound_reg += bias_diff
-                                    upper_bound_reg += bias_diff
-
-                    output_reg_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
+                    output_reg_loss += lower_bound_reg.pow(2) + upper_bound_reg.pow(2)
 
                 if self.use_hypercube_dist_loss:
                     prev_center = (ub + lb) / 2.0
@@ -312,7 +287,7 @@ class IntervalPenalization(MethodPluginABC):
 
                     center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
 
-                    hypercube_dist_loss = center_loss / (prev_radii.mean() + 1e-8)
+                    hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
 
 
         loss = (
@@ -323,3 +298,46 @@ class IntervalPenalization(MethodPluginABC):
             + hypercube_dist_loss
         )
         return loss, preds
+    
+    def _map_interval_to_nearest_param(self, module: nn.Module) -> dict:
+        """
+        Map each IntervalActivation layer to the nearest learnable layer directly above it.
+
+        A "learnable layer" is one of:
+            - nn.Conv2d
+            - nn.BatchNorm1d / nn.BatchNorm2d
+            - nn.Linear
+
+        Returns:
+            dict: mapping {IntervalActivation: nearest parameterized layer or None}
+        """
+        if hasattr(module, 'fe'):
+            # ResNet architecture
+            m = module
+            mapping = {
+                m.interval_l4_0_conv1: m.fe.layer4_0_bn1,
+                m.interval_l4_0_bn1: m.fe.layer4_0_conv2,
+                m.interval_l4_0_conv2: m.fe.layer4_0_bn2,
+                m.interval_l4_1_conv1: m.fe.layer4_1_bn1,
+                m.interval_l4_1_bn1: m.fe.layer4_1_conv2,
+                m.interval_l4_1_conv2: m.fe.layer4_1_bn2,
+                m.mlp[0]: m.mlp[1],
+                m.mlp[2]: m.head,
+            }
+            if hasattr(m, 'interval_l4_0_downsample'):
+                mapping[m.interval_l4_0_downsample] = None  # No immediate parameterized layer
+            if m.insert_between_blocks:
+                mapping[m.interval_l4_0_end] = m.fe.layer4_1_conv1
+                mapping[m.interval_l4_1_end] = m.mlp[1]
+            # For bn2 layers without insert_between_blocks, set to next conv or linear
+            if not m.insert_between_blocks:
+                mapping[m.interval_l4_0_bn2] = m.fe.layer4_1_conv1
+                mapping[m.interval_l4_1_bn2] = m.mlp[1]
+        else:
+            # MLP architecture
+            m = module
+            mapping = {
+                m.mlp[0]: m.mlp[1],
+                m.mlp[2]: m.head
+            }
+        return mapping

@@ -179,6 +179,8 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
         if log_per_batch and not quiet:
             wandb.log({f'Loss/train/{task_id}/per_batch': loss})
 
+        break
+
     avg_loss /= len(dataloader)
     if not quiet:
         wandb.log({f'Loss/train/{task_id}': avg_loss})
@@ -210,6 +212,7 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             if gen_cm:
                 y_total.extend(y.cpu().numpy())
                 preds_total.extend(preds.cpu().numpy())
+            break
 
         avg_loss /= len(dataloader)
         if not quiet:

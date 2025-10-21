@@ -14,4 +14,4 @@ plugins:
     interval_drift_reg_scale: 10000000000.0
     use_hypercube_dist_loss: True
     dil_mode: False
-    regularize_classifier: True
+    regularize_classifier: False
