@@ -3,7 +3,7 @@ defaults:
   - dataset: sin_regression
   - scenario: regression
   - model: mlp_regression
-  - method: composer_interval_penalization
+  - method: composer_interval_penalization_regression
 
 exp:
   run_func:
@@ -30,6 +30,3 @@ fabric:
 wandb:
   entity: ${oc.env:WANDB_ENTITY}
   project: ${oc.env:WANDB_PROJECT}
-
-method:
-  criterion: L2DistanceLoss
