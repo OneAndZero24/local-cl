@@ -51,8 +51,7 @@ class SyntheticRegressionDataset(Dataset):
         # Add noise
         if noise_std > 0:
             self.y += rng.normal(0, noise_std, n_samples).astype(np.float32)
-        
-        self.data_type = "numpy"
+
         self.bounding_boxes = None
         
     def __len__(self):
@@ -120,7 +119,6 @@ class SyntheticRegressionScenario:
                 t_task,
                 trsf=None,
                 target_trsf=None,
-                data_type="numpy",
             )
             
             # Add custom attributes for visualization
