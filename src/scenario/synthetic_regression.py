@@ -129,7 +129,7 @@ class SyntheticRegressionScenario:
 
 
 def get_sin_regression_scenario(x_max=5*np.pi, n_tasks=5, n_samples=1000, 
-                                 noise_std=0.1, overlap=0.0, seed=42):
+                                 noise_std=0.1, overlap=0.0, seed=42, train=True):
     """
     Factory function for creating a sine wave regression scenario.
     
@@ -140,25 +140,22 @@ def get_sin_regression_scenario(x_max=5*np.pi, n_tasks=5, n_samples=1000,
         noise_std: Standard deviation of noise
         overlap: Fraction of overlap between tasks
         seed: Random seed
+        train: Whether this is for training (affects random seed)
         
     Returns:
-        Callable that takes train parameter and returns scenario
+        SyntheticRegressionScenario instance
     """
+    # Sine function
+    func = lambda x: np.sin(x)
     
-    def scenario_fn(train=True):
-        # Sine function
-        func = lambda x: np.sin(x)
-        
-        # Create dataset
-        dataset = SyntheticRegressionDataset(
-            func=func,
-            x_range=(0, x_max),
-            n_samples=n_samples,
-            noise_std=noise_std,
-            seed=seed if train else seed + 1
-        )
-        
-        # Create scenario
-        return SyntheticRegressionScenario(dataset, n_tasks=n_tasks, overlap=overlap)
+    # Create dataset
+    dataset = SyntheticRegressionDataset(
+        func=func,
+        x_range=(0, x_max),
+        n_samples=n_samples,
+        noise_std=noise_std,
+        seed=seed if train else seed + 1
+    )
     
-    return scenario_fn
+    # Create scenario
+    return SyntheticRegressionScenario(dataset, n_tasks=n_tasks, overlap=overlap)
