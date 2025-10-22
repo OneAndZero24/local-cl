@@ -1,6 +1,5 @@
 program: src/main.py
 method: bayes
-run_cap: 5
 metric:
   name: avg_acc
   goal: maximize
@@ -9,17 +8,17 @@ parameters:
   dataset:
     value: mnist
   scenario:
-    value: class_inc
+    value: domain_inc
   model:
     value: mlp
   method:
-    value: composer_lwf
+    value: composer_ewc
   exp.seed: 
-    values: [42, 69, 2137, 0, 10]      
+    value: 42      
   exp.batch_size:
-    value: 512 
+    values: [512, 256, 128]    
   exp.epochs: 
-    value: 5
+    values: [5, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -30,14 +29,17 @@ parameters:
     value: False
   exp.cleanup:
     value: True
+  exp.dil:
+    value: True
+
 
   # Scenario configuration
   scenario._partial_:
     value: True
   scenario._target_:
-    value: continuum.ClassIncremental
+    value: scenario.DomainIncremental
   scenario.increment:
-    value: 2  
+    value: 2
 
   # Model configuration
   model._target_: 
@@ -53,37 +55,41 @@ parameters:
   model.activation: 
     value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
-    value: False
-  exp.dil:
-    value: False
+    value: False 
 
   # Method configuration
   method._partial_: 
     value: True
-  method.use_dynamic_alpha: 
-    value: False
   method._target_: 
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
   method.criterion_scale:
-    value: 1.0
+    distribution: uniform
+    min: 0.00000001
+    max: 1.0
+  
   method.lr: 
-    value: 0.00012830009278145548
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
   method.ema_scale:
     value: 0.95
 
   method.plugins.0._target_:
-    value: method.LwF
-  method.plugins.0.T:
-    value: 0.6214754331504223
-  method.plugins.0.alpha:
-    value: 0.758663165520897
+    value: method.EWC
+  method.plugins.0.alpha: 
+    distribution: uniform      
+    min: 100
+    max: 10000
+  method.plugins.0.head_opt:
+    value: True
+
 
 command:
   - ${env}
   - python
   - ${program}
   - --config-name
-  - lwf_split_mnist_mlp.yaml
+  - ewc_split_mnist_mlp.yaml
   - ${args_no_hyphens}

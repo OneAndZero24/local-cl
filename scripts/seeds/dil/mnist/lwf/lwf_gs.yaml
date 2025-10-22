@@ -1,6 +1,5 @@
 program: src/main.py
 method: bayes
-run_cap: 5
 metric:
   name: avg_acc
   goal: maximize
@@ -9,17 +8,17 @@ parameters:
   dataset:
     value: mnist
   scenario:
-    value: class_inc
+    value: domain_inc
   model:
     value: mlp
   method:
     value: composer_lwf
   exp.seed: 
-    values: [42, 69, 2137, 0, 10]      
+    value: 42      
   exp.batch_size:
-    value: 512 
+    values: [512, 256, 128]    
   exp.epochs: 
-    value: 5
+    values: [5, 10]
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -35,7 +34,7 @@ parameters:
   scenario._partial_:
     value: True
   scenario._target_:
-    value: continuum.ClassIncremental
+    value: scenario.DomainIncremental
   scenario.increment:
     value: 2  
 
@@ -55,7 +54,7 @@ parameters:
   model.mask_past_classifier_neurons:
     value: False
   exp.dil:
-    value: False
+    value: True
 
   # Method configuration
   method._partial_: 
@@ -69,16 +68,22 @@ parameters:
   method.criterion_scale:
     value: 1.0
   method.lr: 
-    value: 0.00012830009278145548
+    distribution: log_uniform_values 
+    min: 0.0001
+    max: 0.01
   method.ema_scale:
     value: 0.95
-
   method.plugins.0._target_:
     value: method.LwF
   method.plugins.0.T:
-    value: 0.6214754331504223
+    distribution: uniform      
+    min: 0.5
+    max: 4.0
   method.plugins.0.alpha:
-    value: 0.758663165520897
+    distribution: uniform      
+    min: 0.1
+    max: 0.9
+
 
 command:
   - ${env}
