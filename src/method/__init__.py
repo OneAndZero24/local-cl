@@ -6,4 +6,5 @@ from .si import SI
 from .sharpening import Sharpening
 from .dreaming import Dreaming
 from .dynamic_loss_scaling import DynamicScaling
-from .interval_penalization import IntervalPenalization
+from .interval_penalization_resnet18 import ResNet18IntervalPenalization
+from .interval_penalization_mlp import MLPIntervalPenalization

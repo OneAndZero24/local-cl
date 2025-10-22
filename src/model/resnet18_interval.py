@@ -161,13 +161,14 @@ class ResNet18Interval(CLModuleABC):
         # Block 4.0
         identity = self.fe.layer4_0_downsample[0](x)
         identity = self.interval_l4_0_downsample_0(identity)
+        identity_first_interval_activation = identity.clone()
 
         identity = self.fe.layer4_0_downsample[1](identity)
         identity = self.interval_l4_0_downsample_1(identity)
-        identity_first_interval_activation = identity.clone()
 
         out = self.fe.layer4_0_conv1(x)
         out = self.interval_l4_0_conv1(out)
+        layer4_0_first_interval_activation = out.clone()
 
         out = self.fe.layer4_0_bn1(out)
         out = self.interval_l4_0_bn1(out)
@@ -177,8 +178,6 @@ class ResNet18Interval(CLModuleABC):
 
         out = self.fe.layer4_0_bn2(out)
         out = self.interval_l4_0_bn2(out)
-        
-        layer4_0_first_interval_activation = out.clone()
 
         out += identity
         out = self.fe.final_relu(out)
