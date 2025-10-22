@@ -17,7 +17,7 @@ parameters:
   exp.seed: 
     values: [42, 69, 2137, 0, 10]  
   exp.batch_size:
-    value: 128
+    value: 512
   exp.epochs: 
     value: 5
   exp.gen_cm: 
@@ -69,13 +69,13 @@ parameters:
   method.criterion_scale:
     value: 1.0
   method.lr: 
-    value: 0.0014627026457083294
+    value: 0.0004798790225073533
   method.ema_scale:
     value: 0.95
   method.plugins.0._target_:
     value: method.MAS
   method.plugins.0.alpha: 
-    value: 662.6165643649695
+    value: 959.7471181657532
   method.plugins.0.head_opt:
     value: True
 
