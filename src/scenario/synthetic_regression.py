@@ -7,9 +7,13 @@ of a continuous function (e.g., sine wave).
 """
 
 import numpy as np
-import torch
 from torch.utils.data import Dataset
 from continuum.tasks import TaskSet
+
+
+def sin_function(x):
+    """Sine function for regression."""
+    return np.sin(x)
 
 
 class SyntheticRegressionDataset(Dataset):
@@ -17,23 +21,32 @@ class SyntheticRegressionDataset(Dataset):
     Synthetic regression dataset based on a mathematical function.
     
     Args:
-        func: Callable that takes x values and returns y values
-        x_range: Tuple of (min, max) for the input range
+        func: Callable that takes x values and returns y values (or a Hydra instantiated object)
+        x_range: List/Tuple of [min, max] for the input range
         n_samples: Number of samples to generate
         noise_std: Standard deviation of Gaussian noise to add to targets
         seed: Random seed for reproducibility
+        train: Whether this is training data (for compatibility, uses same data)
     """
     
-    def __init__(self, func, x_range, n_samples=1000, noise_std=0.1, seed=42):
-        self.func = func
-        self.x_range = x_range
+    def __init__(self, func, x_range, n_samples=1000, noise_std=0.1, seed=42, train=True):
+        # Handle Hydra instantiation - func might be the actual function or need to be called
+        if callable(func):
+            self.func = func
+        else:
+            self.func = func  # Already instantiated
+            
+        self.x_range = tuple(x_range) if isinstance(x_range, list) else x_range
         self.n_samples = n_samples
         self.noise_std = noise_std
         
+        # Use different seed for test to get different noise realizations
+        actual_seed = seed if train else seed + 1000
+        
         # Generate data
-        rng = np.random.RandomState(seed)
+        rng = np.random.RandomState(actual_seed)
         self.x = np.linspace(x_range[0], x_range[1], n_samples, dtype=np.float32)
-        self.y = func(self.x).astype(np.float32)
+        self.y = self.func(self.x).astype(np.float32)
         
         # Add noise
         if noise_std > 0:
@@ -126,36 +139,3 @@ class SyntheticRegressionScenario:
     def __iter__(self):
         self._create_tasks()
         return iter(self._tasks)
-
-
-def get_sin_regression_scenario(x_max=5*np.pi, n_tasks=5, n_samples=1000, 
-                                 noise_std=0.1, overlap=0.0, seed=42, train=True):
-    """
-    Factory function for creating a sine wave regression scenario.
-    
-    Args:
-        x_max: Maximum x value (in multiples of pi)
-        n_tasks: Number of tasks to split into
-        n_samples: Total number of samples
-        noise_std: Standard deviation of noise
-        overlap: Fraction of overlap between tasks
-        seed: Random seed
-        train: Whether this is for training (affects random seed)
-        
-    Returns:
-        SyntheticRegressionScenario instance
-    """
-    # Sine function
-    func = lambda x: np.sin(x)
-    
-    # Create dataset
-    dataset = SyntheticRegressionDataset(
-        func=func,
-        x_range=(0, x_max),
-        n_samples=n_samples,
-        noise_std=noise_std,
-        seed=seed if train else seed + 1
-    )
-    
-    # Create scenario
-    return SyntheticRegressionScenario(dataset, n_tasks=n_tasks, overlap=overlap)
