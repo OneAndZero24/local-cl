@@ -7,3 +7,4 @@ lightning==2.5.0
 lightning-fabric==2.5.0
 wandb==0.19.1
 continuum==1.2.7
+matplotlib>=3.5.0

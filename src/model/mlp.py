@@ -6,6 +6,7 @@ import torch.nn as nn
 
 from model.cl_module_abc import CLModuleABC
 from model.inc_classifier import IncrementalClassifier
+from model.regression_head import RegressionHead
 from model.layer import instantiate, LayerType
 from model.layer.interval_activation import IntervalActivation
 
@@ -76,15 +77,24 @@ class MLP(CLModuleABC):
             head_kwargs = config[0]
             config = config[1:]
 
-        super().__init__(
-            IncrementalClassifier(
+        # Choose head based on type
+        if head_type == LayerType.REGRESSION:
+            head = RegressionHead(
+                sizes[-1],
+                initial_out_features,
+                LayerType.NORMAL,
+                **head_kwargs
+            )
+        else:
+            head = IncrementalClassifier(
                 sizes[-1], 
                 initial_out_features,
                 head_type,
                 mask_past_classifier_neurons=mask_past_classifier_neurons,
                 **head_kwargs
             )
-        )
+
+        super().__init__(head)
 
         layers = []
         N = len(sizes)-1

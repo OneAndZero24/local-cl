@@ -1,0 +1,4 @@
+_partial_: True
+_target_: scenario.synthetic_regression.SyntheticRegressionScenario
+n_tasks: ${dataset.n_tasks}
+overlap: ${dataset.overlap}

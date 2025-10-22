@@ -15,7 +15,9 @@
 - Lightning Fabric
 - Custom Plugin System for Methods
 - Incremental Classifier
+- Regression Head for Continual Regression
 - Ability to use any torchvision model as pretrained backbone
+- Synthetic Regression Datasets (e.g., sine wave split into tasks)
 
 | Method | Status | Custom Layers | Status | Model | Status | Scenario | Status | Dataset | Status |
 | ------ | -- | ------ | -- | ------ | -- | ------ | -- | ------ | -- |
@@ -24,10 +26,10 @@
 | EWC | ✅ | SingleRBFHead | ✅ | Big Backbone | ✅ | TI | ✅ | CIFAR100 | ✅ |
 | Sharpening | ✅ | MultiRBFHead | ✅ | DenseNet | ✅ | II | ✅ | TinyImageNet | ✅ |
 | SI | ✅ | KAN | ❌ | | | Permuted | ⭕️ | SVHN | ✅ |
-| MAS | ✅ | LocalHead | ⭕️ | | | | | CIFAR-10 | ✅ |
+| MAS | ✅ | LocalHead | ⭕️ | | | Regression | ✅ | CIFAR-10 | ✅ |
 | RBFReg | ✅ | LocalConv2D | ⭕️ | | | | | FMNIST | ✅ |
-| Dreaming | ✅ | IntervalActivation | ✅ |
-| Dynamic Loss Scaling | ✅ |
+| Dreaming | ✅ | IntervalActivation | ✅ | | | | | SinRegression | ✅ |
+| Dynamic Loss Scaling | ✅ | RegressionHead | ✅ |
 | Interval Penalization | ✅ |
 
 ## Commands

@@ -1,0 +1,7 @@
+_target_: model.MLP
+initial_out_features: 1  # Regression output dimension
+sizes: [1, 64, 64]  # Input size 1 (x value), two hidden layers of 64 neurons
+layers: ["Normal", "Normal"]
+head_type: Regression
+activation: IntervalActivation
+mask_past_classifier_neurons: False

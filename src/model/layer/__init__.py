@@ -12,7 +12,7 @@ from .interval_activation import IntervalActivation
 
 class LayerType(Enum):
     """
-    enum = (LOCAL, NORMAL, RBF, INTERVAL)
+    enum = (LOCAL, NORMAL, RBF, INTERVAL, REGRESSION)
     """
 
     LOCAL = "Local"
@@ -21,6 +21,7 @@ class LayerType(Enum):
     SingleRBFHead = "SingleRBFHead"
     MultiRBFHead = "MultiRBFHead"
     INTERVAL = "Interval"
+    REGRESSION = "Regression"
 
 
 def _instantiate(

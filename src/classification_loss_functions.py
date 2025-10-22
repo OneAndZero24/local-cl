@@ -8,6 +8,7 @@ class LossCriterionType(Enum):
     CROSS_ENTROPY = "CrossEntropyLoss"
     JUST_MAHA = "JustMahalanobisLoss"
     MAHALANOBIS_DISTANCE = "MahalanobisDistanceLoss"
+    L2_DISTANCE = "L2DistanceLoss"
 
 
 class LossCriterion(nn.Module):
@@ -27,6 +28,7 @@ class LossCriterion(nn.Module):
             LossCriterionType.CROSS_ENTROPY: self._cross_entropy_loss,
             LossCriterionType.MAHALANOBIS_DISTANCE: self._mahalanobis_distance_loss,
             LossCriterionType.JUST_MAHA: self._just_mahalanobis_loss,
+            LossCriterionType.L2_DISTANCE: self._l2_distance_loss,
         }
 
     def _map_to_loss_type(self, criterion: str) -> LossCriterionType:
@@ -34,7 +36,7 @@ class LossCriterion(nn.Module):
         Convert a string criterion to the corresponding LossCriterionType Enum.
 
         Args:
-        - criterion (str): Loss function name, either "CrossEntropyLoss" or "MahalanobisDistanceLoss".
+        - criterion (str): Loss function name, either "CrossEntropyLoss", "MahalanobisDistanceLoss", or "L2DistanceLoss".
 
         Returns:
         - LossCriterionType: Corresponding enum value.
@@ -45,8 +47,10 @@ class LossCriterion(nn.Module):
             return LossCriterionType.MAHALANOBIS_DISTANCE
         elif criterion == "JustMahalanobisLoss":
             return LossCriterionType.JUST_MAHA
+        elif criterion == "L2DistanceLoss":
+            return LossCriterionType.L2_DISTANCE
         else:
-            raise ValueError("Invalid criterion. Use 'CrossEntropyLoss' or 'MahalanobisDistanceLoss'.")
+            raise ValueError("Invalid criterion. Use 'CrossEntropyLoss', 'MahalanobisDistanceLoss', or 'L2DistanceLoss'.")
 
     def compute_mahalanobis_distance(self, x: torch.Tensor, target: torch.Tensor,
                                      margin: float = 0.5, triplet: bool = True) -> torch.Tensor:
@@ -138,3 +142,17 @@ class LossCriterion(nn.Module):
         """
 
         return self.compute_mahalanobis_distance(x, target, False)
+
+    def _l2_distance_loss(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the L2 (Mean Squared Error) loss for regression.
+
+        Args:
+        - x (torch.Tensor): Model output predictions of shape [batch_size, output_dim].
+        - target (torch.Tensor): True target values of shape [batch_size, output_dim].
+
+        Returns:
+        - torch.Tensor: L2 distance loss (MSE).
+        """
+        return F.mse_loss(x, target)
+
