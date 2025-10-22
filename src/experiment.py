@@ -175,6 +175,10 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
     method.module.train()
     avg_loss = 0.0
     for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
+        # For regression, ensure y has correct shape
+        if is_regression and y.dim() > 1 and y.shape[1] == 1:
+            y = y.squeeze(1)
+            
         loss, preds = method.forward(X, y, task_id)
 
         loss = loss.mean()
@@ -203,6 +207,10 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             avg_loss = 0.0
             
             for batch_idx, (X, y, _) in enumerate(tqdm(dataloader)):
+                # Ensure y has correct shape
+                if y.dim() > 1 and y.shape[1] == 1:
+                    y = y.squeeze(1)
+                    
                 loss, preds = method.forward(X, y, task_id)
                 avg_loss += loss
                 

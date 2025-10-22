@@ -126,10 +126,23 @@ def visualize_regression(config: DictConfig):
         log.info('Training...')
         method.module.train()
         for epoch in range(config.exp.epochs):
+            epoch_loss = 0.0
+            n_batches = 0
             for X, y, _ in train_task:
+                # Ensure y has correct shape for regression
+                if y.dim() > 1 and y.shape[1] == 1:
+                    y = y.squeeze(1)
+                
                 loss, preds = method.forward(X, y, task_id)
                 loss = loss.mean()
                 method.backward(loss)
+                
+                epoch_loss += loss.item()
+                n_batches += 1
+            
+            if epoch % 10 == 0:
+                avg_loss = epoch_loss / n_batches
+                log.info(f'  Epoch {epoch+1}/{config.exp.epochs}, Loss: {avg_loss:.6f}')
         
         # Collect interval activation ranges
         interval_layers = []
@@ -163,13 +176,13 @@ def visualize_regression(config: DictConfig):
                 
                 for X, y, _ in test_tasks[tid]:
                     preds = method.module(X)
-                    task_x.append(X.cpu().numpy())
-                    task_y_true.append(y.cpu().numpy())
-                    task_y_pred.append(preds.cpu().numpy())
+                    task_x.append(X.cpu().numpy().squeeze())
+                    task_y_true.append(y.cpu().numpy().squeeze())
+                    task_y_pred.append(preds.cpu().numpy().squeeze())
                 
-                task_x = np.concatenate(task_x).flatten()
-                task_y_true = np.concatenate(task_y_true).flatten()
-                task_y_pred = np.concatenate(task_y_pred).flatten()
+                task_x = np.concatenate(task_x)
+                task_y_true = np.concatenate(task_y_true)
+                task_y_pred = np.concatenate(task_y_pred)
                 
                 # Sort by x for plotting
                 sort_idx = np.argsort(task_x)
@@ -177,23 +190,27 @@ def visualize_regression(config: DictConfig):
                 task_y_true = task_y_true[sort_idx]
                 task_y_pred = task_y_pred[sort_idx]
                 
-                all_x.extend(task_x)
-                all_y_true.extend(task_y_true)
-                all_y_pred.extend(task_y_pred)
-                
                 # Plot ground truth
-                ax_main.plot(task_x, task_y_true, 'o', color=colors[tid], 
-                           alpha=0.3, markersize=3, label=f'Task {tid+1} (True)' if tid == task_id else None)
+                ax_main.scatter(task_x, task_y_true, color=colors[tid], 
+                           alpha=0.4, s=15, label=f'Task {tid+1} Data', zorder=3)
                 
                 # Plot predictions
                 ax_main.plot(task_x, task_y_pred, '-', color=colors[tid], 
-                           linewidth=2, label=f'Task {tid+1} (Pred)', alpha=0.8)
+                           linewidth=2.5, label=f'Task {tid+1} Pred', alpha=0.9, zorder=4)
         
-        # Highlight task boundaries
+        # Plot the true sine function as reference
+        x_full = np.linspace(0, 15.707963267948966, 500)
+        y_full = np.sin(x_full)
+        ax_main.plot(x_full, y_full, 'k--', linewidth=1.5, alpha=0.5, 
+                    label='True Function', zorder=2)
+        
+        # Add vertical dashed lines for task boundaries
         for tid in range(task_id + 1):
             if hasattr(test_tasks[tid].dataset, 'x_range'):
                 x_start, x_end = test_tasks[tid].dataset.x_range
-                ax_main.axvspan(x_start, x_end, alpha=0.1, color=colors[tid])
+                if tid > 0:  # Don't draw line before first task
+                    ax_main.axvline(x_start, color='gray', linestyle='--', 
+                                  linewidth=1.5, alpha=0.6, zorder=1)
         
         ax_main.set_xlabel('Input (x)', fontsize=12, fontweight='bold')
         ax_main.set_ylabel('Output (y)', fontsize=12, fontweight='bold')
@@ -257,13 +274,13 @@ def visualize_regression(config: DictConfig):
             
             for X, y, _ in test_tasks[tid]:
                 preds = method.module(X)
-                task_x.append(X.cpu().numpy())
-                task_y_true.append(y.cpu().numpy())
-                task_y_pred.append(preds.cpu().numpy())
+                task_x.append(X.cpu().numpy().squeeze())
+                task_y_true.append(y.cpu().numpy().squeeze())
+                task_y_pred.append(preds.cpu().numpy().squeeze())
             
-            task_x = np.concatenate(task_x).flatten()
-            task_y_true = np.concatenate(task_y_true).flatten()
-            task_y_pred = np.concatenate(task_y_pred).flatten()
+            task_x = np.concatenate(task_x)
+            task_y_true = np.concatenate(task_y_true)
+            task_y_pred = np.concatenate(task_y_pred)
             
             # Sort by x
             sort_idx = np.argsort(task_x)
@@ -271,16 +288,25 @@ def visualize_regression(config: DictConfig):
             task_y_true = task_y_true[sort_idx]
             task_y_pred = task_y_pred[sort_idx]
             
-            # Plot
-            ax.plot(task_x, task_y_true, 'o', color=colors[tid], 
-                   alpha=0.3, markersize=3)
+            # Plot data points
+            ax.scatter(task_x, task_y_true, color=colors[tid], 
+                      alpha=0.4, s=15, zorder=3)
+            # Plot predictions
             ax.plot(task_x, task_y_pred, '-', color=colors[tid], 
-                   linewidth=2.5, label=f'Task {tid+1}', alpha=0.8)
-            
-            # Task boundary
-            if hasattr(test_tasks[tid].dataset, 'x_range'):
-                x_start, x_end = test_tasks[tid].dataset.x_range
-                ax.axvspan(x_start, x_end, alpha=0.1, color=colors[tid])
+                   linewidth=2.5, label=f'Task {tid+1}', alpha=0.9, zorder=4)
+    
+    # Plot the true sine function as reference
+    x_full = np.linspace(0, 15.707963267948966, 500)
+    y_full = np.sin(x_full)
+    ax.plot(x_full, y_full, 'k--', linewidth=1.5, alpha=0.5, 
+           label='True Function', zorder=2)
+    
+    # Add vertical dashed lines for task boundaries
+    for tid in range(1, N):  # Start from 1 to skip line before first task
+        if hasattr(test_tasks[tid].dataset, 'x_range'):
+            x_start, _ = test_tasks[tid].dataset.x_range
+            ax.axvline(x_start, color='gray', linestyle='--', 
+                      linewidth=1.5, alpha=0.6, zorder=1)
     
     ax.set_xlabel('Input (x)', fontsize=14, fontweight='bold')
     ax.set_ylabel('Output (y)', fontsize=14, fontweight='bold')
