@@ -1,6 +1,7 @@
 _partial_: True
 _target_: scenario.synthetic_regression.SyntheticRegressionDataset
 func: 
+  _partial_: True
   _target_: scenario.synthetic_regression.sin_function
 x_range: [0, 15.707963267948966]  # 0 to 5 * pi
 n_samples: 1000
