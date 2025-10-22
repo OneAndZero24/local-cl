@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Tuple
+from typing import Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -100,7 +100,7 @@ class IntervalPenalization(MethodPluginABC):
         self.data_buffer = []
         self.old_module = None
 
-    def forward_with_snapshot(self, x: torch.Tensor) -> torch.Tensor:
+    def forward_with_snapshot(self, x: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Runs the model forward using parameters and buffers from the previous task snapshot.  
         Used to compare new activations with old-task activations.
@@ -113,7 +113,9 @@ class IntervalPenalization(MethodPluginABC):
         """
         if hasattr(self.old_module, "fe"):
             with torch.no_grad():
-                _, out = self.old_module.forward(x, return_first_interval_activation=True)
+                identity, out = self.old_module.forward(x, return_first_interval_activation=True)
+
+                return identity.detach(), out.detach()
         else:
             out = x.flatten(start_dim=1)
             for layer in self.old_module.mlp:
@@ -121,7 +123,7 @@ class IntervalPenalization(MethodPluginABC):
                 if type(layer).__name__ == "IntervalActivation":
                     break
         
-        return out.detach()
+            return out.detach()
 
     def setup_task(self, task_id: int) -> None:
         """
@@ -217,7 +219,6 @@ class IntervalPenalization(MethodPluginABC):
         interval_drift_loss = torch.tensor(0.0, device=x.device)
         hypercube_dist_loss = torch.tensor(0.0, device=x.device)
 
-
         for idx, layer in enumerate(interval_act_layers):
 
             acts = layer.curr_task_last_batch
@@ -232,13 +233,33 @@ class IntervalPenalization(MethodPluginABC):
                 # Drift only at the FIRST IntervalActivation
                 if idx == 0:
                     if hasattr(self.module, "fe"):
-                        y_old = self.forward_with_snapshot(x)
+                        identity_bounds = self.module.interval_l4_0_downsample_1
+
+                        identity_bounds_min = identity_bounds.min.to(x.device)
+                        identity_bounds_max = identity_bounds.max.to(x.device)
+
+                        out_bounds = self.module.interval_l4_0_bn2
+                        out_bounds_min = out_bounds.min.to(x.device)
+                        out_bounds_max = out_bounds.max.to(x.device)
+
+                        old_identity, old_out = self.forward_with_snapshot(x)
+                        curr_identity, curr_out = self.module.forward(x, return_first_interval_activation=True)
+
+                        mask_identity = ((old_identity >= identity_bounds_min) & (old_identity <= identity_bounds_max)).float()
+                        mask_out = ((old_out >= out_bounds_min) & (old_out <= out_bounds_max)).float()
+
+                        interval_drift_loss += (
+                            (mask_identity * (old_identity - curr_identity).pow(2)).sum() / (mask_identity.sum() + 1e-8)
+                        )
+                        interval_drift_loss += (
+                            (mask_out * (old_out - curr_out).pow(2)).sum() / (mask_out.sum() + 1e-8)
+                        )
                     else:
                         y_old = self.forward_with_snapshot(x.flatten(start_dim=1))
-                    mask = ((acts >= lb) & (acts <= ub)).float()
-                    interval_drift_loss += (
-                        (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
-                    )
+                        mask = ((acts >= lb) & (acts <= ub)).float()
+                        interval_drift_loss += (
+                            (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
+                        )
                    
                 # Output reg for the nearest upper layer
                 curr_target = self.curr_interval_to_param.get(layer, None)
