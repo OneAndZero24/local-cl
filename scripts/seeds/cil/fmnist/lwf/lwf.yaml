@@ -17,7 +17,7 @@ parameters:
   exp.seed: 
     values: [42, 69, 2137, 0, 10]      
   exp.batch_size:
-    values: 512
+    value: 512
   exp.epochs: 
     value: 5
   exp.gen_cm: 

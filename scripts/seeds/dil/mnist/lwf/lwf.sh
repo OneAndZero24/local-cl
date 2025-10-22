@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=local_cl_split_mnist_mlp_si_dil
+#SBATCH --job-name=local_cl_split_mnist_mlp_lwf_dil
 #SBATCH --qos=big
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/interval_activation_dil/mnist/si/si_gs"
+run_sweep_and_agent "scripts/seeds/cil/mnist/lwf/lwf"
