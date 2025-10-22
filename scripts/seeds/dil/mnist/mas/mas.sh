@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/seeds/cil/mnist/mas/mas"
+run_sweep_and_agent "scripts/seeds/dil/mnist/mas/mas"

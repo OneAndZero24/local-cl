@@ -1,5 +1,6 @@
 program: src/main.py
 method: bayes
+run_cap: 5
 metric:
   name: avg_acc
   goal: maximize
@@ -14,11 +15,11 @@ parameters:
   method:
     value: composer_lwf
   exp.seed: 
-    value: 42      
+    values: [42, 69, 2137, 0, 10]      
   exp.batch_size:
-    values: [512, 256, 128]    
+    value: 256
   exp.epochs: 
-    values: [5, 10]
+    value: 10
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -68,21 +69,15 @@ parameters:
   method.criterion_scale:
     value: 1.0
   method.lr: 
-    distribution: log_uniform_values 
-    min: 0.0001
-    max: 0.01
+    value: 0.00560338604067801
   method.ema_scale:
     value: 0.95
   method.plugins.0._target_:
     value: method.LwF
   method.plugins.0.T:
-    distribution: uniform      
-    min: 0.5
-    max: 4.0
+    value: 2.413619185702146
   method.plugins.0.alpha:
-    distribution: uniform      
-    min: 0.1
-    max: 0.9
+    value: 0.8921505980200249
 
 
 command:
