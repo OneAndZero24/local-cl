@@ -4,8 +4,10 @@ Regression head for continual learning models.
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 from model.layer import instantiate, LayerType
+from model.layer.interval_activation import IntervalActivation
 
 
 class RegressionHead(nn.Module):
@@ -30,6 +32,8 @@ class RegressionHead(nn.Module):
         in_features: int,
         out_features: int = 1,
         layer_type: LayerType = LayerType.NORMAL,
+        use_interval_activation: bool = True,
+        activation: str = 'sin',
         **kwargs,
     ):
         """
@@ -39,12 +43,16 @@ class RegressionHead(nn.Module):
             in_features (int): Number of input features.
             out_features (int, optional): Number of output features. Defaults to 1.
             layer_type (LayerType, optional): Type of layer to use. Defaults to LayerType.NORMAL.
+            use_interval_activation (bool, optional): Whether to add IntervalActivation after regressor. Defaults to True.
+            activation (str, optional): Activation function to apply before IntervalActivation. Options: 'none', 'relu', 'tanh', 'sigmoid', 'sin'. Defaults to 'none'.
             **kwargs: Additional keyword arguments to pass to the layer instantiation.
         """
         super().__init__()
         
         self.in_features = in_features
         self.out_features = out_features
+        self.use_interval_activation = use_interval_activation
+        self.activation_type = activation
         
         self.regressor = instantiate(
             layer_type,
@@ -52,6 +60,14 @@ class RegressionHead(nn.Module):
             out_features,
             **kwargs
         )
+        
+        # Add IntervalActivation after the regressor to track output intervals
+        if use_interval_activation:
+            self.interval_activation = IntervalActivation(
+                lower_percentile=0.05,
+                upper_percentile=0.95,
+                log_name='regression_output_interval'
+            )
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -63,4 +79,22 @@ class RegressionHead(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape [batch_size, out_features].
         """
-        return self.regressor(x)
+        out = self.regressor(x)
+        
+        # Apply activation function if specified
+        if self.activation_type == 'relu':
+            out = F.relu(out)
+        elif self.activation_type == 'tanh':
+            out = torch.tanh(out)
+        elif self.activation_type == 'sigmoid':
+            out = torch.sigmoid(out)
+        elif self.activation_type == 'sin':
+            out = torch.sin(out)
+        elif self.activation_type == 'cos':
+            out = torch.cos(out)
+        # 'none' - no activation applied
+        
+        if self.use_interval_activation:
+            out = self.interval_activation(out)
+        
+        return out

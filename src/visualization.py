@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.gridspec import GridSpec
+from tqdm import tqdm
 
 from omegaconf import DictConfig
 from hydra.utils import instantiate
@@ -115,8 +115,16 @@ def visualize_regression(config: DictConfig):
     # Colors for tasks
     colors = plt.cm.Set2(np.linspace(0, 1, N))
     
+    # Prepare storage for activation ranges for each task
+    # We'll fill these when setup_task(...) runs: the intervals computed in setup_task(k)
+    # are the "current" intervals for task k-1 and the "reference" intervals for task k.
+    task_data = [
+        {"task_id": i, "reference_intervals": None, "current_intervals": None}
+        for i in range(N)
+    ]
+    
     # Train and visualize each task
-    for task_id, train_task in enumerate(train_tasks):
+    for task_id, train_task in enumerate(tqdm(train_tasks, desc="Tasks")):
         log.info(f'Task {task_id + 1}/{N}')
         
         # Setup task
@@ -125,7 +133,8 @@ def visualize_regression(config: DictConfig):
         # Train
         log.info('Training...')
         method.module.train()
-        for epoch in range(config.exp.epochs):
+        pbar = tqdm(range(config.exp.epochs), desc=f"Task {task_id+1} Training", leave=False)
+        for epoch in pbar:
             epoch_loss = 0.0
             n_batches = 0
             for X, y, _ in train_task:
@@ -140,26 +149,65 @@ def visualize_regression(config: DictConfig):
                 epoch_loss += loss.item()
                 n_batches += 1
             
-            if epoch % 10 == 0:
-                avg_loss = epoch_loss / n_batches
-                log.info(f'  Epoch {epoch+1}/{config.exp.epochs}, Loss: {avg_loss:.6f}')
+            avg_loss = epoch_loss / n_batches
+            pbar.set_postfix({'loss': f'{avg_loss:.6f}'})
         
-        # Collect interval activation ranges
-        interval_layers = []
+        # After calling setup_task(task_id), the plugin may have just computed
+        # intervals (this happens for task_id > 0). The intervals computed in
+        # setup_task(k) are based on data from task k-1. We capture them here
+        # and assign them as:
+        #   - task_data[k-1]['current_intervals'] (the intervals learned on task k-1)
+        #   - task_data[k]['reference_intervals'] (the reference intervals used when training task k)
+        if hasattr(method, 'plugins'):
+            for plugin in method.plugins:
+                if plugin.__class__.__name__ == 'IntervalPenalization':
+                    interval_plugin = plugin
+                    break
+            else:
+                interval_plugin = None
+
+        # If setup_task set new ranges (only for task_id > 0), read them from model
+        if task_id > 0:
+            new_ranges = []
+            for module in method.module.modules():
+                if isinstance(module, IntervalActivation):
+                    if module.min is not None and module.max is not None:
+                        new_ranges.append({
+                            'min': module.min.cpu().numpy().copy(),
+                            'max': module.max.cpu().numpy().copy(),
+                            'name': module.log_name or 'unnamed'
+                        })
+
+            # assign to previous task as its "current" intervals
+            task_data[task_id - 1]['current_intervals'] = new_ranges if new_ranges else None
+            # and also as reference intervals for current task
+            task_data[task_id]['reference_intervals'] = new_ranges if new_ranges else None
+        
+    # After training all tasks, run one final setup_task(N) to compute the intervals
+    # for the last task (these are based on task N-1 data). This ensures the
+    # last task has its "current_intervals" populated as well.
+    try:
+        method.setup_task(N)
+        # collect ranges set by the final setup
+        final_ranges = []
         for module in method.module.modules():
             if isinstance(module, IntervalActivation):
                 if module.min is not None and module.max is not None:
-                    interval_layers.append({
-                        'min': module.min.cpu().numpy(),
-                        'max': module.max.cpu().numpy(),
+                    final_ranges.append({
+                        'min': module.min.cpu().numpy().copy(),
+                        'max': module.max.cpu().numpy().copy(),
+                        'name': module.log_name or 'unnamed'
                     })
-        
-        # Create visualization for this task
-        fig = plt.figure(figsize=(12, 8))
-        gs = GridSpec(2, 1, height_ratios=[3, 1], hspace=0.3)
-        
-        # Main plot: predictions vs ground truth
-        ax_main = fig.add_subplot(gs[0])
+        if final_ranges:
+            task_data[N - 1]['current_intervals'] = final_ranges
+    except Exception:
+        # If setup_task(N) is not supported for some method, ignore silently
+        pass
+
+    # Now create all visualizations with proper activation range alignment
+    log.info('Creating visualizations...')
+    for task_id in range(N):
+        fig, ax_main = plt.subplots(figsize=(14, 8))
         
         # Collect all data for plotting
         all_x = []
@@ -176,10 +224,11 @@ def visualize_regression(config: DictConfig):
                 
                 for X, y, _ in test_tasks[tid]:
                     preds = method.module(X)
-                    # Ensure we keep at least 1D arrays for concatenation
-                    task_x.append(X.cpu().numpy().reshape(-1))
-                    task_y_true.append(y.cpu().numpy().reshape(-1))
-                    task_y_pred.append(preds.cpu().numpy().reshape(-1))
+                    
+                    # Flatten to 1D for proper concatenation
+                    task_x.append(X.cpu().numpy().flatten())
+                    task_y_true.append(y.cpu().numpy().flatten())
+                    task_y_pred.append(preds.cpu().numpy().flatten())
                 
                 task_x = np.concatenate(task_x)
                 task_y_true = np.concatenate(task_y_true)
@@ -191,11 +240,7 @@ def visualize_regression(config: DictConfig):
                 task_y_true = task_y_true[sort_idx]
                 task_y_pred = task_y_pred[sort_idx]
                 
-                # Plot ground truth
-                ax_main.scatter(task_x, task_y_true, color=colors[tid], 
-                           alpha=0.4, s=15, label=f'Task {tid+1} Data', zorder=3)
-                
-                # Plot predictions
+                # Plot predictions only (no scatter points)
                 ax_main.plot(task_x, task_y_pred, '-', color=colors[tid], 
                            linewidth=2.5, label=f'Task {tid+1} Pred', alpha=0.9, zorder=4)
         
@@ -220,35 +265,106 @@ def visualize_regression(config: DictConfig):
         ax_main.legend(loc='upper right', fontsize=10, framealpha=0.9)
         ax_main.grid(True, alpha=0.3, linestyle='--')
         
-        # Interval activation visualization
-        if interval_layers:
-            ax_interval = fig.add_subplot(gs[1])
+        # Add activation range visualization
+        # Use consistent colors: blue for current, red for reference/previous
+        color_current = 'blue'
+        color_reference = 'red'
+        
+        x_min, x_max = ax_main.get_xlim()
+        
+        # Get current task data
+        current_task_data = task_data[task_id]
+        
+        # For task 0: show only current intervals
+        # For task N>0: show both reference (previous) and current intervals
+        if task_id == 0:
+            # Task 1: Show only current intervals
+            if current_task_data['current_intervals']:
+                for layer_idx, layer_ranges in enumerate(current_task_data['current_intervals']):
+                    min_vals = layer_ranges['min']
+                    max_vals = layer_ranges['max']
+                    layer_name = layer_ranges['name']
+                    
+                    if min_vals.size == 1:
+                        min_val = min_vals.item()
+                        max_val = max_vals.item()
+                        
+                        # Draw current intervals
+                        ax_main.axhline(min_val, color=color_current, linestyle='--', 
+                                      linewidth=2, alpha=0.7, zorder=3)
+                        ax_main.axhline(max_val, color=color_current, linestyle='--', 
+                                      linewidth=2, alpha=0.7, zorder=3)
+                        
+                        ax_main.axhspan(min_val, max_val, alpha=0.15, 
+                                      color=color_current, zorder=0)
+                        
+                        mid_val = (min_val + max_val) / 2
+                        label = 'Current Range' if layer_name == 'unnamed' else f'Current {layer_name}'
+                        ax_main.text(x_max * 0.02, mid_val, label, 
+                                   fontsize=8, ha='left', va='center',
+                                   color=color_current, fontweight='bold',
+                                   bbox=dict(boxstyle='round,pad=0.3', 
+                                           facecolor='white', alpha=0.8, 
+                                           edgecolor=color_current))
+        else:
+            # Task 2+: Show both reference (previous) and current intervals
+            # First, show reference intervals (from previous tasks)
+            if current_task_data['reference_intervals']:
+                for layer_idx, layer_ranges in enumerate(current_task_data['reference_intervals']):
+                    min_vals = layer_ranges['min']
+                    max_vals = layer_ranges['max']
+                    layer_name = layer_ranges['name']
+                    
+                    if min_vals.size == 1:
+                        min_val = min_vals.item()
+                        max_val = max_vals.item()
+                        
+                        # Draw reference intervals with dotted lines
+                        ax_main.axhline(min_val, color=color_reference, linestyle=':', 
+                                      linewidth=2, alpha=0.7, zorder=3)
+                        ax_main.axhline(max_val, color=color_reference, linestyle=':', 
+                                      linewidth=2, alpha=0.7, zorder=3)
+                        
+                        ax_main.axhspan(min_val, max_val, alpha=0.15, 
+                                      color=color_reference, zorder=0)
+                        
+                        mid_val = (min_val + max_val) / 2
+                        label = 'Previous Range' if layer_name == 'unnamed' else f'Prev {layer_name}'
+                        ax_main.text(x_max * 0.98, mid_val, label, 
+                                   fontsize=8, ha='right', va='center',
+                                   color=color_reference, fontweight='bold',
+                                   bbox=dict(boxstyle='round,pad=0.3', 
+                                           facecolor='white', alpha=0.8, 
+                                           edgecolor=color_reference))
             
-            # Plot interval ranges for each neuron in the first layer
-            layer_intervals = interval_layers[0]  # First IntervalActivation layer
-            n_neurons = len(layer_intervals['min'])
-            
-            neuron_indices = np.arange(n_neurons)
-            mins = layer_intervals['min']
-            maxs = layer_intervals['max']
-            centers = (mins + maxs) / 2
-            ranges = maxs - mins
-            
-            # Plot as horizontal bars
-            ax_interval.barh(neuron_indices, ranges, left=mins, 
-                           height=0.8, color=colors[task_id], alpha=0.6, 
-                           edgecolor='black', linewidth=0.5)
-            
-            ax_interval.set_xlabel('Activation Value', fontsize=12, fontweight='bold')
-            ax_interval.set_ylabel('Neuron Index', fontsize=12, fontweight='bold')
-            ax_interval.set_title(f'Interval Activation Ranges (Layer 1)', 
-                                fontsize=12, fontweight='bold')
-            ax_interval.grid(True, alpha=0.3, linestyle='--', axis='x')
-            
-            # Limit y-axis to show at most 20 neurons
-            if n_neurons > 20:
-                ax_interval.set_ylim(-0.5, 19.5)
-                ax_interval.set_yticks(range(20))
+            # Then, show current intervals
+            if current_task_data['current_intervals']:
+                for layer_idx, layer_ranges in enumerate(current_task_data['current_intervals']):
+                    min_vals = layer_ranges['min']
+                    max_vals = layer_ranges['max']
+                    layer_name = layer_ranges['name']
+                    
+                    if min_vals.size == 1:
+                        min_val = min_vals.item()
+                        max_val = max_vals.item()
+                        
+                        # Draw current intervals
+                        ax_main.axhline(min_val, color=color_current, linestyle='--', 
+                                      linewidth=2, alpha=0.7, zorder=3)
+                        ax_main.axhline(max_val, color=color_current, linestyle='--', 
+                                      linewidth=2, alpha=0.7, zorder=3)
+                        
+                        ax_main.axhspan(min_val, max_val, alpha=0.15, 
+                                      color=color_current, zorder=0)
+                        
+                        mid_val = (min_val + max_val) / 2
+                        label = 'Current Range' if layer_name == 'unnamed' else f'Current {layer_name}'
+                        ax_main.text(x_max * 0.02, mid_val, label, 
+                                   fontsize=8, ha='left', va='center',
+                                   color=color_current, fontweight='bold',
+                                   bbox=dict(boxstyle='round,pad=0.3', 
+                                           facecolor='white', alpha=0.8, 
+                                           edgecolor=color_current))
         
         # Add task info text
         task_info = f'Trained on {task_id + 1} task(s)'
@@ -275,9 +391,10 @@ def visualize_regression(config: DictConfig):
             
             for X, y, _ in test_tasks[tid]:
                 preds = method.module(X)
-                task_x.append(X.cpu().numpy().squeeze())
-                task_y_true.append(y.cpu().numpy().squeeze())
-                task_y_pred.append(preds.cpu().numpy().squeeze())
+                # Flatten to 1D for proper concatenation
+                task_x.append(X.cpu().numpy().flatten())
+                task_y_true.append(y.cpu().numpy().flatten())
+                task_y_pred.append(preds.cpu().numpy().flatten())
             
             task_x = np.concatenate(task_x)
             task_y_true = np.concatenate(task_y_true)
@@ -289,10 +406,7 @@ def visualize_regression(config: DictConfig):
             task_y_true = task_y_true[sort_idx]
             task_y_pred = task_y_pred[sort_idx]
             
-            # Plot data points
-            ax.scatter(task_x, task_y_true, color=colors[tid], 
-                      alpha=0.4, s=15, zorder=3)
-            # Plot predictions
+            # Plot predictions only (no scatter points)
             ax.plot(task_x, task_y_pred, '-', color=colors[tid], 
                    linewidth=2.5, label=f'Task {tid+1}', alpha=0.9, zorder=4)
     

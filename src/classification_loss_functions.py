@@ -154,5 +154,8 @@ class LossCriterion(nn.Module):
         Returns:
         - torch.Tensor: L2 distance loss (MSE).
         """
+        # Squeeze predictions if they have shape [batch_size, 1] to match target shape [batch_size]
+        if x.dim() > 1 and x.shape[-1] == 1:
+            x = x.squeeze(-1)
         return F.mse_loss(x, target)
 

@@ -11,6 +11,31 @@ from torch.utils.data import Dataset
 from continuum.tasks import TaskSet
 
 
+class RegressionTaskSet(Dataset):
+    """
+    Simple wrapper for regression task data that properly handles indexing.
+    """
+    def __init__(self, x, y, t, x_range):
+        self.x_data = x.flatten()  # Ensure 1D
+        self.y_data = y.flatten()  # Ensure 1D
+        self.t_data = t
+        self.x_range = x_range
+        
+    def __len__(self):
+        return len(self.x_data)
+    
+    def __getitem__(self, idx):
+        # Return properly shaped single samples
+        return (
+            self.x_data[idx].reshape(1),  # [1] for input dimension
+            self.y_data[idx].reshape(1),  # [1] for output dimension
+            self.t_data[idx]
+        )
+    
+    def get_classes(self):
+        return [0]  # Dummy for compatibility
+
+
 def sin_function(x):
     """Sine function for regression."""
     return np.sin(x)
@@ -58,7 +83,8 @@ class SyntheticRegressionDataset(Dataset):
         return self.n_samples
     
     def __getitem__(self, idx):
-        return self.x[idx:idx+1], self.y[idx:idx+1], 0
+        # Return single sample, not a slice
+        return self.x[idx].reshape(1), self.y[idx].reshape(1), 0
 
 
 class SyntheticRegressionScenario:
@@ -112,18 +138,8 @@ class SyntheticRegressionScenario:
             y_task = self.dataset.y[indices]
             t_task = np.full(len(indices), task_id, dtype=np.int64)
             
-            # Create TaskSet
-            task = TaskSet(
-                x_task.reshape(-1, 1),  # [n_samples, 1]
-                y_task.reshape(-1, 1),  # [n_samples, 1]
-                t_task,
-                trsf=None,
-                target_trsf=None,
-            )
-            
-            # Add custom attributes for visualization
-            task.x_range = (start, end)
-            task.get_classes = lambda: [0]  # Dummy for compatibility
+            # Create custom task wrapper instead of TaskSet
+            task = RegressionTaskSet(x_task, y_task, t_task, (start, end))
             
             self._tasks.append(task)
     
