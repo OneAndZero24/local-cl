@@ -10,7 +10,7 @@ exp:
     _target_: experiment.experiment
   seed: 42
   log_dir: # set during runtime to automatically created dir
-  batch_size: 32
+  batch_size: 64
   epochs: 1
   gen_cm: False
   log_per_batch: False

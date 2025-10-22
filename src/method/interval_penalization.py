@@ -152,7 +152,12 @@ class IntervalPenalization(MethodPluginABC):
 
             self.old_interval_to_param = self._map_interval_to_nearest_param(self.old_module)
             self.curr_interval_to_param = self._map_interval_to_nearest_param(self.module)
-
+          
+            # for (name_1, p_1), (name_2, p_2) in zip(self.old_interval_to_param.items(), self.curr_interval_to_param.items()):
+            #     print(f"name_1: {name_1}, p1: {p_1}")
+            #     print(f"name_2: {name_2}, p2: {p_2}")
+            #     print("\n")
+            # exit(0)
             self.old_interval_act_layers = [module for _, module in self.old_module.named_modules() if type(module).__name__ == "IntervalActivation"]
 
             interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
@@ -234,7 +239,7 @@ class IntervalPenalization(MethodPluginABC):
                     interval_drift_loss += (
                         (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
                     )
-                
+                   
                 # Output reg for the nearest upper layer
                 curr_target = self.curr_interval_to_param.get(layer, None)
                 old_target = self.old_interval_to_param.get(self.old_interval_act_layers[idx], None)
@@ -255,6 +260,9 @@ class IntervalPenalization(MethodPluginABC):
 
                         if "weight" in param_name:
                             if isinstance(curr_target, nn.Linear):
+                                lb = lb.view(-1)
+                                ub = ub.view(-1)
+                              
                                 lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
                                 upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
                             elif isinstance(curr_target, nn.Conv2d):
@@ -335,26 +343,21 @@ class IntervalPenalization(MethodPluginABC):
                 m.interval_l4_0_conv1: m.fe.layer4_0_bn1,
                 m.interval_l4_0_bn1: m.fe.layer4_0_conv2,
                 m.interval_l4_0_conv2: m.fe.layer4_0_bn2,
+                m.interval_l4_0_bn2: m.fe.layer4_1_conv1,
                 m.interval_l4_1_conv1: m.fe.layer4_1_bn1,
                 m.interval_l4_1_bn1: m.fe.layer4_1_conv2,
                 m.interval_l4_1_conv2: m.fe.layer4_1_bn2,
+                m.interval_l4_1_bn2: m.mlp[0],
                 m.mlp[0]: m.mlp[1],
-                m.mlp[2]: m.head,
+                m.mlp[1]: m.head if self.regularize_classifier else None
             }
-            if hasattr(m, 'interval_l4_0_downsample'):
-                mapping[m.interval_l4_0_downsample] = None  # No immediate parameterized layer
-            if m.insert_between_blocks:
-                mapping[m.interval_l4_0_end] = m.fe.layer4_1_conv1
-                mapping[m.interval_l4_1_end] = m.mlp[1]
-            # For bn2 layers without insert_between_blocks, set to next conv or linear
-            if not m.insert_between_blocks:
-                mapping[m.interval_l4_0_bn2] = m.fe.layer4_1_conv1
-                mapping[m.interval_l4_1_bn2] = m.mlp[1]
+            if hasattr(m.fe, 'layer4_0_downsample'):
+                mapping[m.interval_l4_0_downsample_0] = m.fe.layer4_0_downsample[1]
         else:
             # MLP architecture
             m = module
             mapping = {
                 m.mlp[0]: m.mlp[1],
-                m.mlp[2]: m.head
+                m.mlp[2]: m.head if self.regularize_classifier else None
             }
         return mapping
