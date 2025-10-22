@@ -176,9 +176,10 @@ def visualize_regression(config: DictConfig):
                 
                 for X, y, _ in test_tasks[tid]:
                     preds = method.module(X)
-                    task_x.append(X.cpu().numpy().squeeze())
-                    task_y_true.append(y.cpu().numpy().squeeze())
-                    task_y_pred.append(preds.cpu().numpy().squeeze())
+                    # Ensure we keep at least 1D arrays for concatenation
+                    task_x.append(X.cpu().numpy().reshape(-1))
+                    task_y_true.append(y.cpu().numpy().reshape(-1))
+                    task_y_pred.append(preds.cpu().numpy().reshape(-1))
                 
                 task_x = np.concatenate(task_x)
                 task_y_true = np.concatenate(task_y_true)
