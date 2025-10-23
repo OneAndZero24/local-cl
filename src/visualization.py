@@ -225,11 +225,11 @@ def visualize_regression(config: DictConfig):
         avg_test_loss = test_loss / test_batches
         log.info(f'Task {task_id}: Test MSE loss = {avg_test_loss:.6f}')
         
-        # AFTER training: Save predictions on ALL tasks seen so far (to show forgetting)
-        log.info(f'Saving predictions for all tasks 0 to {task_id}...')
+        # AFTER training: Save predictions on ALL tasks (including future ones)
+        log.info(f'Saving predictions for all tasks 0 to {N-1}...')
         method.module.eval()
         with torch.no_grad():
-            for tid in range(task_id + 1):
+            for tid in range(N):  # Changed to include all tasks, not just seen ones
                 task_x = []
                 task_y_pred = []
                 for X, y, _ in test_tasks[tid]:
@@ -275,8 +275,8 @@ def visualize_regression(config: DictConfig):
     for task_id in range(N):
         fig, ax_main = plt.subplots(figsize=(12, 6))
         
-        # Plot saved predictions for ALL tasks seen so far (using current model)
-        # This shows how training on new tasks affects old knowledge
+        # Plot saved predictions for ALL tasks (trained and future)
+        # This shows how training on new tasks affects old knowledge and what future tasks look like
         for tid in sorted(task_data[task_id]['predictions_per_task'].keys()):
             pred_data = task_data[task_id]['predictions_per_task'][tid]
             task_x = pred_data['x']
@@ -287,10 +287,19 @@ def visualize_regression(config: DictConfig):
             task_x = task_x[sort_idx]
             task_y_pred = task_y_pred[sort_idx]
             
-            # Current task in red, previous tasks in black
-            color = 'red' if tid == task_id else 'black'
-            ax_main.plot(task_x, task_y_pred, '-', color=color, 
-                       linewidth=2.5, zorder=4)
+            # Determine style based on task status
+            if tid == task_id:
+                # Current task: red solid line
+                ax_main.plot(task_x, task_y_pred, '-', color='red', 
+                           linewidth=2.5, zorder=4)
+            elif tid < task_id:
+                # Previous tasks: black solid line
+                ax_main.plot(task_x, task_y_pred, '-', color='black', 
+                           linewidth=2.5, zorder=4)
+            else:
+                # Future tasks (not yet trained): black dashed line
+                ax_main.plot(task_x, task_y_pred, '--', color='black', 
+                           linewidth=2.5, zorder=4)
             
             log.info(f"Visualization {task_id+1}: Plotted Task {tid+1} predictions in range [{task_y_pred.min():.4f}, {task_y_pred.max():.4f}]")
         
