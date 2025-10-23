@@ -245,9 +245,13 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                 old_target = self.old_interval_to_param.get(self.old_interval_act_layers[idx], None)
 
                 if curr_target is not None and old_target is not None:
+                    use_classifier = False
 
                     # Handle classifier if applicable
                     if (self.regularize_classifier or self.dil_mode) and hasattr(curr_target, "classifier"):
+                        use_classifier = True
+                        old_nclasses = old_target.old_nclasses
+
                         curr_target = curr_target.classifier
                         old_target = old_target.classifier
 
@@ -262,7 +266,15 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                             if isinstance(curr_target, nn.Linear):
                                 lb = lb.view(-1)
                                 ub = ub.view(-1)
-                              
+
+                                if self.regularize_classifier and use_classifier:
+                                    weight_diff_pos = weight_diff_pos[:old_nclasses, :]
+                                    weight_diff_neg = weight_diff_neg[:old_nclasses, :]
+
+                                    p_new_pos = torch.relu(p_curr[old_nclasses:, :])
+                                    p_new_neg = torch.relu(-p_curr[old_nclasses:, :])
+                                    loss += (p_new_pos @ ub - p_new_neg @ lb).sum()
+                               
                                 lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
                                 upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
                             elif isinstance(curr_target, nn.Conv2d):
@@ -292,6 +304,12 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                                 upper_bound_reg += (pos * n_ub - neg * n_lb).sum()
                         elif "bias" in param_name:
                             bias_diff = p_curr - p_old
+                            if self.regularize_classifier and use_classifier:
+                                bias_diff = bias_diff[:old_nclasses]
+                                p_new = p_curr[old_nclasses:]
+
+                                loss += p_new.sum()
+
                             lower_bound_reg += bias_diff.sum()
                             upper_bound_reg += bias_diff.sum()
 
