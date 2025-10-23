@@ -270,6 +270,15 @@ class MLPIntervalPenalization(MethodPluginABC):
                                 if "weight" in name:
                                     weight_diff = p - prev_param
 
+                                    if self.regularize_classifier and hasattr(next_layer, "classifier"):
+                                        weight_diff = weight_diff[:next_layer.old_nclasses, :]
+                                        p_new = p[next_layer.old_nclasses:, :]
+
+                                        p_new_pos = torch.relu(p_new)
+                                        p_new_neg = torch.relu(-p_new)
+
+                                        loss += (p_new_pos @ ub - p_new_neg @ lb).sum()
+
                                     weight_diff_pos = torch.relu(weight_diff)
                                     weight_diff_neg = torch.relu(-weight_diff)
 
@@ -278,6 +287,12 @@ class MLPIntervalPenalization(MethodPluginABC):
 
                                 elif "bias" in name:
                                     bias_diff = p - prev_param
+
+                                    if self.regularize_classifier and hasattr(next_layer, "classifier"):
+                                        bias_diff = weight_diff[:next_layer.old_nclasses]
+                                        p_new = p[next_layer.old_nclasses:]
+
+                                        loss += p_new.sum()
 
                                     lower_bound_reg += bias_diff.sum()
                                     upper_bound_reg += bias_diff.sum()
