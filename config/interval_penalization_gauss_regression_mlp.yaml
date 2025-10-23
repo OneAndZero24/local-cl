@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - dataset: sin_regression
+  - dataset: gauss_regression
   - scenario: regression
   - model: mlp_regression
   - method: composer_interval_penalization_regression
@@ -10,8 +10,8 @@ exp:
     _target_: visualization.visualize_regression
   seed: 42
   log_dir: # set during runtime to automatically created dir
-  batch_size: 32
-  epochs: 200
+  batch_size: 64
+  epochs: 300
   gen_cm: False
   log_per_batch: False
   detect_anomaly: False

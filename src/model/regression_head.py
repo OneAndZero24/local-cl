@@ -33,7 +33,7 @@ class RegressionHead(nn.Module):
         out_features: int = 1,
         layer_type: LayerType = LayerType.NORMAL,
         use_interval_activation: bool = True,
-        activation: str = 'sin',
+        activation: str = 'relu',
         **kwargs,
     ):
         """
@@ -62,11 +62,13 @@ class RegressionHead(nn.Module):
         )
         
         # Add IntervalActivation after the regressor to track output intervals
+        # Don't apply activation - just track the raw regression output values
         if use_interval_activation:
             self.interval_activation = IntervalActivation(
                 lower_percentile=0.05,
                 upper_percentile=0.95,
-                log_name='regression_output_interval'
+                log_name='regression_output_interval',
+                apply_activation=False  # Don't modify the output, just track intervals
             )
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -81,6 +83,16 @@ class RegressionHead(nn.Module):
         """
         out = self.regressor(x)
         
+        # DEBUG: Track batch count
+        if not hasattr(self, '_debug_batch_count'):
+            self._debug_batch_count = 0
+        self._debug_batch_count += 1
+        
+        if self._debug_batch_count % 50 == 1 and self.training:
+            print(f"\n[REGRESSION_HEAD DEBUG] Batch {self._debug_batch_count}")
+            print(f"  Input to head range: [{x.min().item():.4f}, {x.max().item():.4f}]")
+            print(f"  Raw regressor output range: [{out.min().item():.4f}, {out.max().item():.4f}]")
+        
         # Apply activation function if specified
         if self.activation_type == 'relu':
             out = F.relu(out)
@@ -94,7 +106,13 @@ class RegressionHead(nn.Module):
             out = torch.cos(out)
         # 'none' - no activation applied
         
+        if self._debug_batch_count % 50 == 1 and self.training and self.activation_type != 'none':
+            print(f"  After '{self.activation_type}' activation: [{out.min().item():.4f}, {out.max().item():.4f}]")
+        
         if self.use_interval_activation:
             out = self.interval_activation(out)
+            
+            if self._debug_batch_count % 50 == 1 and self.training:
+                print(f"  After IntervalActivation (apply_activation={self.interval_activation.apply_activation}): [{out.min().item():.4f}, {out.max().item():.4f}]")
         
         return out

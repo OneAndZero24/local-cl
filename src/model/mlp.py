@@ -3,6 +3,7 @@ from omegaconf import ListConfig
 
 import torch
 import torch.nn as nn
+from torch.nn import Tanh, ReLU, LeakyReLU, ELU, GELU
 
 from model.cl_module_abc import CLModuleABC
 from model.inc_classifier import IncrementalClassifier

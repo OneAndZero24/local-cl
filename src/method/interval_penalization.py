@@ -212,6 +212,10 @@ class IntervalPenalization(MethodPluginABC):
         interval_drift_loss = torch.tensor(0.0, device=x.device)
         hypercube_dist_loss = torch.tensor(0.0, device=x.device)
 
+        # DEBUG: Track batch count
+        if not hasattr(self, '_debug_batch_count'):
+            self._debug_batch_count = 0
+        self._debug_batch_count += 1
 
         for idx, layer in enumerate(interval_act_layers):
 
@@ -219,6 +223,16 @@ class IntervalPenalization(MethodPluginABC):
             acts_flat = acts.view(acts.size(0), -1)
             batch_var = acts_flat.var(dim=0, unbiased=False).mean()
             var_loss += batch_var
+            
+            # DEBUG: Log activation statistics
+            if self._debug_batch_count % 10 == 1:
+                print(f"\n[INTERVAL_PENALIZATION DEBUG] Task {self.task_id}, Batch {self._debug_batch_count}")
+                print(f"  IntervalActivation layer {idx} ({layer.log_name}):")
+                print(f"    Activations range: [{acts.min().item():.4f}, {acts.max().item():.4f}]")
+                print(f"    Activations mean: {acts.mean().item():.4f}, std: {acts.std().item():.4f}")
+                print(f"    Batch variance: {batch_var.item():.6f}")
+                if self.task_id > 0 and layer.min is not None:
+                    print(f"    Stored intervals: [{layer.min.min().item():.4f}, {layer.max.max().item():.4f}]")
 
             if self.task_id > 0:
                 lb = layer.min.to(x.device)
@@ -307,6 +321,15 @@ class IntervalPenalization(MethodPluginABC):
                 #     hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
 
 
+        # DEBUG: Log loss components
+        if self._debug_batch_count % 10 == 1:
+            print(f"\n[INTERVAL_PENALIZATION LOSS] Task {self.task_id}:")
+            print(f"  Base loss: {loss.mean().item():.6f}")
+            print(f"  Var loss: {var_loss.item():.6f} (scale: {self.var_scale})")
+            print(f"  Output reg loss: {output_reg_loss.item():.6f} (scale: {self.output_reg_scale})")
+            print(f"  Interval drift loss: {interval_drift_loss.item():.6f} (scale: {self.interval_drift_reg_scale})")
+            print(f"  Hypercube dist loss: {hypercube_dist_loss.item():.6f}")
+        
         loss = (
             loss
             + self.var_scale * var_loss
@@ -314,6 +337,10 @@ class IntervalPenalization(MethodPluginABC):
             + self.interval_drift_reg_scale * interval_drift_loss
             + hypercube_dist_loss
         )
+        
+        if self._debug_batch_count % 10 == 1:
+            print(f"  Total loss: {loss.mean().item():.6f}")
+        
         return loss, preds
     
     def _map_interval_to_nearest_param(self, module: nn.Module) -> dict:

@@ -199,6 +199,21 @@ class Composer:
 
         preds = self.module(x)
         loss = self.criterion(preds, y)
+        
+        # DEBUG: Log raw loss and predictions
+        if not hasattr(self, '_debug_batch_count'):
+            self._debug_batch_count = {}
+        if task_id not in self._debug_batch_count:
+            self._debug_batch_count[task_id] = 0
+        self._debug_batch_count[task_id] += 1
+        
+        if self._debug_batch_count[task_id] % 10 == 1:  # Log every 10 batches
+            print(f"\n[COMPOSER DEBUG] Task {task_id}, Batch {self._debug_batch_count[task_id]}")
+            print(f"  Input x range: [{x.min().item():.4f}, {x.max().item():.4f}]")
+            print(f"  Target y range: [{y.min().item():.4f}, {y.max().item():.4f}]")
+            print(f"  Predictions range: [{preds.min().item():.4f}, {preds.max().item():.4f}]")
+            print(f"  Raw MSE loss: {loss.mean().item():.6f}")
+        
         if task_id > 0:
             loss *= self.criterion_scale
             
@@ -211,8 +226,13 @@ class Composer:
             loss = self.dynamic_scaling.forward(task_id, loss_ct, reg_loss, preds)
         else:
             loss = self._add_reg(loss)
+            loss_before_plugin = loss.mean().item()
             for plugin in self.plugins:
                 loss, preds = plugin.forward(x, y, loss, preds)
+            
+            if self._debug_batch_count[task_id] % 10 == 1:
+                print(f"  Loss after plugins: {loss.mean().item():.6f}")
+                print(f"  Regularization added: {loss.mean().item() - loss_before_plugin:.6f}")
 
         if self.log_reg:
             wandb.log({f'Loss/train/{task_id}/reg': loss-loss_ct.mean()})

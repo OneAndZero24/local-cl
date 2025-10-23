@@ -1,0 +1,9 @@
+_partial_: True
+_target_: scenario.synthetic_regression.SyntheticRegressionDataset
+func: 
+  _partial_: True
+  _target_: scenario.synthetic_regression.gaussian_function
+x_range: [-3, 3]  # Standard range for Gaussian around 0
+n_samples: 2000
+noise_std: 0.0
+seed: 42

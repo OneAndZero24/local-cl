@@ -41,6 +41,11 @@ def sin_function(x):
     return np.sin(x)
 
 
+def gaussian_function(x):
+    """Standard Gaussian (normal) function centered at 0."""
+    return np.exp(-0.5 * x**2) / np.sqrt(2 * np.pi)
+
+
 class SyntheticRegressionDataset(Dataset):
     """
     Synthetic regression dataset based on a mathematical function.

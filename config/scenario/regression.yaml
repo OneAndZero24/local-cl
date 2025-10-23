@@ -1,4 +1,4 @@
 _partial_: True
 _target_: scenario.synthetic_regression.SyntheticRegressionScenario
-n_tasks: 5
+n_tasks: 3
 overlap: 0.0

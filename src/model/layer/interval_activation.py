@@ -34,6 +34,7 @@ class IntervalActivation(nn.Module):
         lower_percentile: float = 0.05,
         upper_percentile: float = 0.95,
         log_name: str = None,
+        apply_activation: bool = True,
     ) -> None:
         """
         Initializes the IntervalActivation layer.
@@ -42,11 +43,13 @@ class IntervalActivation(nn.Module):
             lower_percentile (float, optional): Lower percentile for min bound. Defaults to 0.05.
             upper_percentile (float, optional): Upper percentile for max bound. Defaults to 0.95.
             log_name (str, optional): Name of the layer for wandb logging. Defaults to None.
+            apply_activation (bool, optional): Whether to apply LeakyReLU activation. Defaults to True.
         """
 
         super().__init__()
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
+        self.apply_activation = apply_activation
         
         self.min = None
         self.max = None
@@ -112,9 +115,12 @@ class IntervalActivation(nn.Module):
             x (torch.Tensor): Input tensor of shape (batch, ...).
 
         Returns:
-            torch.Tensor: Activated tensor.
+            torch.Tensor: Activated tensor (or passthrough if apply_activation=False).
         """
-        out = F.leaky_relu(x)
+        if self.apply_activation:
+            out = F.leaky_relu(x)
+        else:
+            out = x
 
         if self.training:
             self.curr_task_last_batch = out

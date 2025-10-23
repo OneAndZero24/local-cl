@@ -8,7 +8,7 @@ This script creates publication-quality plots showing:
 - Task boundaries
 
 Usage:
-    python src/visualization.py --config-name naive_sin_regression_mlp
+    python src/visualization.py --config-name interval_penalization_gauss_regression_mlp
 """
 
 import logging
@@ -112,18 +112,21 @@ def visualize_regression(config: DictConfig):
     output_dir = Path(config.exp.log_dir) / 'visualizations'
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Colors for tasks
-    colors = plt.cm.Set2(np.linspace(0, 1, N))
-    
-    # Prepare storage for activation ranges for each task
-    # We'll fill these when setup_task(...) runs: the intervals computed in setup_task(k)
-    # are the "current" intervals for task k-1 and the "reference" intervals for task k.
+    # Prepare storage for activation ranges and trained models for each task
     task_data = [
-        {"task_id": i, "reference_intervals": None, "current_intervals": None}
+        {"task_id": i, "old_intervals": None, "current_intervals": None, "model_state": None, "data_buffer": None}
         for i in range(N)
     ]
     
-    # Train and visualize each task
+    # Find IntervalPenalization plugin
+    interval_plugin = None
+    if hasattr(method, 'plugins'):
+        for plugin in method.plugins:
+            if plugin.__class__.__name__ == 'IntervalPenalization':
+                interval_plugin = plugin
+                break
+    
+    # Train all tasks and save their models and data
     for task_id, train_task in enumerate(tqdm(train_tasks, desc="Tasks")):
         log.info(f'Task {task_id + 1}/{N}')
         
@@ -152,74 +155,153 @@ def visualize_regression(config: DictConfig):
             avg_loss = epoch_loss / n_batches
             pbar.set_postfix({'loss': f'{avg_loss:.6f}'})
         
-        # After calling setup_task(task_id), the plugin may have just computed
-        # intervals (this happens for task_id > 0). The intervals computed in
-        # setup_task(k) are based on data from task k-1. We capture them here
-        # and assign them as:
-        #   - task_data[k-1]['current_intervals'] (the intervals learned on task k-1)
-        #   - task_data[k]['reference_intervals'] (the reference intervals used when training task k)
-        if hasattr(method, 'plugins'):
-            for plugin in method.plugins:
-                if plugin.__class__.__name__ == 'IntervalPenalization':
-                    interval_plugin = plugin
-                    break
-            else:
-                interval_plugin = None
-
-        # If setup_task set new ranges (only for task_id > 0), read them from model
-        if task_id > 0:
-            new_ranges = []
-            for module in method.module.modules():
-                if isinstance(module, IntervalActivation):
-                    if module.min is not None and module.max is not None:
-                        new_ranges.append({
-                            'min': module.min.cpu().numpy().copy(),
-                            'max': module.max.cpu().numpy().copy(),
-                            'name': module.log_name or 'unnamed'
-                        })
-
-            # assign to previous task as its "current" intervals
-            task_data[task_id - 1]['current_intervals'] = new_ranges if new_ranges else None
-            # and also as reference intervals for current task
-            task_data[task_id]['reference_intervals'] = new_ranges if new_ranges else None
+        # Log final statistics
+        log.info(f'Task {task_id}: Final training loss = {avg_loss:.6f}')
         
-    # After training all tasks, run one final setup_task(N) to compute the intervals
-    # for the last task (these are based on task N-1 data). This ensures the
-    # last task has its "current_intervals" populated as well.
-    try:
-        method.setup_task(N)
-        # collect ranges set by the final setup
-        final_ranges = []
-        for module in method.module.modules():
-            if isinstance(module, IntervalActivation):
-                if module.min is not None and module.max is not None:
-                    final_ranges.append({
-                        'min': module.min.cpu().numpy().copy(),
-                        'max': module.max.cpu().numpy().copy(),
-                        'name': module.log_name or 'unnamed'
-                    })
-        if final_ranges:
-            task_data[N - 1]['current_intervals'] = final_ranges
-    except Exception:
-        # If setup_task(N) is not supported for some method, ignore silently
-        pass
+        # Evaluate on test set to check actual fit
+        method.module.eval()
+        test_loss = 0.0
+        test_batches = 0
+        with torch.no_grad():
+            for X, y, _ in test_tasks[task_id]:
+                if y.dim() > 1 and y.shape[1] == 1:
+                    y = y.squeeze(1)
+                preds = method.module(X)
+                if preds.dim() > 1 and preds.shape[-1] == 1:
+                    preds = preds.squeeze(-1)
+                loss = torch.nn.functional.mse_loss(preds, y)
+                test_loss += loss.item()
+                test_batches += 1
+        avg_test_loss = test_loss / test_batches
+        log.info(f'Task {task_id}: Test MSE loss = {avg_test_loss:.6f}')
+        
+        # Save model state and data buffer after training this task
+        import io
+        # Use state_dict to avoid deepcopy issues with non-leaf tensors
+        task_data[task_id]['model_state'] = io.BytesIO()
+        torch.save(method.module.state_dict(), task_data[task_id]['model_state'])
+        task_data[task_id]['model_state'].seek(0)
+        
+        # Save data buffer if available
+        if interval_plugin is not None and interval_plugin.data_buffer:
+            task_data[task_id]['data_buffer'] = [x.clone() for x in interval_plugin.data_buffer]
+    
+    # Now compute intervals for all tasks
+    log.info("Computing activation intervals for all tasks...")
+    
+    def compute_intervals(model, data_buffer, percentiles=(0.05, 0.95)):
+        """Helper function to compute intervals from a model and data buffer.
+        Only collects intervals from the regression head."""
+        if not data_buffer:
+            return None
+        
+        activation_buffers = {}
+        # Only get IntervalActivation layers from the regression head
+        interval_layers = []
+        for name, module in model.named_modules():
+            if isinstance(module, IntervalActivation) and 'head' in name:
+                interval_layers.append(module)
+        
+        if not interval_layers:
+            return None
+        
+        for idx, layer in enumerate(interval_layers):
+            activation_buffers[idx] = []
+        
+        # Hook into interval layers to collect activations
+        hook_handles = []
+        for idx, layer in enumerate(interval_layers):
+            def hook(module, input, output, idx=idx):
+                activation_buffers[idx].append(output.detach())
+            handle = layer.register_forward_hook(hook)
+            hook_handles.append(handle)
+        
+        # Run model on data buffer
+        model.eval()
+        with torch.no_grad():
+            for x_batch in data_buffer:
+                x_batch = x_batch.to(next(model.parameters()).device)
+                _ = model(x_batch)
+        
+        # Remove hooks
+        for handle in hook_handles:
+            handle.remove()
+        
+        # Calculate intervals from activations
+        intervals = []
+        for idx, layer in enumerate(interval_layers):
+            if len(activation_buffers[idx]) > 0:
+                activations = torch.cat(activation_buffers[idx], dim=0)
+                activations_flat = activations.view(activations.size(0), -1)
+                
+                sorted_buf, _ = torch.sort(activations_flat, dim=0)
+                n = sorted_buf.size(0)
+                
+                l_idx = int(np.clip(int(n * percentiles[0]), 0, n - 1))
+                u_idx = int(np.clip(int(n * percentiles[1]), 0, n - 1))
+                
+                min_vals = sorted_buf[l_idx]
+                max_vals = sorted_buf[u_idx]
+                
+                intervals.append({
+                    'min': min_vals.cpu().numpy().copy(),
+                    'max': max_vals.cpu().numpy().copy(),
+                    'name': layer.log_name or f'head_layer_{idx}'
+                })
+        
+        return intervals if intervals else None
+    
+    # For each task, compute current_intervals (using its own model on its own data)
+    for task_id in range(N):
+        if task_data[task_id]['model_state'] and task_data[task_id]['data_buffer']:
+            # Load model from saved state
+            temp_model = instantiate(config.model)
+            task_data[task_id]['model_state'].seek(0)
+            temp_model.load_state_dict(torch.load(task_data[task_id]['model_state']))
+            temp_model = fabric.setup(temp_model)
+            temp_model.eval()
+            
+            task_data[task_id]['current_intervals'] = compute_intervals(
+                temp_model,
+                task_data[task_id]['data_buffer']
+            )
+            log.info(f"Task {task_id}: Computed current_intervals")
+    
+    # For tasks 1+, compute old_intervals (using previous task's model on previous task's data)
+    for task_id in range(1, N):
+        if task_data[task_id - 1]['model_state'] and task_data[task_id - 1]['data_buffer']:
+            # Load model from saved state
+            temp_model = instantiate(config.model)
+            task_data[task_id - 1]['model_state'].seek(0)
+            temp_model.load_state_dict(torch.load(task_data[task_id - 1]['model_state']))
+            temp_model = fabric.setup(temp_model)
+            temp_model.eval()
+            
+            task_data[task_id]['old_intervals'] = compute_intervals(
+                temp_model,
+                task_data[task_id - 1]['data_buffer']
+            )
+            log.info(f"Task {task_id}: Computed old_intervals from task {task_id - 1}")
+    
+    log.info(f"Task data intervals summary:")
+    for i, td in enumerate(task_data):
+        log.info(f"  Task {i}: old_intervals={td['old_intervals'] is not None}, current_intervals={td['current_intervals'] is not None}")
 
     # Now create all visualizations with proper activation range alignment
     log.info('Creating visualizations...')
+    
+    # Use distinct, publication-quality colors for tasks
+    task_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                   '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    
     for task_id in range(N):
-        fig, ax_main = plt.subplots(figsize=(14, 8))
-        
-        # Collect all data for plotting
-        all_x = []
-        all_y_true = []
-        all_y_pred = []
+        fig, ax_main = plt.subplots(figsize=(12, 6))
         
         # Plot all previous and current tasks
         method.module.eval()
         with torch.no_grad():
             for tid in range(task_id + 1):
                 task_x = []
-                task_y_true = []
                 task_y_pred = []
                 
                 for X, y, _ in test_tasks[tid]:
@@ -227,149 +309,107 @@ def visualize_regression(config: DictConfig):
                     
                     # Flatten to 1D for proper concatenation
                     task_x.append(X.cpu().numpy().flatten())
-                    task_y_true.append(y.cpu().numpy().flatten())
                     task_y_pred.append(preds.cpu().numpy().flatten())
                 
                 task_x = np.concatenate(task_x)
-                task_y_true = np.concatenate(task_y_true)
                 task_y_pred = np.concatenate(task_y_pred)
+                
+                # Log prediction ranges for debugging
+                log.info(f"Task {task_id}, plotting task {tid}: predictions in range [{task_y_pred.min():.4f}, {task_y_pred.max():.4f}]")
                 
                 # Sort by x for plotting
                 sort_idx = np.argsort(task_x)
                 task_x = task_x[sort_idx]
-                task_y_true = task_y_true[sort_idx]
                 task_y_pred = task_y_pred[sort_idx]
                 
-                # Plot predictions only (no scatter points)
-                ax_main.plot(task_x, task_y_pred, '-', color=colors[tid], 
-                           linewidth=2.5, label=f'Task {tid+1} Pred', alpha=0.9, zorder=4)
+                # Plot predictions with distinct colors, no transparency
+                ax_main.plot(task_x, task_y_pred, '-', color=task_colors[tid % len(task_colors)], 
+                           linewidth=2.5, label=f'Task {tid+1}', zorder=4)
         
-        # Plot the true sine function as reference
-        x_full = np.linspace(0, 15.707963267948966, 500)
-        y_full = np.sin(x_full)
-        ax_main.plot(x_full, y_full, 'k--', linewidth=1.5, alpha=0.5, 
+        # Plot the true function as reference (with transparency)
+        # Dynamically determine x range from test data
+        x_min_plot = test_tasks[0].dataset.x_range[0]
+        x_max_plot = test_tasks[-1].dataset.x_range[1]
+        x_full = np.linspace(x_min_plot, x_max_plot, 500)
+        # Get the function from config
+        func = instantiate(config.dataset.func)
+        y_full = func(x_full)
+        ax_main.plot(x_full, y_full, 'k--', linewidth=1.5, alpha=0.4, 
                     label='True Function', zorder=2)
         
-        # Add vertical dashed lines for task boundaries
-        for tid in range(task_id + 1):
+        # Add vertical dashed lines for ALL task boundaries (not just trained ones)
+        for tid in range(N):
             if hasattr(test_tasks[tid].dataset, 'x_range'):
                 x_start, x_end = test_tasks[tid].dataset.x_range
                 if tid > 0:  # Don't draw line before first task
                     ax_main.axvline(x_start, color='gray', linestyle='--', 
                                   linewidth=1.5, alpha=0.6, zorder=1)
         
-        ax_main.set_xlabel('Input (x)', fontsize=12, fontweight='bold')
-        ax_main.set_ylabel('Output (y)', fontsize=12, fontweight='bold')
-        ax_main.set_title(f'Regression Performance after Task {task_id + 1}', 
-                         fontsize=14, fontweight='bold', pad=20)
-        ax_main.legend(loc='upper right', fontsize=10, framealpha=0.9)
-        ax_main.grid(True, alpha=0.3, linestyle='--')
-        
         # Add activation range visualization
-        # Use consistent colors: blue for current, red for reference/previous
-        color_current = 'blue'
-        color_reference = 'red'
-        
-        x_min, x_max = ax_main.get_xlim()
+        # Use distinct colors for old and current intervals
+        color_old = '#d62728'  # Red for old intervals
+        color_current = '#1f77b4'  # Blue for current intervals
         
         # Get current task data
         current_task_data = task_data[task_id]
         
-        # For task 0: show only current intervals
-        # For task N>0: show both reference (previous) and current intervals
-        if task_id == 0:
-            # Task 1: Show only current intervals
-            if current_task_data['current_intervals']:
-                for layer_idx, layer_ranges in enumerate(current_task_data['current_intervals']):
-                    min_vals = layer_ranges['min']
-                    max_vals = layer_ranges['max']
-                    layer_name = layer_ranges['name']
-                    
-                    if min_vals.size == 1:
-                        min_val = min_vals.item()
-                        max_val = max_vals.item()
-                        
-                        # Draw current intervals
-                        ax_main.axhline(min_val, color=color_current, linestyle='--', 
-                                      linewidth=2, alpha=0.7, zorder=3)
-                        ax_main.axhline(max_val, color=color_current, linestyle='--', 
-                                      linewidth=2, alpha=0.7, zorder=3)
-                        
-                        ax_main.axhspan(min_val, max_val, alpha=0.15, 
-                                      color=color_current, zorder=0)
-                        
-                        mid_val = (min_val + max_val) / 2
-                        label = 'Current Range' if layer_name == 'unnamed' else f'Current {layer_name}'
-                        ax_main.text(x_max * 0.02, mid_val, label, 
-                                   fontsize=8, ha='left', va='center',
-                                   color=color_current, fontweight='bold',
-                                   bbox=dict(boxstyle='round,pad=0.3', 
-                                           facecolor='white', alpha=0.8, 
-                                           edgecolor=color_current))
-        else:
-            # Task 2+: Show both reference (previous) and current intervals
-            # First, show reference intervals (from previous tasks)
-            if current_task_data['reference_intervals']:
-                for layer_idx, layer_ranges in enumerate(current_task_data['reference_intervals']):
-                    min_vals = layer_ranges['min']
-                    max_vals = layer_ranges['max']
-                    layer_name = layer_ranges['name']
-                    
-                    if min_vals.size == 1:
-                        min_val = min_vals.item()
-                        max_val = max_vals.item()
-                        
-                        # Draw reference intervals with dotted lines
-                        ax_main.axhline(min_val, color=color_reference, linestyle=':', 
-                                      linewidth=2, alpha=0.7, zorder=3)
-                        ax_main.axhline(max_val, color=color_reference, linestyle=':', 
-                                      linewidth=2, alpha=0.7, zorder=3)
-                        
-                        ax_main.axhspan(min_val, max_val, alpha=0.15, 
-                                      color=color_reference, zorder=0)
-                        
-                        mid_val = (min_val + max_val) / 2
-                        label = 'Previous Range' if layer_name == 'unnamed' else f'Prev {layer_name}'
-                        ax_main.text(x_max * 0.98, mid_val, label, 
-                                   fontsize=8, ha='right', va='center',
-                                   color=color_reference, fontweight='bold',
-                                   bbox=dict(boxstyle='round,pad=0.3', 
-                                           facecolor='white', alpha=0.8, 
-                                           edgecolor=color_reference))
-            
-            # Then, show current intervals
-            if current_task_data['current_intervals']:
-                for layer_idx, layer_ranges in enumerate(current_task_data['current_intervals']):
-                    min_vals = layer_ranges['min']
-                    max_vals = layer_ranges['max']
-                    layer_name = layer_ranges['name']
-                    
-                    if min_vals.size == 1:
-                        min_val = min_vals.item()
-                        max_val = max_vals.item()
-                        
-                        # Draw current intervals
-                        ax_main.axhline(min_val, color=color_current, linestyle='--', 
-                                      linewidth=2, alpha=0.7, zorder=3)
-                        ax_main.axhline(max_val, color=color_current, linestyle='--', 
-                                      linewidth=2, alpha=0.7, zorder=3)
-                        
-                        ax_main.axhspan(min_val, max_val, alpha=0.15, 
-                                      color=color_current, zorder=0)
-                        
-                        mid_val = (min_val + max_val) / 2
-                        label = 'Current Range' if layer_name == 'unnamed' else f'Current {layer_name}'
-                        ax_main.text(x_max * 0.02, mid_val, label, 
-                                   fontsize=8, ha='left', va='center',
-                                   color=color_current, fontweight='bold',
-                                   bbox=dict(boxstyle='round,pad=0.3', 
-                                           facecolor='white', alpha=0.8, 
-                                           edgecolor=color_current))
+        log.info(f"Task {task_id}: Plotting intervals - old={current_task_data['old_intervals'] is not None}, current={current_task_data['current_intervals'] is not None}")
         
-        # Add task info text
-        task_info = f'Trained on {task_id + 1} task(s)'
-        fig.text(0.99, 0.01, task_info, ha='right', va='bottom', 
-                fontsize=10, style='italic', alpha=0.7)
+        # Show old_intervals (if available) - from previous task
+        if current_task_data['old_intervals']:
+            log.info(f"  Plotting {len(current_task_data['old_intervals'])} old interval layers")
+            for layer_idx, layer_ranges in enumerate(current_task_data['old_intervals']):
+                min_vals = layer_ranges['min']
+                max_vals = layer_ranges['max']
+                
+                # Handle both scalar and array cases
+                if min_vals.size == 1:
+                    min_val = min_vals.item()
+                    max_val = max_vals.item()
+                else:
+                    # For multi-dimensional activations, take the mean
+                    min_val = min_vals.mean()
+                    max_val = max_vals.mean()
+                
+                log.info(f"    Layer {layer_idx}: old interval [{min_val:.4f}, {max_val:.4f}]")
+                
+                # Draw old intervals with dashed lines (no fill)
+                ax_main.axhline(min_val, color=color_old, linestyle='--', 
+                              linewidth=2, zorder=3, 
+                              label='Old Interval' if layer_idx == 0 else '')
+                ax_main.axhline(max_val, color=color_old, linestyle='--', 
+                              linewidth=2, zorder=3)
+        
+        # Show current_intervals (if available) - computed for this task using old_module
+        if current_task_data['current_intervals']:
+            log.info(f"  Plotting {len(current_task_data['current_intervals'])} current interval layers")
+            for layer_idx, layer_ranges in enumerate(current_task_data['current_intervals']):
+                min_vals = layer_ranges['min']
+                max_vals = layer_ranges['max']
+                
+                # Handle both scalar and array cases
+                if min_vals.size == 1:
+                    min_val = min_vals.item()
+                    max_val = max_vals.item()
+                else:
+                    # For multi-dimensional activations, take the mean
+                    min_val = min_vals.mean()
+                    max_val = max_vals.mean()
+                
+                log.info(f"    Layer {layer_idx} ({layer_ranges['name']}): current interval [{min_val:.4f}, {max_val:.4f}]")
+                
+                # Draw current intervals with dashed lines (no fill)
+                ax_main.axhline(min_val, color=color_current, linestyle='--', 
+                              linewidth=2, zorder=3,
+                              label='Current Interval' if layer_idx == 0 else '')
+                ax_main.axhline(max_val, color=color_current, linestyle='--', 
+                              linewidth=2, zorder=3)
+        
+        ax_main.set_xlabel('Input (x)', fontsize=12)
+        ax_main.set_ylabel('Output (y)', fontsize=12)
+        ax_main.set_title(f'After Task {task_id + 1}', fontsize=14)
+        ax_main.legend(loc='best', fontsize=10, framealpha=0.95)
+        ax_main.grid(True, alpha=0.3, linestyle='--')
         
         plt.tight_layout()
         
@@ -378,62 +418,5 @@ def visualize_regression(config: DictConfig):
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         log.info(f'Saved visualization to {output_path}')
         plt.close()
-    
-    # Create a final comparison plot showing all tasks
-    fig, ax = plt.subplots(figsize=(14, 8))
-    
-    method.module.eval()
-    with torch.no_grad():
-        for tid in range(N):
-            task_x = []
-            task_y_true = []
-            task_y_pred = []
-            
-            for X, y, _ in test_tasks[tid]:
-                preds = method.module(X)
-                # Flatten to 1D for proper concatenation
-                task_x.append(X.cpu().numpy().flatten())
-                task_y_true.append(y.cpu().numpy().flatten())
-                task_y_pred.append(preds.cpu().numpy().flatten())
-            
-            task_x = np.concatenate(task_x)
-            task_y_true = np.concatenate(task_y_true)
-            task_y_pred = np.concatenate(task_y_pred)
-            
-            # Sort by x
-            sort_idx = np.argsort(task_x)
-            task_x = task_x[sort_idx]
-            task_y_true = task_y_true[sort_idx]
-            task_y_pred = task_y_pred[sort_idx]
-            
-            # Plot predictions only (no scatter points)
-            ax.plot(task_x, task_y_pred, '-', color=colors[tid], 
-                   linewidth=2.5, label=f'Task {tid+1}', alpha=0.9, zorder=4)
-    
-    # Plot the true sine function as reference
-    x_full = np.linspace(0, 15.707963267948966, 500)
-    y_full = np.sin(x_full)
-    ax.plot(x_full, y_full, 'k--', linewidth=1.5, alpha=0.5, 
-           label='True Function', zorder=2)
-    
-    # Add vertical dashed lines for task boundaries
-    for tid in range(1, N):  # Start from 1 to skip line before first task
-        if hasattr(test_tasks[tid].dataset, 'x_range'):
-            x_start, _ = test_tasks[tid].dataset.x_range
-            ax.axvline(x_start, color='gray', linestyle='--', 
-                      linewidth=1.5, alpha=0.6, zorder=1)
-    
-    ax.set_xlabel('Input (x)', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Output (y)', fontsize=14, fontweight='bold')
-    ax.set_title('Final Regression Performance on All Tasks', 
-                fontsize=16, fontweight='bold', pad=20)
-    ax.legend(loc='upper right', fontsize=11, framealpha=0.9)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    
-    plt.tight_layout()
-    output_path = output_dir / 'final_all_tasks.png'
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    log.info(f'Saved final visualization to {output_path}')
-    plt.close()
     
     log.info(f'All visualizations saved to {output_dir}')

@@ -1,7 +1,7 @@
 _target_: model.MLP
 initial_out_features: 1
-sizes: [1, 128, 64]
+sizes: [1, 256, 64]
 layers: ["Normal", "Normal"]
 head_type: Regression
-activation: IntervalActivation
+activation: ReLU
 mask_past_classifier_neurons: False
