@@ -287,9 +287,9 @@ def visualize_regression(config: DictConfig):
             task_x = task_x[sort_idx]
             task_y_pred = task_y_pred[sort_idx]
             
-            # Plot predictions in black - visible because it cuts off at task boundary
-            # Don't add label to avoid cluttering legend
-            ax_main.plot(task_x, task_y_pred, '-', color='black', 
+            # Current task in red, previous tasks in black
+            color = 'red' if tid == task_id else 'black'
+            ax_main.plot(task_x, task_y_pred, '-', color=color, 
                        linewidth=2.5, zorder=4)
             
             log.info(f"Visualization {task_id+1}: Plotted Task {tid+1} predictions in range [{task_y_pred.min():.4f}, {task_y_pred.max():.4f}]")
