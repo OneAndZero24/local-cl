@@ -9,17 +9,17 @@ parameters:
   dataset:
     value: mnist
   scenario:
-    value: class_inc
+    value: domain_inc
   model:
     value: mlp
   method:
-    value: composer_ewc
+    value: composer_mas
   exp.seed: 
-    value: [42, 69, 2137, 0, 10] 
+    values: [42, 69, 2137, 0, 10]      
   exp.batch_size:
-    values: 128
+    value: 512  
   exp.epochs: 
-    values: 5
+    value: 10
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -30,15 +30,12 @@ parameters:
     value: False
   exp.cleanup:
     value: True
-  exp.dil:
-    value: False
-
 
   # Scenario configuration
   scenario._partial_:
     value: True
   scenario._target_:
-    value: continuum.ClassIncremental
+    value: scenario.DomainIncremental
   scenario.increment:
     value: 2
 
@@ -56,30 +53,31 @@ parameters:
   model.activation: 
     value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
-    value: True 
+    value: False
+  exp.dil:
+    value: True
 
   # Method configuration
   method._partial_: 
     value: True
+  method.use_dynamic_alpha: 
+    value: False
   method._target_: 
     value: method.Composer
   method.criterion: 
     value: CrossEntropyLoss
   method.criterion_scale:
-    value: 0.9491647615719008
+    value: 1.0
+  method.lr: 
+    value: 0.002046731498795776
   method.ema_scale:
     value: 0.95
-  method.lr: 
-    value: 0.00169032251946277
-
   method.plugins.0._target_:
-    value: method.EWC
+    value: method.MAS
   method.plugins.0.alpha: 
-    value: 4839.616796536014
+    value: 761.650414610656
   method.plugins.0.head_opt:
     value: True
-  method.use_dynamic_alpha:
-    value: False
 
 
 command:
@@ -87,5 +85,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - ewc_split_mnist_mlp.yaml
+  - mas_split_mnist_mlp.yaml
   - ${args_no_hyphens}

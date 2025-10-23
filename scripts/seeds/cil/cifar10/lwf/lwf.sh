@@ -8,4 +8,4 @@
 
 source scripts/main.sh
 
-run_sweep_and_agent "scripts/seeds/cifar10/lwf/lwf"
+run_sweep_and_agent "scripts/seeds/cil/cifar10/lwf/lwf"

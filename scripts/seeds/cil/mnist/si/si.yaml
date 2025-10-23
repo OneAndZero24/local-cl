@@ -13,13 +13,13 @@ parameters:
   model:
     value: mlp
   method:
-    value: composer_mas
+    value: composer_si
   exp.seed: 
-    value: [42, 69, 2137, 0, 10] 
+    values: [42, 69, 2137, 0, 10]    
   exp.batch_size:
-    values: 128
+    value: 128  
   exp.epochs: 
-    values: 5
+    value: 5
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -30,6 +30,8 @@ parameters:
     value: False
   exp.cleanup:
     value: True
+  exp.dil:
+    value: False
 
   # Scenario configuration
   scenario._partial_:
@@ -37,7 +39,7 @@ parameters:
   scenario._target_:
     value: continuum.ClassIncremental
   scenario.increment:
-    value: 2
+    value: 2 
 
   # Model configuration
   model._target_: 
@@ -53,9 +55,7 @@ parameters:
   model.activation: 
     value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
-    value: True
-  exp.dil:
-    value: False
+    value: False 
 
   # Method configuration
   method._partial_: 
@@ -67,16 +67,15 @@ parameters:
   method.criterion: 
     value: CrossEntropyLoss
   method.criterion_scale:
-    value: 1.0
+    value: 1
   method.ema_scale:
     value: 0.95
   method.lr: 
-    value: 0.0014506638711600929
-
+    value: 0.002551576226583207
   method.plugins.0._target_:
-    value: method.MAS
+    value: method.SI
   method.plugins.0.alpha: 
-    value: 45.399803595558936
+    value: 798.5697884837812
   method.plugins.0.head_opt:
     value: True
 
@@ -86,5 +85,5 @@ command:
   - python
   - ${program}
   - --config-name
-  - mas_split_mnist_mlp.yaml
+  - si_split_mnist_mlp.yaml
   - ${args_no_hyphens}
