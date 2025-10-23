@@ -1,7 +1,7 @@
 _partial_: True
 _target_: method.Composer
 criterion: L2DistanceLoss
-lr: 0.001
+lr: 0.0001  # Further increased to overcome regularization in later tasks
 ema_scale: 0.95
 beta: 0.1
 use_dynamic_alpha: False
@@ -9,9 +9,9 @@ criterion_scale: 1.0
 retaingraph: True
 plugins:
   - _target_: method.interval_penalization.IntervalPenalization
-    var_scale: 0.0  # No variance penalty - let task 0 learn freely
+    var_scale: 0.0000001  # Small variance penalty for stability
     output_reg_scale: 0
-    interval_drift_reg_scale: 0.01  # MUCH lower - was blocking learning on task 1+
+    interval_drift_reg_scale: 0.00001  # Further reduced to prevent collapse
     use_hypercube_dist_loss: False
     dil_mode: False
     regularize_classifier: False
