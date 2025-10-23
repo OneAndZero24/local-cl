@@ -1,24 +1,25 @@
 program: src/main.py
 method: bayes
+run_cap: 5
 metric:
   name: avg_acc
   goal: maximize
 
 parameters:
   dataset:
-    value: fmnist
+    value: mnist
   scenario:
     value: domain_inc
   model:
     value: mlp
   method:
-    value: composer_interval_penalization_mlp
+    value: composer_lwf
   exp.seed: 
-    value: 42      
+    values: [42, 69, 2137, 0, 10]      
   exp.batch_size:
-    values: [512, 256, 128]     
+    value: 256
   exp.epochs: 
-    values: [10, 5]
+    value: 10
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
@@ -29,8 +30,14 @@ parameters:
     value: False
   exp.cleanup:
     value: True
-  exp.dil:
+
+  # Scenario configuration
+  scenario._partial_:
     value: True
+  scenario._target_:
+    value: scenario.DomainIncremental
+  scenario.increment:
+    value: 2  
 
   # Model configuration
   model._target_: 
@@ -44,17 +51,11 @@ parameters:
   model.layers: 
     value: ["Normal", "Normal"]
   model.activation: 
-    value: IntervalActivation
+    value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
     value: False
-
-  # Scenario configuration
-  scenario._partial_:
+  exp.dil:
     value: True
-  scenario._target_:
-    value: scenario.DomainIncremental
-  scenario.increment:
-    value: 2
 
   # Method configuration
   method._partial_: 
@@ -67,42 +68,22 @@ parameters:
     value: CrossEntropyLoss
   method.criterion_scale:
     value: 1.0
-  method.retaingraph:
-    value: True
   method.lr: 
-    distribution: log_uniform_values 
-    min: 0.0001
-    max: 0.01
+    value: 0.00560338604067801
   method.ema_scale:
-    value: null
-  method.beta:
-    value: null
+    value: 0.95
   method.plugins.0._target_:
-    value: method.interval_penalization_mlp.MLPIntervalPenalization
-  method.plugins.0.var_scale: 
-    distribution: uniform
-    min: 0.0
-    max: 10.0
-  method.plugins.0.output_reg_scale: 
-    distribution: uniform
-    min: 0.0
-    max: 1000.0
-  method.plugins.0.interval_drift_reg_scale: 
-    distribution: uniform
-    min: 0.0
-    max: 1000.0
-  method.plugins.0.use_hypercube_dist_loss:
-    value: True
-  method.plugins.0.dil_mode:
-    value: True
-  method.plugins.0.regularize_classifier:
-    value: True
-  
+    value: method.LwF
+  method.plugins.0.T:
+    value: 2.413619185702146
+  method.plugins.0.alpha:
+    value: 0.8921505980200249
+
 
 command:
   - ${env}
   - python
   - ${program}
   - --config-name
-  - interval_penalization_mnist_mlp_interval.yaml
+  - lwf_split_mnist_mlp.yaml
   - ${args_no_hyphens}

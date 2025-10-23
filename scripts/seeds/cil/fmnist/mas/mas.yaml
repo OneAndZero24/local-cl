@@ -7,66 +7,31 @@ metric:
 
 parameters:
   dataset:
-    value: cifar10
+    value: fmnist
   scenario:
     value: class_inc
   model:
-    value: resnet18
+    value: mlp
   method:
     value: composer_mas
   exp.seed: 
-    values: [42, 69, 2137, 0, 10]      
+    values: [42, 69, 2137, 0, 10]  
   exp.batch_size:
-    value: 32    
+    value: 512
   exp.epochs: 
-    value: 20
+    value: 5
   exp.gen_cm: 
     value: False
   exp.detect_anomaly:
     value: False
   fabric.accelerator:
-    value: gpu  
+    value: gpu   
   exp.log_per_batch:
     value: False
   exp.cleanup:
-    value: True      
+    value: True
   exp.dil:
     value: False
-
-  # Method configuration
-  method._partial_: 
-    value: True
-  method._target_: 
-    value: method.Composer
-  method.criterion: 
-    value: CrossEntropyLoss
-  method.criterion_scale:
-    value: 0.8938907563531251
-  method.ema_scale:
-    value: 0.95
-  method.lr: 
-    value: 0.00032627315783150446
-
-  method.plugins.0._target_:
-    value: method.MAS
-  method.plugins.0.alpha: 
-    value: 102.48095038639234
-  method.plugins.0.head_opt:
-    value: True
-  method.use_dynamic_alpha:
-    value: False
-
-  # Model configuration
-  model._target_:
-    value: model.ResNet18
-  model.dim_hidden:
-    value: 400
-  model.head_type:
-    value: Normal
-  model.initial_out_features:
-    value: 2
-  model.mask_past_classifier_neurons:
-    value: True
 
   # Scenario configuration
   scenario._partial_:
@@ -76,10 +41,48 @@ parameters:
   scenario.increment:
     value: 2
 
+  # Model configuration
+  model._target_: 
+    value: model.MLP
+  model.initial_out_features:
+    value: 2          
+  model.sizes:
+    value: [1024, 400, 400]
+  model.head_type: 
+    value: Normal
+  model.layers: 
+    value: ["Normal", "Normal"]
+  model.activation: 
+    value: torch.nn.ReLU
+  model.mask_past_classifier_neurons:
+    value: False 
+
+  # Method configuration
+  method._partial_: 
+    value: True
+  method.use_dynamic_alpha: 
+    value: False
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.criterion_scale:
+    value: 1.0
+  method.lr: 
+    value: 0.0004798790225073533
+  method.ema_scale:
+    value: 0.95
+  method.plugins.0._target_:
+    value: method.MAS
+  method.plugins.0.alpha: 
+    value: 959.7471181657532
+  method.plugins.0.head_opt:
+    value: True
+
 command:
   - ${env}
   - python
   - ${program}
   - --config-name
-  - mas_cifar10_resnet18.yaml
+  - mas_split_mnist_mlp.yaml
   - ${args_no_hyphens}

@@ -160,15 +160,15 @@ class ResNet18Interval(CLModuleABC):
         # --- Layer 4 with Interval Activations ---
         # Block 4.0
         identity = self.fe.layer4_0_downsample[0](x)
-        identity_first_interval_activation = identity.clone()
         identity = self.interval_l4_0_downsample_0(identity)
+        identity_first_interval_activation = identity.clone()
 
         identity = self.fe.layer4_0_downsample[1](identity)
         identity = self.interval_l4_0_downsample_1(identity)
 
         out = self.fe.layer4_0_conv1(x)
-        layer4_0_conv1_first_interval_activation = out.clone()
         out = self.interval_l4_0_conv1(out)
+        layer4_0_first_interval_activation = out.clone()
 
         out = self.fe.layer4_0_bn1(out)
         out = self.interval_l4_0_bn1(out)
@@ -204,7 +204,7 @@ class ResNet18Interval(CLModuleABC):
         x = self.interval_l4_1_bn2(x)
 
         if return_first_interval_activation:
-            return x, identity_first_interval_activation + layer4_0_conv1_first_interval_activation
+            return x, identity_first_interval_activation, layer4_0_first_interval_activation
         return x
 
     def forward(
@@ -217,11 +217,9 @@ class ResNet18Interval(CLModuleABC):
 
         feats = self.forward_features(x, return_first_interval_activation=return_first_interval_activation)
         if return_first_interval_activation:
-            feats, first_interval_activation = feats
-            feats = self.mlp(feats)
-            out = self.head(feats)
+            _, identity_first_interval_activation, layer4_0_first_interval_activation = feats
         
-            return out, first_interval_activation
+            return identity_first_interval_activation, layer4_0_first_interval_activation
         else:
             feats = self.mlp(feats)
             return self.head(feats)

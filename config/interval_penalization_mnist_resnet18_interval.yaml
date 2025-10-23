@@ -3,7 +3,7 @@ defaults:
   - dataset: mnist
   - scenario: class_inc
   - model: resnet18_interval_id
-  - method: composer_interval_penalization
+  - method: composer_interval_penalization_mlp
 
 exp:
   run_func:

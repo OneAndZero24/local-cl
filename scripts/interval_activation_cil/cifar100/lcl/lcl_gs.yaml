@@ -12,7 +12,7 @@ parameters:
   model:
     value: resnet18_interval
   method:
-    value: composer_interval_penalization
+    value: composer_interval_penalization_resnet18
   exp.seed: 
     value: 42      
   exp.batch_size:
@@ -75,7 +75,7 @@ parameters:
   method.beta:
     value: null
   method.plugins.0._target_:
-    value: method.interval_penalization.IntervalPenalization
+    value: method.interval_penalization_resnet18.ResNet18IntervalPenalization
   method.plugins.0.var_scale: 
     distribution: uniform
     min: 0.0

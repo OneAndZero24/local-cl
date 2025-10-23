@@ -99,7 +99,7 @@ class MLP(CLModuleABC):
             except TypeError:
                 layers.append(activation)
             
-        self.mlp = nn.ModuleList(layers)
+        self.layers = nn.ModuleList(layers)
         
     def forward(self, x):
         """
@@ -115,7 +115,7 @@ class MLP(CLModuleABC):
         self.reset_activations()
 
         x = torch.flatten(x, start_dim=1)
-        for layer in self.mlp:
+        for layer in self.layers:
             x = layer(x)
 
         return self.head(x)
