@@ -16,6 +16,7 @@ class IntervalActivation(nn.Module):
     new tasks.
 
     Attributes:
+        layer_name (str): Optional name of the layer for logging purposes.
         lower_percentile (float): Lower percentile for min bound computation.
         upper_percentile (float): Upper percentile for max bound computation.
         min (torch.Tensor): Lower bound per neuron (updated via reset_range).
@@ -31,6 +32,7 @@ class IntervalActivation(nn.Module):
     """
 
     def __init__(self,
+        layer_name: str = None,
         lower_percentile: float = 0.05,
         upper_percentile: float = 0.95,
         log_name: str = None,
@@ -39,6 +41,7 @@ class IntervalActivation(nn.Module):
         Initializes the IntervalActivation layer.
 
         Args:
+            layer_name (str, optional): Name of the layer. Defaults to None.
             lower_percentile (float, optional): Lower percentile for min bound. Defaults to 0.05.
             upper_percentile (float, optional): Upper percentile for max bound. Defaults to 0.95.
             log_name (str, optional): Name of the layer for wandb logging. Defaults to None.
@@ -51,6 +54,7 @@ class IntervalActivation(nn.Module):
         self.min = None
         self.max = None
         self.log_name = log_name
+        self.layer_name = layer_name
 
         self.curr_task_last_batch = None
 
@@ -120,3 +124,6 @@ class IntervalActivation(nn.Module):
             self.curr_task_last_batch = out
 
         return out
+    
+    def __repr__(self):
+        return super().__repr__() + f"(layer_name={self.layer_name})"

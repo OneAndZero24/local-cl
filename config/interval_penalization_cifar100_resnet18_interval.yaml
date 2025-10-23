@@ -3,7 +3,7 @@ defaults:
   - dataset: cifar100
   - scenario: class_inc
   - model: resnet18_interval
-  - method: composer_interval_penalization
+  - method: composer_interval_penalization_resnet18
 
 exp:
   run_func:

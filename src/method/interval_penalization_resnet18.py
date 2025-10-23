@@ -12,10 +12,10 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
-class IntervalPenalization(MethodPluginABC):
+class ResNet18IntervalPenalization(MethodPluginABC):
     """
     Continual learning regularizer that protects representations learned inside 
-    `IntervalActivation` hypercubes across tasks.
+    `IntervalActivation` hypercubes across tasks for the ResNet-18 architecture.
 
     This plugin adds multiple penalties to the task loss:
     
@@ -31,33 +31,31 @@ class IntervalPenalization(MethodPluginABC):
       Penalizes deviations of new activations from old-task activations 
       inside the same hypercube, with a stronger penalty near the cube center.
 
-    - **Hypercube distance loss (`hypercube_dist_loss`)**
+    - **Hypercube distance loss (`hypercube_dist_loss`)**  
       Penalizes distance between representations learned within hypercubes.
 
-    Together, these terms reduce representation drift inside protected regions, 
-    while still allowing free adaptation outside.
+    Together, these terms reduce representation drift inside protected regions 
+    while allowing free adaptation outside them.
 
-    Attributes:
+    Args:
         var_scale (float): Weight of the variance regularizer.
         output_reg_scale (float): Weight of the output preservation term.
-        interval_drift_reg_scale (float): Weight of the drift regularizer.
+        interval_drift_reg_scale (float): Weight of the interval drift regularizer.
+        use_hypercube_dist_loss (bool, optional): Whether to use the hypercube distance loss. Defaults to True.
+        dil_mode (bool, optional): If True, also regularizes the classifier head. Defaults to False.
+        regularize_classifier (bool, optional): If True, the classifier head is regularized. Defaults to False.
+
+    Attributes:
         task_id (int): Identifier for the current task.
         params_buffer (dict): Snapshot of frozen parameters from the previous task.
-        old_state (dict): Full parameter/buffer snapshot used for drift comparison.
-        use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
-                                                      representations close to each other.
-        data_buffer (list): A buffer to store data samples.
-        regularize_classifier (bool): If True, the classifier head is regularized. Default: False.
-
-    Methods:
-        setup_task(task_id):
-            Prepares state before starting a new task (snapshots old params/buffers).
-        forward_with_snapshot(x, stop_at="IntervalActivation"):
-            Runs a forward pass with frozen params up to the first IntervalActivation.
-        snapshot_state():
-            Creates a snapshot of all parameters and buffers.
-        forward(x, y, loss, preds):
-            Adds interval regularization terms to the given loss.
+        old_module (nn.Module): Deep copy of the previous model used for activation comparison.
+        data_buffer (list): Buffer to store representative input samples.
+        var_scale (float): Weight of the variance penalty term.
+        output_reg_scale (float): Weight of the output preservation term.
+        interval_drift_reg_scale (float): Weight of the drift penalty term.
+        use_hypercube_dist_loss (bool): Flag indicating whether to include the hypercube distance loss.
+        dil_mode (bool): Whether to apply regularization to the classifier head.
+        regularize_classifier (bool): If True, includes classifier head in regularization.
     """
 
     def __init__(self,
@@ -69,17 +67,15 @@ class IntervalPenalization(MethodPluginABC):
             regularize_classifier: bool = False,
         ) -> None:
         """
-        Initialize the interval penalization plugin.
+        Initializes the interval penalization plugin.
 
         Args:
-            var_scale (float, optional): Weight of the variance penalty. Default: 0.01.
-            output_reg_scale (float, optional): Weight of the output preservation penalty. Default: 1.0.
-            interval_drift_reg_scale (float, optional): Weight of the interval drift penalty. Default: 1.0.
-            use_hypercube_dist_loss (bool, optional): If True, hypercube distance loss is used to keep the learned
-                                                      representations close to each other.
-            dil_mode (bool, optional): If True, the classifier head is also regularized. If False (TIL/CIL scenarios)
-                                        past class neurons should be simply masked without the regularization.
-            regularize_classifier (bool, optional): If True, the classifier head is regularized. Default: False.
+            var_scale (float, optional): Weight of the variance penalty. Defaults to 0.01.
+            output_reg_scale (float, optional): Weight of the output preservation penalty. Defaults to 1.0.
+            interval_drift_reg_scale (float, optional): Weight of the interval drift penalty. Defaults to 1.0.
+            use_hypercube_dist_loss (bool, optional): Whether to include the hypercube distance loss. Defaults to True.
+            dil_mode (bool, optional): If True, applies regularization to the classifier head. Defaults to False.
+            regularize_classifier (bool, optional): If True, includes the classifier in regularization. Defaults to False.
         """
         
         super().__init__()
@@ -100,37 +96,33 @@ class IntervalPenalization(MethodPluginABC):
         self.data_buffer = []
         self.old_module = None
 
-    def forward_with_snapshot(self, x: torch.Tensor) -> torch.Tensor:
+    def forward_with_snapshot(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Runs the model forward using parameters and buffers from the previous task snapshot.  
-        Used to compare new activations with old-task activations.
+        Runs the model forward using parameters and buffers from the previous task snapshot.
+
+        This is used to obtain activations from the frozen (old) model for drift comparison
+        against the current model.
 
         Args:
             x (torch.Tensor): Input tensor.
 
         Returns:
-            torch.Tensor: Activations at the stopping point with old parameters/buffers.
+            Tuple[torch.Tensor, torch.Tensor]]: Activations from the old model
+            corresponding to the first `IntervalActivation` layer.
         """
-        if hasattr(self.old_module, "fe"):
-            with torch.no_grad():
-                _, out = self.old_module.forward(x, return_first_interval_activation=True)
-        else:
-            out = x.flatten(start_dim=1)
-            for layer in self.old_module.mlp:
-                out = layer(out)
-                if type(layer).__name__ == "IntervalActivation":
-                    break
-        
-        return out.detach()
+        with torch.no_grad():
+            identity, out = self.old_module.forward(x, return_first_interval_activation=True)
+
+            return identity.detach(), out.detach()
 
     def setup_task(self, task_id: int) -> None:
         """
-        Prepare the plugin for a new task.  
+        Prepares the plugin for a new task.
 
-        - Task 0: only sets `task_id`.  
-        - Task >0: freezes trainable parameters, saves a snapshot in `old_state`,
-        collects activations from all IntervalActivation layers over `self.data_buffer`,
-        and resets their intervals.  
+        - For the first task (task_id == 0), only initializes internal variables.
+        - For subsequent tasks, creates a frozen snapshot of model parameters and buffers,
+          collects activations for all `IntervalActivation` layers from stored samples,
+          and resets their activation intervals.
 
         Args:
             task_id (int): Identifier for the current task.
@@ -152,7 +144,7 @@ class IntervalPenalization(MethodPluginABC):
 
             self.old_interval_to_param = self._map_interval_to_nearest_param(self.old_module)
             self.curr_interval_to_param = self._map_interval_to_nearest_param(self.module)
-
+          
             self.old_interval_act_layers = [module for _, module in self.old_module.named_modules() if type(module).__name__ == "IntervalActivation"]
 
             interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
@@ -186,21 +178,22 @@ class IntervalPenalization(MethodPluginABC):
     def forward(self, x: torch.Tensor, y: torch.Tensor, loss: torch.Tensor, 
                 preds: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
         """
-        Add interval regularization penalties to the current loss.  
+        Adds interval regularization penalties to the current task loss.
 
-        Penalties:
-            - Variance loss: discourages variance within interval activations.  
-            - Drift loss: penalizes change of activations inside the old-task hypercube.  
-            - Output reg: discourages parameter updates that break interval consistency.  
+        The method computes and applies the following penalties:
+            - Variance loss: discourages high variance within interval activations.
+            - Drift loss: penalizes deviation from old-task activations inside hypercubes.
+            - Output regularization: constrains parameter changes above intervals.
+            - (Optional) Hypercube distance loss: keeps new representations close to previous ones.
 
         Args:
-            x (torch.Tensor): Input tensor.  
-            y (torch.Tensor): Target labels (unused here, passed through).  
-            loss (torch.Tensor): Current task loss.  
-            preds (torch.Tensor): Model predictions.  
+            x (torch.Tensor): Input tensor.
+            y (torch.Tensor): Target labels (not directly used here).
+            loss (torch.Tensor): Current task loss.
+            preds (torch.Tensor): Model predictions.
 
         Returns:
-            (loss, preds): Updated loss with added penalties, predictions unchanged.
+            Tuple[torch.Tensor, torch.Tensor]: Tuple containing the updated loss and unmodified predictions.
         """
 
         self.data_buffer.append(x.detach())
@@ -211,7 +204,6 @@ class IntervalPenalization(MethodPluginABC):
         output_reg_loss = torch.tensor(0.0, device=x.device)
         interval_drift_loss = torch.tensor(0.0, device=x.device)
         hypercube_dist_loss = torch.tensor(0.0, device=x.device)
-
 
         for idx, layer in enumerate(interval_act_layers):
 
@@ -226,15 +218,28 @@ class IntervalPenalization(MethodPluginABC):
 
                 # Drift only at the FIRST IntervalActivation
                 if idx == 0:
-                    if hasattr(self.module, "fe"):
-                        y_old = self.forward_with_snapshot(x)
-                    else:
-                        y_old = self.forward_with_snapshot(x.flatten(start_dim=1))
-                    mask = ((acts >= lb) & (acts <= ub)).float()
+                    identity_bounds = self.module.interval_l4_0_downsample_0
+
+                    identity_bounds_min = identity_bounds.min.to(x.device)
+                    identity_bounds_max = identity_bounds.max.to(x.device)
+
+                    out_bounds = self.module.interval_l4_0_conv1
+                    out_bounds_min = out_bounds.min.to(x.device)
+                    out_bounds_max = out_bounds.max.to(x.device)
+
+                    old_identity, old_out = self.forward_with_snapshot(x)
+                    curr_identity, curr_out = self.module.forward(x, return_first_interval_activation=True)
+
+                    mask_identity = ((old_identity >= identity_bounds_min) & (old_identity <= identity_bounds_max)).float()
+                    mask_out = ((old_out >= out_bounds_min) & (old_out <= out_bounds_max)).float()
+
                     interval_drift_loss += (
-                        (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
+                        (mask_identity * (old_identity - curr_identity).pow(2)).sum() / (mask_identity.sum() + 1e-8)
                     )
-                
+                    interval_drift_loss += (
+                        (mask_out * (old_out - curr_out).pow(2)).sum() / (mask_out.sum() + 1e-8)
+                    )
+                   
                 # Output reg for the nearest upper layer
                 curr_target = self.curr_interval_to_param.get(layer, None)
                 old_target = self.old_interval_to_param.get(self.old_interval_act_layers[idx], None)
@@ -255,6 +260,9 @@ class IntervalPenalization(MethodPluginABC):
 
                         if "weight" in param_name:
                             if isinstance(curr_target, nn.Linear):
+                                lb = lb.view(-1)
+                                ub = ub.view(-1)
+                              
                                 lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
                                 upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
                             elif isinstance(curr_target, nn.Conv2d):
@@ -289,22 +297,25 @@ class IntervalPenalization(MethodPluginABC):
 
                     output_reg_loss += lower_bound_reg.pow(2) + upper_bound_reg.pow(2)
 
-                # if self.use_hypercube_dist_loss:
-                #     prev_center = (ub + lb) / 2.0
-                #     prev_radii  = (ub - lb) / 2.0
+                if self.use_hypercube_dist_loss:
+                    prev_center = (ub + lb) / 2.0
+                    prev_radii  = (ub - lb) / 2.0
                     
-                #     lb_prev_hypercube = prev_center - prev_radii
-                #     ub_prev_hypercube = prev_center + prev_radii
+                    lb_prev_hypercube = prev_center - prev_radii
+                    ub_prev_hypercube = prev_center + prev_radii
 
-                #     new_lb, _ = acts_flat.min(dim=0)
-                #     new_ub, _ = acts_flat.max(dim=0)
+                    lb_prev_hypercube = lb_prev_hypercube.view(-1)
+                    ub_prev_hypercube = ub_prev_hypercube.view(-1)
 
-                #     non_overlap_mask = (new_lb > ub_prev_hypercube) | (new_ub < lb_prev_hypercube)
-                #     new_center = (new_ub + new_lb) / 2.0
+                    new_lb, _ = acts_flat.min(dim=0)
+                    new_ub, _ = acts_flat.max(dim=0)
 
-                #     center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
+                    non_overlap_mask = (new_lb > ub_prev_hypercube) | (new_ub < lb_prev_hypercube)
+                    new_center = (new_ub + new_lb) / 2.0
 
-                #     hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
+                    center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
+
+                    hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
 
 
         loss = (
@@ -318,43 +329,37 @@ class IntervalPenalization(MethodPluginABC):
     
     def _map_interval_to_nearest_param(self, module: nn.Module) -> dict:
         """
-        Map each IntervalActivation layer to the nearest learnable layer directly above it.
+        Maps each `IntervalActivation` layer to the nearest learnable layer above it.
 
-        A "learnable layer" is one of:
+        Learnable layers include:
             - nn.Conv2d
             - nn.BatchNorm1d / nn.BatchNorm2d
             - nn.Linear
 
+        This mapping is used to associate activation intervals with the layers
+        most responsible for generating them, enabling localized regularization.
+
+        Args:
+            module (nn.Module): The model instance to analyze.
+
         Returns:
-            dict: mapping {IntervalActivation: nearest parameterized layer or None}
+            dict: Mapping from `IntervalActivation` layers to their nearest parameterized layers.
         """
-        if hasattr(module, 'fe'):
-            # ResNet architecture
-            m = module
-            mapping = {
-                m.interval_l4_0_conv1: m.fe.layer4_0_bn1,
-                m.interval_l4_0_bn1: m.fe.layer4_0_conv2,
-                m.interval_l4_0_conv2: m.fe.layer4_0_bn2,
-                m.interval_l4_1_conv1: m.fe.layer4_1_bn1,
-                m.interval_l4_1_bn1: m.fe.layer4_1_conv2,
-                m.interval_l4_1_conv2: m.fe.layer4_1_bn2,
-                m.mlp[0]: m.mlp[1],
-                m.mlp[2]: m.head,
-            }
-            if hasattr(m, 'interval_l4_0_downsample'):
-                mapping[m.interval_l4_0_downsample] = None  # No immediate parameterized layer
-            if m.insert_between_blocks:
-                mapping[m.interval_l4_0_end] = m.fe.layer4_1_conv1
-                mapping[m.interval_l4_1_end] = m.mlp[1]
-            # For bn2 layers without insert_between_blocks, set to next conv or linear
-            if not m.insert_between_blocks:
-                mapping[m.interval_l4_0_bn2] = m.fe.layer4_1_conv1
-                mapping[m.interval_l4_1_bn2] = m.mlp[1]
-        else:
-            # MLP architecture
-            m = module
-            mapping = {
-                m.mlp[0]: m.mlp[1],
-                m.mlp[2]: m.head
-            }
+        # ResNet architecture
+        m = module
+        mapping = {
+            m.interval_l4_0_conv1: m.fe.layer4_0_bn1,
+            m.interval_l4_0_bn1: m.fe.layer4_0_conv2,
+            m.interval_l4_0_conv2: m.fe.layer4_0_bn2,
+            m.interval_l4_0_bn2: m.fe.layer4_1_conv1,
+            m.interval_l4_1_conv1: m.fe.layer4_1_bn1,
+            m.interval_l4_1_bn1: m.fe.layer4_1_conv2,
+            m.interval_l4_1_conv2: m.fe.layer4_1_bn2,
+            m.interval_l4_1_bn2: m.mlp[0],
+            m.mlp[0]: m.mlp[1],
+            m.mlp[1]: m.head if self.regularize_classifier else None
+        }
+        if hasattr(m.fe, 'layer4_0_downsample'):
+            mapping[m.interval_l4_0_downsample_0] = m.fe.layer4_0_downsample[1]
+        
         return mapping
