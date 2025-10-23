@@ -312,36 +312,37 @@ def visualize_regression(config: DictConfig):
         color_old = 'black'
         color_current = 'red'
         
-        # Get current task data
+        # Get current task data and x boundaries
         current_task_data = task_data[task_id]
+        current_x_start, current_x_end = test_tasks[task_id].dataset.x_range
         
         log.info(f"Task {task_id}: Plotting intervals - old={current_task_data['old_interval'] is not None}, current={current_task_data['current_interval'] is not None}")
         
-        # Show old_interval (if available) - from previous task
+        # Show old_interval (if available) - from x_min to start of current task
         if current_task_data['old_interval']:
             min_val = current_task_data['old_interval']['min']
             max_val = current_task_data['old_interval']['max']
             
             log.info(f"  Old interval: [{min_val:.4f}, {max_val:.4f}]")
             
-            # Draw old interval with dashed lines (no fill)
-            ax_main.axhline(min_val, color=color_old, linestyle='--', 
-                          linewidth=2, zorder=3, label='Previous Interval')
-            ax_main.axhline(max_val, color=color_old, linestyle='--', 
-                          linewidth=2, zorder=3)
+            # Draw old interval lines only up to current task boundary
+            ax_main.hlines(min_val, x_min_global, current_x_start, 
+                          color=color_old, linestyle='--', linewidth=2, zorder=3, label='Previous Interval')
+            ax_main.hlines(max_val, x_min_global, current_x_start, 
+                          color=color_old, linestyle='--', linewidth=2, zorder=3)
         
-        # Show current_interval (if available) - computed after training this task
+        # Show current_interval (if available) - from start of current task onwards
         if current_task_data['current_interval']:
             min_val = current_task_data['current_interval']['min']
             max_val = current_task_data['current_interval']['max']
             
             log.info(f"  Current interval: [{min_val:.4f}, {max_val:.4f}]")
             
-            # Draw current interval with dashed lines (no fill)
-            ax_main.axhline(min_val, color=color_current, linestyle='--', 
-                          linewidth=2, zorder=3, label='Current Interval')
-            ax_main.axhline(max_val, color=color_current, linestyle='--', 
-                          linewidth=2, zorder=3)
+            # Draw current interval lines from current task start to current task end
+            ax_main.hlines(min_val, current_x_start, current_x_end, 
+                          color=color_current, linestyle='--', linewidth=2, zorder=3, label='Current Interval')
+            ax_main.hlines(max_val, current_x_start, current_x_end, 
+                          color=color_current, linestyle='--', linewidth=2, zorder=3)
         
         # Set consistent axis ranges for all plots
         ax_main.set_xlim(x_min_global, x_max_global)
