@@ -299,7 +299,7 @@ class MLPIntervalPenalization(MethodPluginABC):
 
                     center_loss = torch.norm(new_center[non_overlap_mask] - prev_center[non_overlap_mask], p=2)
 
-                    hypercube_dist_loss = center_loss / (prev_radii.mean() + 1e-8)
+                    hypercube_dist_loss += center_loss / (prev_radii.mean() + 1e-8)
 
 
         loss = (
