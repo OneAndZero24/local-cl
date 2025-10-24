@@ -266,11 +266,6 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                             if isinstance(curr_target, nn.Linear):
                                 lb = lb.view(-1)
                                 ub = ub.view(-1)
-
-                                if self.regularize_classifier and use_classifier:
-                                    weight_diff_pos = weight_diff_pos[:old_nclasses, :]
-                                    weight_diff_neg = weight_diff_neg[:old_nclasses, :]
-
                                
                                 lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
                                 upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
@@ -301,8 +296,6 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                                 upper_bound_reg += (pos * n_ub - neg * n_lb).sum()
                         elif "bias" in param_name:
                             bias_diff = p_curr - p_old
-                            if self.regularize_classifier and use_classifier:
-                                bias_diff = bias_diff[:old_nclasses]
                 
                             lower_bound_reg += bias_diff.sum()
                             upper_bound_reg += bias_diff.sum()
