@@ -271,9 +271,6 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                                     weight_diff_pos = weight_diff_pos[:old_nclasses, :]
                                     weight_diff_neg = weight_diff_neg[:old_nclasses, :]
 
-                                    p_new_pos = torch.relu(p_curr[old_nclasses:, :])
-                                    p_new_neg = torch.relu(-p_curr[old_nclasses:, :])
-                                    loss += (p_new_pos @ ub - p_new_neg @ lb).sum()
                                
                                 lower_bound_reg += (weight_diff_pos @ lb - weight_diff_neg @ ub).sum()
                                 upper_bound_reg += (weight_diff_pos @ ub - weight_diff_neg @ lb).sum()
@@ -306,10 +303,7 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                             bias_diff = p_curr - p_old
                             if self.regularize_classifier and use_classifier:
                                 bias_diff = bias_diff[:old_nclasses]
-                                p_new = p_curr[old_nclasses:]
-
-                                loss += p_new.sum()
-
+                
                             lower_bound_reg += bias_diff.sum()
                             upper_bound_reg += bias_diff.sum()
 
