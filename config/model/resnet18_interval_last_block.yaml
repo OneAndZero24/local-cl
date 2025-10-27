@@ -1,4 +1,4 @@
-_target_: model.ResNet18Interval
+_target_: model.ResNet18IntervalLastBlock
 initial_out_features: 2
 dim_hidden: 400
 interval_layer_kwargs:

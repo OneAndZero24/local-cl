@@ -1,0 +1,9 @@
+_target_: model.ResNet18IntervalCls
+initial_out_features: 2
+dim_hidden: 400
+interval_layer_kwargs:
+  lower_percentile: 0.05
+  upper_percentile: 0.95
+head_type: Normal
+head_kwargs: {}
+mask_past_classifier_neurons: True

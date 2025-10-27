@@ -12,10 +12,11 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
-class ResNet18IntervalPenalization(MethodPluginABC):
+class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
     """
     Continual learning regularizer that protects representations learned inside 
     `IntervalActivation` hypercubes across tasks for the ResNet-18 architecture.
+    The regularizer is applied only to the last block of the ResNet-18.
 
     This plugin adds multiple penalties to the task loss:
     
@@ -196,7 +197,7 @@ class ResNet18IntervalPenalization(MethodPluginABC):
             Tuple[torch.Tensor, torch.Tensor]: Tuple containing the updated loss and unmodified predictions.
         """
 
-        self.data_buffer.append(x.detach())
+        self.data_buffer.append(x)
 
         interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
 
@@ -245,13 +246,9 @@ class ResNet18IntervalPenalization(MethodPluginABC):
                 old_target = self.old_interval_to_param.get(self.old_interval_act_layers[idx], None)
 
                 if curr_target is not None and old_target is not None:
-                    use_classifier = False
 
                     # Handle classifier if applicable
                     if (self.regularize_classifier or self.dil_mode) and hasattr(curr_target, "classifier"):
-                        use_classifier = True
-                        old_nclasses = old_target.old_nclasses
-
                         curr_target = curr_target.classifier
                         old_target = old_target.classifier
 

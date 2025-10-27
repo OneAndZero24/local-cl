@@ -2,8 +2,8 @@ defaults:
   - _self_
   - dataset: cifar10
   - scenario: class_inc
-  - model: resnet18_interval
-  - method: composer_interval_penalization_resnet18
+  - model: resnet18_interval_cls
+  - method: composer_interval_penalization_resnet18_cls
 
 exp:
   run_func:

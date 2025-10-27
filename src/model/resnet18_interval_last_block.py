@@ -52,7 +52,7 @@ class FlattenedResNet18FE(nn.Module):
         self.final_relu = nn.ReLU(inplace=True)
         self.relu_int = nn.ReLU(inplace=True)
 
-class ResNet18Interval(CLModuleABC):
+class ResNet18IntervalLastBlock(CLModuleABC):
     """
     A flattened ResNet-18 backbone augmented with IntervalActivation layers.
     
