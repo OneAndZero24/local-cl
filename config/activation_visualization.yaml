@@ -1,0 +1,32 @@
+defaults:
+  - _self_
+  - dataset: imagenet
+  - scenario: class_inc
+  - model: big_model
+  - method: composer_interval_penalization_big_model
+
+exp:
+  run_func:
+    _target_: experiment.experiment
+  seed: 42
+  log_dir: # set during runtime to automatically created dir
+  batch_size: 64
+  epochs: 1
+  gen_cm: False
+  log_per_batch: False
+  detect_anomaly: False
+  cleanup: True
+  calc_bwt: False
+  calc_fwt: False
+  acc_table: False
+  dil: False
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
+  accelerator: cpu # or gpu
+
+wandb:
+  entity: ${oc.env:WANDB_ENTITY}
+  project: ${oc.env:WANDB_PROJECT}
