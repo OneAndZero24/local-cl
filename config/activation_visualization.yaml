@@ -1,8 +1,8 @@
 defaults:
   - _self_
-  - dataset: imagenet
+  - dataset: imagenet10
   - scenario: class_inc
-  - model: big_model
+  - model: vit
   - method: composer_interval_penalization_big_model
 
 exp:

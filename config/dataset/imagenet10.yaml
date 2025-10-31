@@ -1,0 +1,15 @@
+_target_: src.dataset.imagenet10.ImageNetSubset10
+_partial_: True
+
+data_path: ${oc.env:DATA_DIR}/imagenet
+class_names_to_wnid:
+  goldfinch: n01531178
+  koala: n01882714
+  sea anemone: n01914609
+  hip: n12620546
+  cock: n01514668
+  white stork: n02002556
+  norwegian elkhound: n02091467
+  indigo bunting: n01537544
+  cocker spaniel: n02102318
+  leopard: n02128385

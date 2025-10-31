@@ -1,0 +1,1 @@
+from .imagenet10 import ImageNetSubset10

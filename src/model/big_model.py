@@ -61,7 +61,7 @@ class BigModel(CLModuleABC):
 
         channels = None
         if pretrained_backbone_name == 'resnet18':
-            base_model = models.resnet18(pretrained=pretrained)
+            base_model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
             channels = 256
             self.fe = nn.Sequential(
                 base_model.conv1,
@@ -80,7 +80,7 @@ class BigModel(CLModuleABC):
             )
 
         elif pretrained_backbone_name == 'resnet50':
-            base_model = models.resnet50(pretrained=pretrained)
+            base_model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
             channels = 1024
             self.fe = nn.Sequential(
                 base_model.conv1,
@@ -99,7 +99,7 @@ class BigModel(CLModuleABC):
             )
 
         else:
-            vit = models.vit_b_16(pretrained=pretrained)
+            vit = models.vit_b_16(weights=models.ViT_B_16_Weights.DEFAULT)
             self.fe = nn.Sequential(*list(vit.children())[:-1])
             self.flatten_output = False
             self.reducer = nn.Identity()

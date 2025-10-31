@@ -9,3 +9,4 @@ from .dynamic_loss_scaling import DynamicScaling
 from .interval_penalization_resnet18_last_block import ResNet18IntervalPenalizationLastBlock
 from .interval_penalization_resnet18_cls import ResNet18IntervalPenalizationCls
 from .interval_penalization_mlp import MLPIntervalPenalization
+from .interval_penalization_big_model import BigModelIntervalPenalization
