@@ -11,20 +11,21 @@ class ImageNetSubset10(_ContinuumDataset):
         self.data_path = os.path.join(data_path, "train" if train else "test")
         self.class_names_to_wnid = class_names_to_wnid
         self.class_name_to_label = {name: i for i, name in enumerate(class_names_to_wnid.keys())}
-        self.image_size = image_size  # ✅ kluczowe
+        self.image_size = image_size
         self._x, self._y, self._t = None, None, None
+        self._bboxes = None
 
     def _setup(self):
         """Load all selected classes as numpy image arrays."""
         all_x, all_y = [], []
-        print(f"📂 Loading subset from: {self.data_path}")
+        print(f"Loading subset from: {self.data_path}")
 
         for class_name, wnid in self.class_names_to_wnid.items():
             label = self.class_name_to_label[class_name]
             folder = os.path.join(self.data_path, wnid)
 
             if not os.path.isdir(folder):
-                print(f"⚠️ Missing folder for '{class_name}' ({wnid})")
+                print(f"Missing folder for '{class_name}' ({wnid})")
                 continue
 
             img_files = [
@@ -40,10 +41,10 @@ class ImageNetSubset10(_ContinuumDataset):
                     all_x.append(np.array(img, dtype=np.uint8))
                     all_y.append(label)
                 except Exception as e:
-                    print(f"⚠️ Could not load {path}: {e}")
+                    print(f"Could not load {path}: {e}")
 
         self._x, self._y, self._t = np.array(all_x), np.array(all_y), np.zeros(len(all_x))
-        print(f"✅ Loaded {len(all_x)} images across {len(set(all_y))} classes.")
+        print(f"Loaded {len(all_x)} images across {len(set(all_y))} classes.")
 
 
     def get_data(self):

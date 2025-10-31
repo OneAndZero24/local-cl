@@ -1,7 +1,7 @@
 _target_: model.BigModel
 pretrained_backbone_name: "vit_b_16"
 frozen: true
-pretrained: true
+add_interval_activation_after_backbone: True
 head:
   _target_: model.MLP
   initial_out_features: 2

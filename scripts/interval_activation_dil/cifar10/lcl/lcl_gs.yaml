@@ -92,7 +92,7 @@ parameters:
   method.plugins.0.dil_mode:
     value: True
   method.plugins.0.regularize_classifier:
-    value: False
+    value: True
   
 
 command:

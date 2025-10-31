@@ -137,15 +137,15 @@ class BigModelIntervalPenalization(MethodPluginABC):
                     p.requires_grad = False
                     self.params_buffer[name] = p.detach().clone()
 
-            self.old_fe = deepcopy(self.module.fe)
-            for p in self.old_fe.parameters():
+            self.old_module = deepcopy(self.module)
+            for p in self.old_module.parameters():
                 p.requires_grad = False
-            self.old_fe.eval()
+            self.old_module.eval()
 
             activation_buffers = {}
             hook_handles = []
 
-            for idx, layer in enumerate(self.module.c_head):
+            for idx, layer in enumerate(self.module.mlp_layers):
                 if type(layer).__name__ == "IntervalActivation":
                     activation_buffers[idx] = []
 
@@ -161,7 +161,7 @@ class BigModelIntervalPenalization(MethodPluginABC):
                     x = x.to(next(self.module.parameters()).device)
                     _ = self.module(x)
 
-            for idx, layer in enumerate(self.module.c_head):
+            for idx, layer in enumerate(self.module.mlp_layers):
                 if type(layer).__name__ == "IntervalActivation":
                     layer.reset_range(activation_buffers[idx])
 
@@ -193,14 +193,26 @@ class BigModelIntervalPenalization(MethodPluginABC):
 
         self.data_buffer.add(x)
 
-        layers = self.module.c_head
-        interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
-
+        layers = self.module.mlp_layers
+        interval_act_layers = [module for _, module in self.module.c_head.named_modules() if type(module).__name__ == "IntervalActivation"]
         var_loss = torch.tensor(0.0, device=x.device)
-        output_reg_loss = torch.tensor(0.0, device=x.device)
         interval_drift_loss = torch.tensor(0.0, device=x.device)
+        output_reg_loss = torch.tensor(0.0, device=x.device)
         hypercube_dist_loss = torch.tensor(0.0, device=x.device)
 
+        # Drift only at the FIRST IntervalActivation
+        if self.task_id > 0:
+            y_old = self.old_module(x, return_first_interval_activation=True)
+            layer = self.module.interval_act_layer_after_backbone
+            acts = self.module.interval_act_layer_after_backbone.curr_task_last_batch
+            lb = layer.min.to(x.device)
+            ub = layer.max.to(x.device)
+            mask = ((acts >= lb) & (acts <= ub)).float()
+            interval_drift_loss += (
+                (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
+            )
+
+            interval_act_layers.insert(0, layer)            
 
         for idx, layer in enumerate(interval_act_layers):
 
@@ -212,15 +224,6 @@ class BigModelIntervalPenalization(MethodPluginABC):
             if self.task_id > 0:
                 lb = layer.min.to(x.device)
                 ub = layer.max.to(x.device)
-
-                # Drift only at the FIRST IntervalActivation
-                if idx == 0:
-
-                    y_old = self.old_fe(x)
-                    mask = ((acts >= lb) & (acts <= ub)).float()
-                    interval_drift_loss += (
-                        (mask * (y_old - acts).pow(2)).sum() / (mask.sum() + 1e-8)
-                    )
                 
                 # Regularize all layers above
                 next_layer = layers[2*idx+1]

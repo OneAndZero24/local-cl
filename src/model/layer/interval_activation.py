@@ -22,6 +22,7 @@ class IntervalActivation(nn.Module):
         min (torch.Tensor): Lower bound per neuron (updated via reset_range).
         max (torch.Tensor): Upper bound per neuron (updated via reset_range).
         curr_task_last_batch (torch.Tensor): Stores last batch activations during training.
+        use_nonlinear_transform (bool): If True, nonlinear transform is used.
 
     Methods:
         reset_range(acttivations):
@@ -36,6 +37,7 @@ class IntervalActivation(nn.Module):
         lower_percentile: float = 0.05,
         upper_percentile: float = 0.95,
         log_name: str = None,
+        use_nonlinear_transform: bool = True
     ) -> None:
         """
         Initializes the IntervalActivation layer.
@@ -45,6 +47,7 @@ class IntervalActivation(nn.Module):
             lower_percentile (float, optional): Lower percentile for min bound. Defaults to 0.05.
             upper_percentile (float, optional): Upper percentile for max bound. Defaults to 0.95.
             log_name (str, optional): Name of the layer for wandb logging. Defaults to None.
+            use_nonlinear_transform (bool): If True, nonlinear transform is used.
         """
 
         super().__init__()
@@ -57,6 +60,7 @@ class IntervalActivation(nn.Module):
         self.layer_name = layer_name
 
         self.curr_task_last_batch = None
+        self.use_nonlinear_transform = use_nonlinear_transform
 
     def reset_range(self, activations: List[torch.Tensor]) -> None:
         """
@@ -118,12 +122,13 @@ class IntervalActivation(nn.Module):
         Returns:
             torch.Tensor: Activated tensor.
         """
-        out = F.leaky_relu(x)
+        if self.use_nonlinear_transform:
+            x = F.leaky_relu(x)
 
         if self.training:
-            self.curr_task_last_batch = out
+            self.curr_task_last_batch = x
 
-        return out
+        return x
     
     def __repr__(self):
         return super().__repr__() + f"(layer_name={self.layer_name})"

@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import models
 
 from model.cl_module_abc import CLModuleABC
-
+from model.layer.interval_activation import IntervalActivation
 
 class BigModel(CLModuleABC):
     """
@@ -12,10 +12,11 @@ class BigModel(CLModuleABC):
     Args:
         head (nn.Module): The custom head module to apply after feature extraction.
         pretrained_backbone_name (str): The name of the pretrained backbone model ('resnet18', 'resnet50', or 'vit_b_16').
-        pretrained (bool, optional): Whether to use a pretrained backbone. Defaults to True.
         frozen (bool, optional): Whether to freeze the backbone parameters. Defaults to False.
         size (tuple[int], optional): The target size for input tensors (height, width). Defaults to (224, 224).
         reduced_dim (int, optional): Output feature dimension after replacing the last ResNet block. Defaults to 128.
+        add_interval_activation_after_backbone (bool, optional): If True, 'IntervalActivation' is added at the top of the
+                                                                 pretrained backbone.
     
     Attributes:
         fe (nn.Module): The feature extractor backbone model (ResNet-18, ResNet-50, or ViT-B/16).
@@ -34,10 +35,10 @@ class BigModel(CLModuleABC):
     def __init__(self,
         head: nn.Module,
         pretrained_backbone_name: str,
-        pretrained: bool=True,
         frozen: bool=False,
         size: tuple[int]=(224, 224),
         reduced_dim: int=64,
+        add_interval_activation_after_backbone: bool = True
     ):
         """
         Initializes the BigModel with a pretrained backbone and a custom head.
@@ -45,16 +46,18 @@ class BigModel(CLModuleABC):
         Args:
             head (nn.Module): The custom head module to apply after feature extraction.
             pretrained_backbone_name (str): The name of the pretrained backbone model ('resnet18', 'resnet50', or 'vit_b_16').
-            pretrained (bool, optional): Whether to use a pretrained backbone. Defaults to True.
             frozen (bool, optional): Whether to freeze the backbone parameters. Defaults to False.
             size (tuple[int], optional): The target size for input tensors (height, width). Defaults to (224, 224).
             reduced_dim (int, optional): Output feature dimension after replacing the last ResNet block. Defaults to 64.
+            add_interval_activation_after_backbone (bool, optional): If True, 'IntervalActivation' is added at the top of the
+                                                                 pretrained backbone.
         """
         super().__init__(head.head)
 
         self.flatten_output = False
         self.reducer = None
         self.output_dim = reduced_dim
+        self.add_interval_activation_after_backbone = add_interval_activation_after_backbone
 
         if pretrained_backbone_name not in ['resnet18', 'resnet50', 'vit_b_16']:
             raise ValueError("pretrained_backbone_name must be 'resnet18', 'resnet50', or 'vit_b_16'")
@@ -100,9 +103,10 @@ class BigModel(CLModuleABC):
 
         else:
             vit = models.vit_b_16(weights=models.ViT_B_16_Weights.DEFAULT)
-            self.fe = nn.Sequential(*list(vit.children())[:-1])
-            self.flatten_output = False
+            self.fe = vit
+            vit.heads.head = nn.Identity()
             self.reducer = nn.Identity()
+            self.flatten_output = False
 
         if (channels is not None) and (channels == reduced_dim):
             self.reducer = nn.Sequential(
@@ -112,10 +116,16 @@ class BigModel(CLModuleABC):
             )
 
         self.c_head = head
-        self.layers = head.layers
+        self.mlp_layers = []
+        if self.add_interval_activation_after_backbone:
+            self.interval_act_layer_after_backbone = IntervalActivation(use_nonlinear_transform=False)
+            self.mlp_layers += [self.interval_act_layer_after_backbone]
+        else:
+            self.interval_act_layer_after_backbone = nn.Identity()
+        self.mlp_layers += head.layers + [head.head]
         self.size = size
         self.frozen = frozen
-
+       
         if self.frozen:
             self.fe.eval()
             for param in self.fe.parameters():
@@ -124,23 +134,27 @@ class BigModel(CLModuleABC):
             for param in self.reducer.parameters():
                 param.requires_grad = True
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor, return_first_interval_activation: bool = False) -> torch.Tensor:
         """
         Performs a forward pass through the model.
         
         Args:
             x (torch.Tensor): The input tensor to process. Expected shape is [C, H, W] or [H, W].
+            return_first_interval_activation (bool): If True, returns tensor after the first interval activation.
         
         Returns:
             torch.Tensor: The output of the custom head after processing the input tensor.
         """  
         self.reset_activations()
-
+    
         if self.frozen:
             with torch.no_grad():
                 x = self.fe(x)
         else:
             x = self.fe(x)
-
+        
         x = self.reducer(x)
+        x = self.interval_act_layer_after_backbone(x)
+        if return_first_interval_activation:
+            return x.detach()
         return self.c_head(x)
