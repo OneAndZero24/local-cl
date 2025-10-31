@@ -54,7 +54,7 @@ parameters:
   model.activation: 
     value: torch.nn.ReLU
   model.mask_past_classifier_neurons:
-    value: True 
+    value: False
 
   # Method configuration
   method._partial_: 
