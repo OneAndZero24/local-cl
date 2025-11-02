@@ -179,9 +179,6 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
         if log_per_batch and not quiet:
             wandb.log({f'Loss/train/{task_id}/per_batch': loss})
 
-        if batch_idx == 3:
-            break
-
     avg_loss /= len(dataloader)
     if not quiet:
         wandb.log({f'Loss/train/{task_id}': avg_loss})
