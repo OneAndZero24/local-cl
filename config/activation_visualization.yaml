@@ -4,6 +4,7 @@ defaults:
   - scenario: class_inc
   - model: vit
   - method: composer_interval_penalization_big_model
+  - visualization: neuronal_activity
 
 exp:
   run_func:
