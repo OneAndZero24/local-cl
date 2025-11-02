@@ -12,7 +12,6 @@ from model import IncrementalClassifier
 from src.method.composer import Composer
 from src.method.method_plugin_abc import MethodPluginABC
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 
@@ -28,7 +27,7 @@ def get_scenarios(config: DictConfig):
     test_scenario = scenario_partial(test_dataset)
     return train_scenario, test_scenario
 
-def experiment(config: DictConfig):
+def activation_visualization(config: DictConfig):
     """
     Visualization for tracking activation changes across continual learning tasks.
     """
@@ -130,22 +129,22 @@ def experiment(config: DictConfig):
                         if lastepoch:
                             R[task_id, j] = acc
                 wandb.log({f'avg_acc': R[task_id, :task_id+1].mean()})
-                log.info(f'Recording activations for all images after task {task_id}')
-                method.module.eval()
-                for img_id in range(N):
-                    img = selected_images[img_id]
-                    avg_activations = get_layer_activations(method.module, img)
-                    activation_history[task_id][img_id] = avg_activations
-                log.info(f' Task {task_id}, Image {img_id}: {len(avg_activations)} layers recorded')
+        log.info(f'Recording activations for all images after task {task_id}')
+        method.module.eval()
+        for img_id in range(N):
+            img = selected_images[img_id]
+            avg_activations = get_layer_activations(method.module, img)
+            activation_history[task_id][img_id] = avg_activations
+            log.info(f' Task {task_id}, Image {img_id}: {len(avg_activations)} layers recorded')
         if stop_task is not None and task_id == stop_task:
             break
-        if calc_bwt:
-            wandb.log({'bwt': (R[task_id, :task_id]-R.diagonal()[:-1]).mean()})
-        if calc_fwt:
-            fwt = []
-            for i in range(1, task_id+1):
-                fwt.append(R[i-1, i]-b[i])
-            wandb.log({'fwt': np.array(fwt).mean()})
+    if calc_bwt:
+        wandb.log({'bwt': (R[task_id, :task_id]-R.diagonal()[:-1]).mean()})
+    if calc_fwt:
+        fwt = []
+        for i in range(1, task_id+1):
+            fwt.append(R[i-1, i]-b[i])
+        wandb.log({'fwt': np.array(fwt).mean()})
     if save_model:
         log.info(f'Saving model')
         torch.save(model.state_dict(), config.exp.model_path)
@@ -166,16 +165,36 @@ def experiment(config: DictConfig):
         activation_differences.append(differences)
     plt.style.use('seaborn-v0_8-paper' if 'seaborn-v0_8-paper' in plt.style.available else 'default')
     fig, ax = plt.subplots(figsize=(14, 8))
+    fig.suptitle('Activation Drift Over Tasks', fontsize=16)
     colors = plt.cm.tab10(np.linspace(0, 1, N))
-    for img_id in range(N):
-        x_values = list(range(img_id, N))
-        y_values = activation_differences[img_id]
+    for img_id in range(N - 1):  # skip final task (no next regularization)
+        x_values = list(range(img_id, N - 1))  # stop one before last
+        y_values = activation_differences[img_id][:len(x_values)]
+        # Plot main line with markers at points except possibly the last
         ax.plot(x_values, y_values,
-                marker='o',
                 linewidth=2.5,
+                marker='o',
                 markersize=8,
                 color=colors[img_id],
                 label=f'Task {img_id+1} (class {selected_labels[img_id]})')
+        # Place only one image at the beginning
+        x = x_values[0]
+        y = y_values[0]
+        img_np = selected_images[img_id].cpu().squeeze().numpy()
+        if img_np.ndim == 3:
+            if img_np.shape[0] == 1:
+                img_np = img_np[0]
+            elif img_np.shape[0] == 3:
+                img_np = np.transpose(img_np, (1, 2, 0))
+        img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min() + 1e-8)
+        imagebox = OffsetImage(img_np, zoom=1.8, cmap='gray' if img_np.ndim == 2 else None)
+        ab = AnnotationBbox(imagebox, (x, y),
+                            frameon=True,
+                            pad=0.3,
+                            bboxprops=dict(edgecolor=colors[img_id],
+                                           linewidth=2,
+                                           facecolor='white'))
+        ax.add_artist(ab)
     max_diff = max([max(diffs) if len(diffs) > 0 else 0 for diffs in activation_differences])
     if max_diff == 0:
         max_diff = 1.0
@@ -200,11 +219,10 @@ def experiment(config: DictConfig):
                                 facecolor='white'
                             ))
         ax.add_artist(ab)
-    ax.set_xlabel('Task ID', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Average Activation Difference from Baseline', fontsize=14, fontweight='bold')
-    ax.set_title('Activation Drift Across Continual Learning Tasks', fontsize=16, fontweight='bold')
+    ax.set_xlabel('Task ID', fontsize=14)
+    ax.set_ylabel('Average Activation Difference from Baseline', fontsize=14)
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.legend(loc='upper left', fontsize=10, framealpha=0.95)
+    ax.legend(loc='upper left', fontsize=14, framealpha=0.95)
     ax.set_xticks(range(N))
     ax.set_xticklabels([f'{i}' for i in range(N)])
     plt.tight_layout()
@@ -219,33 +237,55 @@ def experiment(config: DictConfig):
         log.info(f'Main visualization saved to {output_dir}')
         return
     fig, axes = plt.subplots(num_layers, 1, figsize=(14, 4 * num_layers), sharex=True)
+    fig.suptitle('Per-Layer Activation Over Tasks', fontsize=16)
     if num_layers == 1:
         axes = [axes]
     for layer_idx in range(num_layers):
         ax = axes[layer_idx]
         for img_id in range(N):
+            if img_id == N-1:
+                break
             x_values = list(range(img_id, N))
             y_values = [activation_history[task_id][img_id][layer_idx]
                         for task_id in range(img_id, N)]
             ax.plot(x_values, y_values,
                     marker='o',
-                    linewidth=2.5,
                     markersize=8,
+                    linewidth=2.5,
                     color=colors[img_id],
-                    label=f'Task {img_id+1} (class {selected_labels[img_id]})')
-        ax.set_ylabel(f'Layer {layer_idx+1}\nAvg Activation', fontsize=12, fontweight='bold')
+                    label=f'Sample from Task {img_id+1}')
+            # Place only one image at the beginning
+            x = x_values[0]
+            y = y_values[0]
+            img_np = selected_images[img_id].cpu().squeeze().numpy()
+            if img_np.ndim == 3:
+                if img_np.shape[0] == 1:
+                    img_np = img_np[0]
+                elif img_np.shape[0] == 3:
+                    img_np = np.transpose(img_np, (1, 2, 0))
+            img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min() + 1e-8)
+            imagebox = OffsetImage(img_np, zoom=1.2, cmap='gray' if img_np.ndim == 2 else None)
+            ab = AnnotationBbox(imagebox, (x, y),
+                                frameon=True,
+                                pad=0.3,
+                                bboxprops=dict(edgecolor=colors[img_id],
+                                               linewidth=2,
+                                               facecolor='white'))
+            ax.add_artist(ab)
+        ax.set_title(f'Idx of Interval Activation Layer: {layer_idx+1}', fontsize=14, pad=10)
+        ax.set_ylabel('Average Absolute Activation Value', fontsize=14)
         ax.grid(True, alpha=0.3, linestyle='--')
-        ax.legend(loc='best', fontsize=9)
+        ax.legend(loc='best', fontsize=14)
         ax.set_xticks(range(N))
         ax.set_xticklabels([f'{i}' for i in range(N)])
-    axes[-1].set_xlabel('Task ID', fontsize=14, fontweight='bold')
-    fig.suptitle('Per-Layer Activation Tracking Across Tasks', fontsize=16, fontweight='bold')
+    axes[-1].set_xlabel('Task ID', fontsize=14)
     plt.tight_layout()
     output_path_detailed = output_dir / 'activation_per_layer_detailed.png'
     plt.savefig(output_path_detailed, dpi=300, bbox_inches='tight')
     log.info(f'Saved detailed visualization to {output_path_detailed}')
     plt.close()
     log.info(f'All visualizations saved to {output_dir}')
+    exit(0)
 
 def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per_batch: bool, quiet: bool = False):
     """
@@ -260,8 +300,7 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
         avg_loss += loss
         if log_per_batch and not quiet:
             wandb.log({f'Loss/train/{task_id}/per_batch': loss})
-        if batch_idx == 3:
-            break
+        
     avg_loss /= len(dataloader)
     if not quiet:
         wandb.log({f'Loss/train/{task_id}': avg_loss})
@@ -289,38 +328,32 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             if gen_cm:
                 y_total.extend(y.cpu().numpy())
                 preds_total.extend(preds.cpu().numpy())
+           
         avg_loss /= len(dataloader)
         if not quiet:
             log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')
             wandb.log({f'Loss/test/{task_id}': avg_loss})
             wandb.log({f'Accuracy/test/{task_id}': 100 * correct / total})
-            if gen_cm:
-                title = f'Confusion matrix {str(task_id)+cm_suffix}'
-                wandb.log({title:
-                    wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
-                )
+        if gen_cm:
+            title = f'Confusion matrix {str(task_id)+cm_suffix}'
+            wandb.log({title:
+                wandb.plot.confusion_matrix(probs=None, y_true=y_total, preds=preds_total, title=title)}
+            )
         return 100 * correct / total
 
 def get_layer_activations(model, x):
     """
-    Get average activations for each layer.
+    Get average of absolute values of activations for each layer.
     """
     model.eval()
     activations = []
     with torch.no_grad():
         current = torch.flatten(x, start_dim=1)
         actual_model = model._forward_module if hasattr(model, '_forward_module') else model
-        if hasattr(actual_model, 'mlp'):
-            for layer in actual_model.mlp:
+        if hasattr(actual_model, 'layers'):
+            for layer in actual_model.layers:
                 current = layer(current)
-                if isinstance(layer, (nn.Tanh, nn.ReLU, nn.LeakyReLU, nn.ELU, nn.GELU)) or \
-                   (hasattr(layer, '__class__') and 'Activation' in layer.__class__.__name__):
-                    avg_act = current.mean().item()
-                    activations.append(avg_act)
-        else:
-            _ = actual_model(x)
-            if hasattr(actual_model, 'activations') and actual_model.activations:
-                for layer_activation in actual_model.activations:
-                    avg_act = layer_activation.mean().item()
+                if type(layer).__name__ == "IntervalActivation":
+                    avg_act = current.abs().mean().item()
                     activations.append(avg_act)
     return activations

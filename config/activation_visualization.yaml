@@ -1,16 +1,15 @@
 defaults:
   - _self_
-  - dataset: imagenet
+  - dataset: mnist
   - scenario: class_inc
-  - model: vit
-  - method: composer_interval_penalization_big_model
-  - visualization: neuronal_activity
+  - model: mlp
+  - method: composer_interval_penalization_mlp
 
 exp:
   run_func:
-    _target_: experiment.experiment
+    _target_: visualization.activation_visualization
   seed: 42
-  log_dir: # set during runtime to automatically created dir
+  log_dir: outputs/activation_logs
   batch_size: 64
   epochs: 1
   gen_cm: False

@@ -3,4 +3,4 @@ _target_: continuum.ClassIncremental
 increment: 2
 transformations: 
   _target_: util.resize_transform
-  size: 224
+  size: 32
