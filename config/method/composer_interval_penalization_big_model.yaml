@@ -10,8 +10,8 @@ retaingraph: True
 plugins:
   - _target_: method.interval_penalization_big_model.BigModelIntervalPenalization
     var_scale: 0.01
-    output_reg_scale: 10000000000.0
-    interval_drift_reg_scale: 10000000000.0
+    lambda_int_drift: 10000000000.0
+    lambda_feat: 10000000000.0
     use_hypercube_dist_loss: True
     dil_mode: False
     regularize_classifier: True

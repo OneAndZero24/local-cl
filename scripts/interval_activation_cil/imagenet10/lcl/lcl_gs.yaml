@@ -89,11 +89,11 @@ parameters:
     distribution: uniform
     min: 0.0
     max: 10.0
-  method.plugins.0.output_reg_scale: 
+  method.plugins.0.lambda_int_drift: 
     distribution: uniform
     min: 0.0
     max: 1000.0
-  method.plugins.0.interval_drift_reg_scale: 
+  method.plugins.0.lambda_feat: 
     value: 0.0
   method.plugins.0.use_hypercube_dist_loss:
     value: True

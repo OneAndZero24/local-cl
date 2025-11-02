@@ -79,9 +79,9 @@ parameters:
     value: method.interval_penalization_mlp.MLPIntervalPenalization
   method.plugins.0.var_scale: 
     values: [10, 7.5, 5, 2.5, 1, 0.5, 0.001]
-  method.plugins.0.output_reg_scale: 
+  method.plugins.0.lambda_int_drift: 
     value: 6.0
-  method.plugins.0.interval_drift_reg_scale: 
+  method.plugins.0.lambda_feat: 
     value: 779.0
   method.plugins.0.use_hypercube_dist_loss:
     value: True

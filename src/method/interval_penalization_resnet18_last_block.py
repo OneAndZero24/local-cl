@@ -24,11 +24,11 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
       Minimizes activation variance inside each interval, encouraging stable 
       and compact representations.
     
-    - **Output preservation loss (`output_reg_scale`)**  
+    - **Output preservation loss (`lambda_int_drift`)**  
       Constrains parameters above an `IntervalActivation` to keep producing 
       similar outputs for previously learned intervals.
     
-    - **Interval drift loss (`interval_drift_reg_scale`)**  
+    - **Interval drift loss (`lambda_feat`)**  
       Penalizes deviations of new activations from old-task activations 
       inside the same hypercube, with a stronger penalty near the cube center.
 
@@ -40,8 +40,8 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
 
     Args:
         var_scale (float): Weight of the variance regularizer.
-        output_reg_scale (float): Weight of the output preservation term.
-        interval_drift_reg_scale (float): Weight of the interval drift regularizer.
+        lambda_int_drift (float): Weight of the output preservation term.
+        lambda_feat (float): Weight of the interval drift regularizer.
         use_hypercube_dist_loss (bool, optional): Whether to use the hypercube distance loss. Defaults to True.
         dil_mode (bool, optional): If True, also regularizes the classifier head. Defaults to False.
         regularize_classifier (bool, optional): If True, the classifier head is regularized. Defaults to False.
@@ -52,8 +52,8 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
         old_module (nn.Module): Deep copy of the previous model used for activation comparison.
         data_buffer (list): Buffer to store representative input samples.
         var_scale (float): Weight of the variance penalty term.
-        output_reg_scale (float): Weight of the output preservation term.
-        interval_drift_reg_scale (float): Weight of the drift penalty term.
+        lambda_int_drift (float): Weight of the output preservation term.
+        lambda_feat (float): Weight of the drift penalty term.
         use_hypercube_dist_loss (bool): Flag indicating whether to include the hypercube distance loss.
         dil_mode (bool): Whether to apply regularization to the classifier head.
         regularize_classifier (bool): If True, includes classifier head in regularization.
@@ -61,8 +61,8 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
 
     def __init__(self,
             var_scale: float = 0.01,
-            output_reg_scale: float = 1.0,
-            interval_drift_reg_scale: float = 1.0,
+            lambda_int_drift: float = 1.0,
+            lambda_feat: float = 1.0,
             use_hypercube_dist_loss: bool = True,
             dil_mode: bool = False,
             regularize_classifier: bool = False,
@@ -72,8 +72,8 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
 
         Args:
             var_scale (float, optional): Weight of the variance penalty. Defaults to 0.01.
-            output_reg_scale (float, optional): Weight of the output preservation penalty. Defaults to 1.0.
-            interval_drift_reg_scale (float, optional): Weight of the interval drift penalty. Defaults to 1.0.
+            lambda_int_drift (float, optional): Weight of the output preservation penalty. Defaults to 1.0.
+            lambda_feat (float, optional): Weight of the interval drift penalty. Defaults to 1.0.
             use_hypercube_dist_loss (bool, optional): Whether to include the hypercube distance loss. Defaults to True.
             dil_mode (bool, optional): If True, applies regularization to the classifier head. Defaults to False.
             regularize_classifier (bool, optional): If True, includes the classifier in regularization. Defaults to False.
@@ -82,12 +82,12 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
         super().__init__()
         self.task_id = None
         log.info(f"IntervalPenalization initialized with var_scale={var_scale}, "
-                 f"output_reg_scale={output_reg_scale}, "
-                 f"interval_drift_reg_scale={interval_drift_reg_scale}")
+                 f"lambda_int_drift={lambda_int_drift}, "
+                 f"lambda_feat={lambda_feat}")
 
         self.var_scale = var_scale
-        self.output_reg_scale = output_reg_scale
-        self.interval_drift_reg_scale = interval_drift_reg_scale
+        self.lambda_int_drift = lambda_int_drift
+        self.lambda_feat = lambda_feat
         self.use_hypercube_dist_loss = use_hypercube_dist_loss
 
         self.input_shape = None
@@ -323,8 +323,8 @@ class ResNet18IntervalPenalizationLastBlock(MethodPluginABC):
         loss = (
             loss
             + self.var_scale * var_loss
-            + self.output_reg_scale * output_reg_loss
-            + self.interval_drift_reg_scale * interval_drift_loss
+            + self.lambda_int_drift * output_reg_loss
+            + self.lambda_feat * interval_drift_loss
             + hypercube_dist_loss
         )
         return loss, preds
