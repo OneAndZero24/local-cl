@@ -40,7 +40,7 @@ class MLP(CLModuleABC):
         layers: list[str],
         head_type: str="Normal",
         activation: nn.Module=nn.Tanh(),
-        mask_past_classifier_neurons: bool = True,
+        mask_past_classifier_neurons: bool = False,
         config: Union[dict, list[dict], ListConfig]={},
     ):
         """

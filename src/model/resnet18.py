@@ -23,7 +23,7 @@ class ResNet18(CLModuleABC):
         initial_out_features: int,
         dim_hidden: int,
         head_type: str = "Normal",
-        mask_past_classifier_neurons: bool = True,
+        mask_past_classifier_neurons: bool = False,
         head_kwargs: dict = {}
     ) -> None:
         """

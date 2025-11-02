@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - dataset: imagenet10
+  - dataset: imagenet
   - scenario: class_inc
   - model: vit
   - method: composer_interval_penalization_big_model

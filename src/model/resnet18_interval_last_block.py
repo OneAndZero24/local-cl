@@ -66,7 +66,7 @@ class ResNet18IntervalLastBlock(CLModuleABC):
         dim_hidden: int,
         interval_layer_kwargs: dict = None,
         head_type: str = "Normal",
-        mask_past_classifier_neurons: bool = True,
+        mask_past_classifier_neurons: bool = False,
         head_kwargs: dict = {},
     ) -> None:
         head = IncrementalClassifier(

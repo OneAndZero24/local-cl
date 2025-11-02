@@ -64,7 +64,10 @@ class LwF(MethodPluginABC):
 
         self.task_id = task_id
         if task_id > 0:         
-            with torch.no_grad():   
+            with torch.no_grad():
+                for module in self.module.modules():
+                    if type(module).__name__ == "IntervalActivation":
+                        del module.curr_task_last_batch
                 self.old_module = deepcopy(self.module)
                 for p in self.old_module.parameters():
                     p.requires_grad = False

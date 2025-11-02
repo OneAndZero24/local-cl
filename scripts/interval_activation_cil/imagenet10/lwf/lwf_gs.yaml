@@ -59,7 +59,7 @@ parameters:
     value: ["Normal"]
   model.head.head_type:
     value: Normal
-  model.head.activation:
+  model.head.activation._target_:
     value: torch.nn.ReLU
 
   # Method configuration

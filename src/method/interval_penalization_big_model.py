@@ -145,7 +145,7 @@ class BigModelIntervalPenalization(MethodPluginABC):
             activation_buffers = {}
             hook_handles = []
 
-            for idx, layer in enumerate(self.module.mlp_layers):
+            for idx, layer in enumerate(self.module.layers):
                 if type(layer).__name__ == "IntervalActivation":
                     activation_buffers[idx] = []
 
@@ -161,7 +161,7 @@ class BigModelIntervalPenalization(MethodPluginABC):
                     x = x.to(next(self.module.parameters()).device)
                     _ = self.module(x)
 
-            for idx, layer in enumerate(self.module.mlp_layers):
+            for idx, layer in enumerate(self.module.layers):
                 if type(layer).__name__ == "IntervalActivation":
                     layer.reset_range(activation_buffers[idx])
 
@@ -193,7 +193,7 @@ class BigModelIntervalPenalization(MethodPluginABC):
 
         self.data_buffer.add(x)
 
-        layers = self.module.mlp_layers
+        layers = self.module.layers
         interval_act_layers = [module for _, module in self.module.c_head.named_modules() if type(module).__name__ == "IntervalActivation"]
         var_loss = torch.tensor(0.0, device=x.device)
         interval_drift_loss = torch.tensor(0.0, device=x.device)

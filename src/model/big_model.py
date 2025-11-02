@@ -116,13 +116,13 @@ class BigModel(CLModuleABC):
             )
 
         self.c_head = head
-        self.mlp_layers = []
+        self.layers = []
         if self.add_interval_activation_after_backbone:
             self.interval_act_layer_after_backbone = IntervalActivation(use_nonlinear_transform=False)
-            self.mlp_layers += [self.interval_act_layer_after_backbone]
+            self.layers += [self.interval_act_layer_after_backbone]
         else:
             self.interval_act_layer_after_backbone = nn.Identity()
-        self.mlp_layers += head.layers + [head.head]
+        self.layers += head.layers + [head.head]
         self.size = size
         self.frozen = frozen
        
