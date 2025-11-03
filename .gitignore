@@ -11,3 +11,5 @@ outputs
 *.log
 *.pyc
 *.zip
+
+ablation_study
