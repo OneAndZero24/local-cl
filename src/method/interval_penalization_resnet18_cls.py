@@ -191,7 +191,7 @@ class ResNet18IntervalPenalizationCls(MethodPluginABC):
             (loss, preds): Updated loss with added penalties, predictions unchanged.
         """
 
-        self.data_buffer.add(x)
+        self.data_buffer.add(x.detach())
 
         layers = self.module.mlp + [self.module.head]
         interval_act_layers = [module for _, module in self.module.named_modules() if type(module).__name__ == "IntervalActivation"]
