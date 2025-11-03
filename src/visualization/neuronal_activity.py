@@ -14,6 +14,7 @@ from src.method.method_plugin_abc import MethodPluginABC
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
+import pickle
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -88,9 +89,10 @@ def activation_visualization(config: DictConfig):
             selected_labels.append(y.item())
             break
     log.info(f'Selected {len(selected_images)} images (one per task)')
-    activation_history = [
-        [None for _ in range(N)] for _ in range(N)
-    ]
+    activation_history = []
+    x_points = []
+    task_end_snapshots = []
+    num_samples_per_task = 20
     for task_id, (train_task, test_task) in enumerate(zip(train_tasks, test_tasks)):
         log.info(f'Task {task_id + 1}/{N}')
         if hasattr(method.module, 'head') and isinstance(method.module.head, IncrementalClassifier) \
@@ -99,6 +101,7 @@ def activation_visualization(config: DictConfig):
             method.module.head.increment(train_task.dataset.get_classes())
         log.info(f'Setting up task')
         method.setup_task(task_id)
+        step = max(1, config.exp.epochs // num_samples_per_task)
         with fabric.init_tensor():
             for epoch in range(config.exp.epochs):
                 lastepoch = (epoch == config.exp.epochs-1)
@@ -129,13 +132,19 @@ def activation_visualization(config: DictConfig):
                         if lastepoch:
                             R[task_id, j] = acc
                 wandb.log({f'avg_acc': R[task_id, :task_id+1].mean()})
-        log.info(f'Recording activations for all images after task {task_id}')
-        method.module.eval()
-        for img_id in range(N):
-            img = selected_images[img_id]
-            avg_activations = get_layer_activations(method.module, img)
-            activation_history[task_id][img_id] = avg_activations
-            log.info(f' Task {task_id}, Image {img_id}: {len(avg_activations)} layers recorded')
+                if (epoch + 1) % step == 0 or epoch == config.exp.epochs - 1:
+                    log.info(f'Recording activations after task {task_id} epoch {epoch}')
+                    method.module.eval()
+                    avg_activations_list = []
+                    for img_id in range(N):
+                        img = selected_images[img_id]
+                        avg_activations = get_layer_activations(method.module, img)
+                        avg_activations_list.append(avg_activations)
+                        log.info(f' Task {task_id}, Epoch {epoch}, Image {img_id}: {len(avg_activations)} layers recorded')
+                    activation_history.append(avg_activations_list)
+                    current_x = task_id + (epoch + 1) / config.exp.epochs
+                    x_points.append(current_x)
+        task_end_snapshots.append(len(activation_history) - 1)
         if stop_task is not None and task_id == stop_task:
             break
     if calc_bwt:
@@ -151,33 +160,53 @@ def activation_visualization(config: DictConfig):
     if acc_table:
         log.info(f'Logging accuracy table')
         wandb.log({"acc_table": wandb.Table(data=R.tolist(), columns=[f"task_{i}" for i in range(N)])})
-    log.info('Creating activation drift visualization...')
+    log.info('Saving essential data for plot regeneration...')
     output_dir = Path(config.exp.log_dir) / 'visualizations'
     output_dir.mkdir(parents=True, exist_ok=True)
+    with open(output_dir / 'activation_history.pkl', 'wb') as f:
+        pickle.dump(activation_history, f)
+    with open(output_dir / 'x_points.pkl', 'wb') as f:
+        pickle.dump(x_points, f)
+    with open(output_dir / 'task_end_snapshots.pkl', 'wb') as f:
+        pickle.dump(task_end_snapshots, f)
+    torch.save(selected_images, output_dir / 'selected_images.pt')
+    with open(output_dir / 'selected_labels.pkl', 'wb') as f:
+        pickle.dump(selected_labels, f)
+    log.info('Creating activation drift visualization...')
     activation_differences = []
+    x_values_lists = []
     for img_id in range(N):
-        baseline_activations = activation_history[img_id][img_id]
+        baseline_index = task_end_snapshots[img_id]
+        baseline_activations = activation_history[baseline_index][img_id]
         differences = []
-        for task_id in range(img_id, N):
-            current_activations = activation_history[task_id][img_id]
+        x_values_this = []
+        for s in range(baseline_index, len(activation_history)):
+            current_activations = activation_history[s][img_id]
             diff = np.mean([abs(curr - base) for curr, base in zip(current_activations, baseline_activations)])
             differences.append(diff)
+            x_values_this.append(x_points[s])
         activation_differences.append(differences)
+        x_values_lists.append(x_values_this)
     plt.style.use('seaborn-v0_8-paper' if 'seaborn-v0_8-paper' in plt.style.available else 'default')
     fig, ax = plt.subplots(figsize=(14, 8))
     fig.suptitle('Activation Drift Over Tasks', fontsize=16)
     colors = plt.cm.tab10(np.linspace(0, 1, N))
-    for img_id in range(N - 1):  # skip final task (no next regularization)
-        x_values = list(range(img_id, N - 1))  # stop one before last
-        y_values = activation_differences[img_id][:len(x_values)]
-        # Plot main line with markers at points except possibly the last
+    for img_id in range(N - 1):
+        x_values = x_values_lists[img_id]
+        y_values = activation_differences[img_id]
         ax.plot(x_values, y_values,
                 linewidth=2.5,
-                marker='o',
-                markersize=8,
                 color=colors[img_id],
                 label=f'Task {img_id+1} (class {selected_labels[img_id]})')
-        # Place only one image at the beginning
+        # Add markers at task boundaries (integer x values)
+        marker_x = [x for x in x_values if abs(x - round(x)) < 1e-6]
+        marker_y = [y_values[i] for i, x in enumerate(x_values) if abs(x - round(x)) < 1e-6]
+        if marker_x:
+            ax.plot(marker_x, marker_y,
+                    marker='o',
+                    markersize=8,
+                    color=colors[img_id],
+                    linestyle='None')
         x = x_values[0]
         y = y_values[0]
         img_np = selected_images[img_id].cpu().squeeze().numpy()
@@ -195,11 +224,55 @@ def activation_visualization(config: DictConfig):
                                            linewidth=2,
                                            facecolor='white'))
         ax.add_artist(ab)
-    max_diff = max([max(diffs) if len(diffs) > 0 else 0 for diffs in activation_differences])
-    if max_diff == 0:
-        max_diff = 1.0
-    y_positions = np.linspace(0, max_diff, N)
+    ax.set_xlabel('Task ID', fontsize=14)
+    ax.set_ylabel('Average Activation Difference from Baseline', fontsize=14)
+    ax.grid(True, alpha=0.3, linestyle='--')
+    ax.legend(loc='upper left', fontsize=14, framealpha=0.95)
+    ax.set_xticks(range(1, N+1))
+    ax.set_xticklabels([f'{i}' for i in range(1, N+1)])
+    ax.tick_params(labelsize=14)
+    ax.set_xlim(0.8, N)
+    plt.tight_layout()
+    output_path = output_dir / 'activation_drift_visualization.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    log.info(f'Saved visualization to {output_path}')
+    plt.close()
+    # New plot for signed differences
+    log.info('Creating signed activation drift visualization...')
+    signed_activation_differences = []
+    all_signed_y = []
     for img_id in range(N):
+        baseline_index = task_end_snapshots[img_id]
+        baseline_activations = activation_history[baseline_index][img_id]
+        differences = []
+        for s in range(baseline_index, len(activation_history)):
+            current_activations = activation_history[s][img_id]
+            diff = np.mean([curr - base for curr, base in zip(current_activations, baseline_activations)])
+            differences.append(diff)
+            all_signed_y.append(diff)
+        signed_activation_differences.append(differences)
+    global_min = min(all_signed_y) if all_signed_y else 0
+    global_max = max(all_signed_y) if all_signed_y else 1.0
+    fig, ax = plt.subplots(figsize=(14, 8))
+    fig.suptitle('Activation Drift Over Tasks', fontsize=16)
+    for img_id in range(N - 1):
+        x_values = x_values_lists[img_id]
+        y_values = signed_activation_differences[img_id]
+        ax.plot(x_values, y_values,
+                linewidth=2.5,
+                color=colors[img_id],
+                label=f'Task {img_id+1} (class {selected_labels[img_id]})')
+        # Add markers at task boundaries (integer x values)
+        marker_x = [x for x in x_values if abs(x - round(x)) < 1e-6]
+        marker_y = [y_values[i] for i, x in enumerate(x_values) if abs(x - round(x)) < 1e-6]
+        if marker_x:
+            ax.plot(marker_x, marker_y,
+                    marker='o',
+                    markersize=8,
+                    color=colors[img_id],
+                    linestyle='None')
+        x = x_values[0]
+        y = y_values[0]
         img_np = selected_images[img_id].cpu().squeeze().numpy()
         if img_np.ndim == 3:
             if img_np.shape[0] == 1:
@@ -207,31 +280,29 @@ def activation_visualization(config: DictConfig):
             elif img_np.shape[0] == 3:
                 img_np = np.transpose(img_np, (1, 2, 0))
         img_np = (img_np - img_np.min()) / (img_np.max() - img_np.min() + 1e-8)
-        imagebox = OffsetImage(img_np, zoom=2.0, cmap='gray' if img_np.ndim == 2 else None)
-        x_pos = N - 0.5
-        y_pos = y_positions[img_id]
-        ab = AnnotationBbox(imagebox, (x_pos, y_pos),
+        imagebox = OffsetImage(img_np, zoom=1.8, cmap='gray' if img_np.ndim == 2 else None)
+        ab = AnnotationBbox(imagebox, (x, y),
                             frameon=True,
                             pad=0.3,
-                            bboxprops=dict(
-                                edgecolor=colors[img_id],
-                                linewidth=3,
-                                facecolor='white'
-                            ))
+                            bboxprops=dict(edgecolor=colors[img_id],
+                                           linewidth=2,
+                                           facecolor='white'))
         ax.add_artist(ab)
     ax.set_xlabel('Task ID', fontsize=14)
     ax.set_ylabel('Average Activation Difference from Baseline', fontsize=14)
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.legend(loc='upper left', fontsize=14, framealpha=0.95)
-    ax.set_xticks(range(N))
-    ax.set_xticklabels([f'{i}' for i in range(N)])
+    ax.set_xticks(range(1, N+1))
+    ax.set_xticklabels([f'{i}' for i in range(1, N+1)])
+    ax.tick_params(labelsize=14)
+    ax.set_xlim(0.8, N)
     plt.tight_layout()
-    output_path = output_dir / 'activation_drift_visualization.png'
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    log.info(f'Saved visualization to {output_path}')
+    output_path_signed = output_dir / 'activation_signed_drift_visualization.png'
+    plt.savefig(output_path_signed, dpi=300, bbox_inches='tight')
+    log.info(f'Saved signed visualization to {output_path_signed}')
     plt.close()
     log.info('Creating detailed per-layer activation plot...')
-    num_layers = len(activation_history[0][0]) if activation_history[0][0] else 0
+    num_layers = len(activation_history[0][0]) if activation_history and activation_history[0] and activation_history[0][0] else 0
     if num_layers == 0:
         log.warning('No layer activations recorded. Skipping detailed per-layer plot.')
         log.info(f'Main visualization saved to {output_dir}')
@@ -245,16 +316,23 @@ def activation_visualization(config: DictConfig):
         for img_id in range(N):
             if img_id == N-1:
                 break
-            x_values = list(range(img_id, N))
-            y_values = [activation_history[task_id][img_id][layer_idx]
-                        for task_id in range(img_id, N)]
+            baseline_index = task_end_snapshots[img_id]
+            x_values = x_values_lists[img_id]
+            y_values = [activation_history[baseline_index + i][img_id][layer_idx]
+                        for i in range(len(x_values))]
             ax.plot(x_values, y_values,
-                    marker='o',
-                    markersize=8,
                     linewidth=2.5,
                     color=colors[img_id],
                     label=f'Sample from Task {img_id+1}')
-            # Place only one image at the beginning
+            # Add markers at task boundaries (integer x values)
+            marker_x = [x for x in x_values if abs(x - round(x)) < 1e-6]
+            marker_y = [y_values[i] for i, x in enumerate(x_values) if abs(x - round(x)) < 1e-6]
+            if marker_x:
+                ax.plot(marker_x, marker_y,
+                        marker='o',
+                        markersize=8,
+                        color=colors[img_id],
+                        linestyle='None')
             x = x_values[0]
             y = y_values[0]
             img_np = selected_images[img_id].cpu().squeeze().numpy()
@@ -276,8 +354,10 @@ def activation_visualization(config: DictConfig):
         ax.set_ylabel('Average Absolute Activation Value', fontsize=14)
         ax.grid(True, alpha=0.3, linestyle='--')
         ax.legend(loc='best', fontsize=14)
-        ax.set_xticks(range(N))
-        ax.set_xticklabels([f'{i}' for i in range(N)])
+        ax.set_xticks(range(1, N+1))
+        ax.set_xticklabels([f'{i}' for i in range(1, N+1)])
+        ax.tick_params(labelsize=14)
+        ax.set_xlim(0.8, N)
     axes[-1].set_xlabel('Task ID', fontsize=14)
     plt.tight_layout()
     output_path_detailed = output_dir / 'activation_per_layer_detailed.png'
@@ -300,7 +380,7 @@ def train(method: MethodPluginABC, dataloader: DataLoader, task_id: int, log_per
         avg_loss += loss
         if log_per_batch and not quiet:
             wandb.log({f'Loss/train/{task_id}/per_batch': loss})
-        
+
     avg_loss /= len(dataloader)
     if not quiet:
         wandb.log({f'Loss/train/{task_id}': avg_loss})
@@ -328,7 +408,7 @@ def test(method: MethodPluginABC, dataloader: DataLoader, task_id: int, gen_cm: 
             if gen_cm:
                 y_total.extend(y.cpu().numpy())
                 preds_total.extend(preds.cpu().numpy())
-           
+            
         avg_loss /= len(dataloader)
         if not quiet:
             log.info(f'Accuracy of the model on the test images (task {task_id}): {100 * correct / total:.2f}%')

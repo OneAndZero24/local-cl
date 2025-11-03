@@ -11,7 +11,7 @@ exp:
   seed: 42
   log_dir: outputs/activation_logs
   batch_size: 64
-  epochs: 1
+  epochs: 20
   gen_cm: False
   log_per_batch: False
   detect_anomaly: False
@@ -20,6 +20,7 @@ exp:
   calc_fwt: False
   acc_table: False
   dil: False
+  num_samples_per_task: 20
 
 fabric:
   _target_: lightning.Fabric
