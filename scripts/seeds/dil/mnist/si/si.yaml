@@ -15,7 +15,7 @@ parameters:
   method:
     value: composer_si
   exp.seed: 
-    values: [42, 69, 2137, 0, 10]     
+    values: [42, 1, 2, 3, 4]     
   exp.batch_size:
     value: 128
   exp.epochs: 

@@ -1,0 +1,102 @@
+program: src/main.py
+method: grid
+metric:
+  name: avg_acc
+  goal: maximize
+
+parameters:
+  dataset:
+    value: mnist
+  scenario:
+    value: class_inc
+  model:
+    value: mlp
+  method:
+    value: composer_interval_penalization_mlp
+  exp.seed: 
+    value: 42
+  exp.batch_size:
+    value: 512    
+  exp.epochs: 
+    value: 5
+  exp.gen_cm: 
+    value: False
+  exp.detect_anomaly:
+    value: False
+  fabric.accelerator:
+    value: gpu   
+  exp.log_per_batch:
+    value: False
+  exp.cleanup:
+    value: True
+  exp.dil:
+    value: False
+  exp.num_samples_per_task:
+    value: 20
+
+  # Model configuration
+  model._target_: 
+    value: model.MLP
+  model.initial_out_features:
+    value: 2          
+  model.sizes:
+    value: [1024, 400, 400]
+  model.head_type: 
+    value: Normal
+  model.layers: 
+    value: ["Normal", "Normal"]
+  model.activation: 
+    value: IntervalActivation
+  model.mask_past_classifier_neurons:
+    value: False
+
+  # Scenario configuration
+  scenario._partial_:
+    value: True
+  scenario._target_:
+    value: continuum.ClassIncremental
+  scenario.increment:
+    value: 2
+    
+  # Method configuration
+  method._partial_: 
+    value: True
+  method.use_dynamic_alpha: 
+    value: False
+  method._target_: 
+    value: method.Composer
+  method.criterion: 
+    value: CrossEntropyLoss
+  method.criterion_scale:
+    value: 1.0
+  method.retaingraph:
+    value: True
+  method.lr: 
+    value: 0.000167011223364483
+  method.ema_scale:
+    value: null
+  method.beta:
+    value: null
+  method.plugins.0._target_:
+    value: method.interval_penalization_mlp.MLPIntervalPenalization
+  method.plugins.0.var_scale: 
+    value: 4.196907463555686
+  method.plugins.0.lambda_int_drift: 
+    value: 5.710612264296477
+  method.plugins.0.lambda_feat: 
+    value: 778.5931549949635
+  method.plugins.0.use_hypercube_dist_loss:
+    value: True
+  method.plugins.0.dil_mode:
+    value: False
+  method.plugins.0.regularize_classifier:
+    value: True
+  
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config-name
+  - activation_visualization.yaml
+  - ${args_no_hyphens}
