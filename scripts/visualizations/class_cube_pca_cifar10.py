@@ -116,26 +116,36 @@ def apply_pca(features, n_components=3):
     return features_pca, pca
 
 
-def compute_bounding_cube(points):
+def compute_bounding_cube(points, lower_percentile=1, upper_percentile=99):
     """
-    Compute axis-aligned bounding cube for a set of points.
+    Compute axis-aligned bounding cube for a set of points using percentiles.
     
     Args:
         points: np.array of shape (N, 3)
+        lower_percentile: Lower percentile for bounds (default: 1)
+        upper_percentile: Upper percentile for bounds (default: 99)
     
     Returns:
-        min_corner: np.array of shape (3,) - minimum coordinates
-        max_corner: np.array of shape (3,) - maximum coordinates
+        min_corner: np.array of shape (3,) - lower percentile coordinates
+        max_corner: np.array of shape (3,) - upper percentile coordinates
     """
-    min_corner = np.min(points, axis=0)
-    max_corner = np.max(points, axis=0)
+    min_corner = np.percentile(points, lower_percentile, axis=0)
+    max_corner = np.percentile(points, upper_percentile, axis=0)
     
     return min_corner, max_corner
 
 
-def draw_cube(ax, min_corner, max_corner, color='blue', alpha=0.1, edge_alpha=0.6):
-    """Draw a 3D cube on the given axes."""
-    # Define the 8 vertices of the cube
+def cube_corners_to_vertices(min_corner, max_corner):
+    """
+    Convert min/max corners to 8 vertices in the format expected by pytorch3d.
+    
+    Args:
+        min_corner: np.array of shape (3,)
+        max_corner: np.array of shape (3,)
+    
+    Returns:
+        vertices: np.array of shape (8, 3)
+    """
     r = [min_corner, max_corner]
     vertices = np.array([
         [r[0][0], r[0][1], r[0][2]],
@@ -147,6 +157,54 @@ def draw_cube(ax, min_corner, max_corner, color='blue', alpha=0.1, edge_alpha=0.
         [r[1][0], r[1][1], r[1][2]],
         [r[0][0], r[1][1], r[1][2]]
     ])
+    return vertices
+
+
+def compute_3d_iou(box1_min, box1_max, box2_min, box2_max):
+    """
+    Compute 3D Intersection over Union (IoU) for two axis-aligned bounding boxes.
+    
+    Args:
+        box1_min: np.array of shape (3,) - minimum corner of box 1
+        box1_max: np.array of shape (3,) - maximum corner of box 1
+        box2_min: np.array of shape (3,) - minimum corner of box 2
+        box2_max: np.array of shape (3,) - maximum corner of box 2
+    
+    Returns:
+        iou: float - 3D IoU value between 0 and 1
+    """
+    # Compute intersection box
+    inter_min = np.maximum(box1_min, box2_min)
+    inter_max = np.minimum(box1_max, box2_max)
+    
+    # Check if there's an intersection
+    if np.any(inter_min >= inter_max):
+        return 0.0
+    
+    # Compute intersection volume
+    inter_dims = inter_max - inter_min
+    inter_volume = np.prod(inter_dims)
+    
+    # Compute volumes of both boxes
+    box1_dims = box1_max - box1_min
+    box2_dims = box2_max - box2_min
+    box1_volume = np.prod(box1_dims)
+    box2_volume = np.prod(box2_dims)
+    
+    # Compute union volume
+    union_volume = box1_volume + box2_volume - inter_volume
+    
+    # Compute IoU
+    if union_volume == 0:
+        return 0.0
+    
+    iou = inter_volume / union_volume
+    return iou
+
+
+def draw_cube(ax, min_corner, max_corner, color='blue', alpha=0.1, edge_alpha=0.6):
+    """Draw a 3D cube on the given axes."""
+    vertices = cube_corners_to_vertices(min_corner, max_corner)
     
     # Define the 6 faces of the cube
     faces = [
@@ -354,7 +412,7 @@ def visualize_cube_sizes(features_pca, labels, output_dir="outputs/pca_cubes"):
 
 def visualize_cube_overlaps(features_pca, labels, output_dir="outputs/pca_cubes"):
     """
-    Visualize which classes have overlapping bounding cubes.
+    Visualize IoU (Intersection over Union) between class bounding cubes.
     """
     os.makedirs(output_dir, exist_ok=True)
     
@@ -368,53 +426,45 @@ def visualize_cube_overlaps(features_pca, labels, output_dir="outputs/pca_cubes"
         min_corner, max_corner = compute_bounding_cube(class_points)
         cubes[class_id] = (min_corner, max_corner)
     
-    # Check for overlaps
-    overlap_matrix = np.zeros((10, 10))
+    # Compute 3D IoU matrix
+    iou_matrix = np.zeros((10, 10))
     
+    # Compute pairwise 3D IoU using our custom function
     for i in range(10):
         for j in range(10):
             if i == j:
-                overlap_matrix[i, j] = 1.0
-                continue
-            
-            min_i, max_i = cubes[i]
-            min_j, max_j = cubes[j]
-            
-            # Check if cubes overlap
-            overlap = True
-            for dim in range(3):
-                if max_i[dim] < min_j[dim] or max_j[dim] < min_i[dim]:
-                    overlap = False
-                    break
-            
-            overlap_matrix[i, j] = 1.0 if overlap else 0.0
+                iou_matrix[i, j] = 1.0
+            else:
+                min_i, max_i = cubes[i]
+                min_j, max_j = cubes[j]
+                iou_matrix[i, j] = compute_3d_iou(min_i, max_i, min_j, max_j)
     
     # Plot heatmap
     fig, ax = plt.subplots(figsize=(10, 8))
     
     sns.heatmap(
-        overlap_matrix,
+        iou_matrix,
         annot=True,
-        fmt='.0f',
+        fmt='.2f',
         cmap='RdYlGn_r',
         xticklabels=cifar10_classes,
         yticklabels=cifar10_classes,
-        cbar_kws={'label': 'Overlap (1=yes, 0=no)'},
+        cbar_kws={'label': '3D IoU'},
         ax=ax,
         vmin=0,
         vmax=1
     )
     
-    ax.set_title('Bounding Cube Overlap Matrix\n(1 = cubes overlap, 0 = no overlap)', fontsize=14)
+    ax.set_title('Bounding Cube 3D IoU Matrix\n(Intersection over Union, 1%-99% percentile bounds)', fontsize=14)
     plt.tight_layout()
     
-    output_path = os.path.join(output_dir, "cube_overlap_matrix.png")
+    output_path = os.path.join(output_dir, "cube_iou_matrix.png")
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     print(f"Saved: {output_path}")
     
     plt.close()
     
-    return overlap_matrix
+    return iou_matrix
 
 
 def main():
@@ -454,10 +504,14 @@ def main():
     print("\n3. Cube statistics...")
     cube_stats = visualize_cube_sizes(features_pca, labels, output_dir)
     
-    print("\n4. Cube overlap analysis...")
-    overlap_matrix = visualize_cube_overlaps(features_pca, labels, output_dir)
+    print("\n4. Cube 3D IoU analysis...")
+    iou_matrix = visualize_cube_overlaps(features_pca, labels, output_dir)
     
     print(f"\n✓ All visualizations saved to {output_dir}/")
+    
+    print("\nAverage IoU between different classes: {:.4f}".format(
+        np.sum(iou_matrix - np.eye(10)) / (10 * 9)
+    ))
     
     # Print summary
     print("\n" + "="*60)
