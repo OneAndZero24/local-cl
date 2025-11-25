@@ -49,7 +49,8 @@ def load_model(device, num_classes=10):
         interval_layer_kwargs={"lower_percentile": 0.05, "upper_percentile": 0.95},
         head_type="Normal",
     )
-    model.eval()
+    # Keep in training mode to collect activations, but disable gradients
+    model.train()
     for param in model.parameters():
         param.requires_grad = False
     return model.to(device)
@@ -78,10 +79,11 @@ def collect_activations(model, dataloader, device, num_features=30):
     activation_dict = {}
     random_indices = {}
     
-    # Get all interval layers
+    # Get all interval layers by checking the module class name
+    from model.layer.interval_activation import IntervalActivation
     interval_layers = []
     for name, module in model.named_modules():
-        if isinstance(module, type(model.interval_l4_0_conv1)):
+        if isinstance(module, IntervalActivation):
             interval_layers.append((name, module))
     
     print(f"Found {len(interval_layers)} interval activation layers")
@@ -98,6 +100,11 @@ def collect_activations(model, dataloader, device, num_features=30):
             # Forward pass
             _ = model(images)
             
+            # Debug: Check first layer
+            first_layer_name, first_layer = interval_layers[0]
+            if first_layer.curr_task_last_batch is None:
+                print(f"WARNING: {first_layer_name}.curr_task_last_batch is None!")
+            
             # Extract activations from each interval layer
             for layer_name, layer_module in interval_layers:
                 if layer_module.curr_task_last_batch is not None:
@@ -109,6 +116,7 @@ def collect_activations(model, dataloader, device, num_features=30):
                     elif len(activations.shape) == 2:  # Linear layers: (B, C)
                         pass
                     else:
+                        print(f"  Warning: Unexpected shape {activations.shape} for {layer_name}")
                         continue
                     
                     # Sample features if needed
@@ -129,6 +137,9 @@ def collect_activations(model, dataloader, device, num_features=30):
         for class_id in activation_dict[layer_name]:
             if len(activation_dict[layer_name][class_id]) > 0:
                 activation_dict[layer_name][class_id] = np.array(activation_dict[layer_name][class_id])
+                print(f"  {layer_name} class {class_id}: {activation_dict[layer_name][class_id].shape}")
+            else:
+                print(f"  {layer_name} class {class_id}: NO DATA")
     
     return activation_dict, interval_layers
 
@@ -169,6 +180,7 @@ def visualize_intervals_2d(activation_dict, intervals, layer_name, output_dir="o
     os.makedirs(output_dir, exist_ok=True)
     
     if layer_name not in activation_dict or layer_name not in intervals:
+        print(f"  Skipping {layer_name}: missing data")
         return
     
     palette = sns.color_palette("tab10", 10)
@@ -188,6 +200,10 @@ def visualize_intervals_2d(activation_dict, intervals, layer_name, output_dir="o
                     })
     
     if len(data_list) == 0:
+        return
+    
+    if len(data_list) == 0:
+        print(f"  Skipping {layer_name}: no activation data")
         return
     
     df = pd.DataFrame(data_list)
