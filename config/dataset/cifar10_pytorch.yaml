@@ -1,0 +1,11 @@
+_partial_: True
+_target_: torchvision.datasets.CIFAR10
+root: ${oc.env:DATA_DIR}/cifar10
+download: True
+transform:
+  _target_: torchvision.transforms.Compose
+  transforms:
+    - _target_: torchvision.transforms.ToTensor
+    - _target_: torchvision.transforms.Normalize
+      mean: [0.4914, 0.4822, 0.4465]
+      std: [0.2470, 0.2435, 0.2616]

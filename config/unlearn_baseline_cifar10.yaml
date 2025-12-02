@@ -1,0 +1,54 @@
+# @package _global_
+# Baseline Unlearning: Simple negative loss without interval protection
+# Tests how well the model can unlearn specific classes using only negative loss
+
+defaults:
+  - dataset: cifar10_pytorch
+  - model: resnet18_unlearn
+  - _self_
+
+exp:
+  run_func:
+    _target_: src.unlearn.unlearn_experiment
+  
+  seed: 42
+  
+  # Unlearning specific parameters
+  unlearn_classes: 
+    - 0
+    - 1
+  
+  # Interval protection disabled for baseline
+  use_interval_protection: false
+  
+  # Pretraining parameters (if model_path is null)
+  pretrain_epochs: 10
+  pretrain_lr: 0.001
+  save_pretrained_path: null  # Optional: save pretrained model
+  
+  # Training parameters
+  batch_size: 128
+  epochs: 1
+  lr: 0.0001
+  criterion: CrossEntropyLoss
+  
+  # Model paths
+  model_path: null  # Path to pretrained model (or null to train from scratch)
+  save_unlearned_model_path: null  # Path to save unlearned model (optional)
+  
+  # Logging
+  detect_anomaly: False
+  log_dir: ${hydra:runtime.output_dir}
+  cleanup: False
+
+fabric:
+  _target_: lightning.Fabric
+  num_nodes: 1
+  devices: 1
+  accelerator: cpu # or gpu
+
+wandb:
+  entity: ${oc.env:WANDB_ENTITY}
+  project: unlearning-experiments
+  name: baseline_cifar10_unlearn_0_1
+  mode: online
