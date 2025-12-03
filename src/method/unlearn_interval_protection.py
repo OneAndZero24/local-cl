@@ -16,8 +16,7 @@ class UnlearnIntervalProtection:
     
     This method protects the knowledge of classes we want to RETAIN by:
     1. Computing activation intervals on retain classes
-    2. Computing the "negative space" (inverse intervals) by running unlearn classes
-    3. Penalizing weight changes that would affect activations in the protected intervals
+    2. Penalizing weight changes that would affect activations in the protected intervals
     
     The goal is to unlearn specific classes while preserving the rest.
     
@@ -52,15 +51,13 @@ class UnlearnIntervalProtection:
         
         Steps:
         1. Collect activations from retain classes (what we want to keep)
-        2. Collect activations from unlearn classes (what we want to forget)
-        3. Compute protected intervals as the "negative space" - regions where retain 
-           classes are active but unlearn classes are not
-        4. Save parameter snapshot for computing weight changes
+        2. Compute protected intervals based on retain class activations
+        3. Save parameter snapshot for computing weight changes
         
         Args:
             model: The model to protect
             retain_dataloader: DataLoader with samples from classes to retain
-            unlearn_dataloader: DataLoader with samples from classes to unlearn
+            unlearn_dataloader: DataLoader with samples from classes to unlearn (not used)
             device: Device to run computations on
         """
         
@@ -77,40 +74,38 @@ class UnlearnIntervalProtection:
             log.warning("No IntervalActivation layers found! Protection will be disabled.")
             return
         
-        # Collect activations
+        # Collect activations from retain classes only
         retain_activations = self._collect_activations(model, retain_dataloader, device)
-        unlearn_activations = self._collect_activations(model, unlearn_dataloader, device)
         
-        # Compute protected intervals (negative space of unlearn intervals)
+        # Compute protected intervals based on retain data
         self.protected_intervals = []
         for idx, (layer_name, layer) in enumerate(self.interval_layers):
             retain_acts = retain_activations[idx]  # Shape: (N_retain, features)
-            unlearn_acts = unlearn_activations[idx]  # Shape: (N_unlearn, features)
             
-            # Compute bounds for retain and unlearn classes
-            retain_min = retain_acts.min(dim=0)[0]
-            retain_max = retain_acts.max(dim=0)[0]
+            if len(retain_acts) == 0:
+                log.warning(f"No activations collected for layer {layer_name}")
+                continue
             
-            unlearn_min = unlearn_acts.min(dim=0)[0]
-            unlearn_max = unlearn_acts.max(dim=0)[0]
+            # Compute bounds for retain classes using percentiles
+            sorted_acts, _ = torch.sort(retain_acts, dim=0)
+            n_samples = sorted_acts.size(0)
             
-            # Protected intervals: where retain is active but unlearn is not
-            # We protect the regions [retain_min, unlearn_min) and (unlearn_max, retain_max]
-            # This creates two "safe zones" on either side of the unlearn region
+            lower_idx = int(n_samples * self.lower_percentile)
+            upper_idx = int(n_samples * self.upper_percentile)
+            
+            retain_min = sorted_acts[lower_idx]
+            retain_max = sorted_acts[upper_idx]
             
             protected_interval = {
                 'retain_min': retain_min,
                 'retain_max': retain_max,
-                'unlearn_min': unlearn_min,
-                'unlearn_max': unlearn_max,
                 'layer_name': layer_name
             }
             
             self.protected_intervals.append(protected_interval)
             
-            log.info(f"Layer {layer_name}: Protected intervals computed")
+            log.info(f"Layer {layer_name}: Protected interval computed")
             log.info(f"  Retain range: [{retain_min.mean().item():.4f}, {retain_max.mean().item():.4f}]")
-            log.info(f"  Unlearn range: [{unlearn_min.mean().item():.4f}, {unlearn_max.mean().item():.4f}]")
         
         # Save parameter snapshot
         self.params_snapshot = {}
@@ -143,7 +138,12 @@ class UnlearnIntervalProtection:
         
         # Run forward passes
         with torch.no_grad():
-            for X, y, _ in dataloader:
+            for batch in dataloader:
+                # Handle both 2-value and 3-value unpacking
+                if len(batch) == 3:
+                    X, y, _ = batch
+                else:
+                    X, y = batch
                 X = X.to(device)
                 _ = model(X)
         
@@ -169,9 +169,7 @@ class UnlearnIntervalProtection:
         Compute the interval protection loss.
         
         This loss penalizes weight changes that would cause the output to change
-        within the protected intervals (where retain classes are but unlearn classes aren't).
-        
-        Based on the output_reg_loss from interval_penalization_resnet18_cls.py
+        within the protected retain intervals.
         
         Returns:
             Tensor: Protection loss value
@@ -187,19 +185,14 @@ class UnlearnIntervalProtection:
             layer_name = interval_info['layer_name']
             retain_min = interval_info['retain_min'].to(device)
             retain_max = interval_info['retain_max'].to(device)
-            unlearn_min = interval_info['unlearn_min'].to(device)
-            unlearn_max = interval_info['unlearn_max'].to(device)
             
             # Find the next linear layer after this interval activation
-            # Assuming structure: IntervalActivation -> Linear -> ...
             next_linear = self._find_next_linear(model, layer_name)
             
             if next_linear is None:
                 continue
             
-            # Compute output change bounds for PROTECTED regions
-            # We protect two regions: [retain_min, unlearn_min] and [unlearn_max, retain_max]
-            
+            # Compute output change bounds for the RETAIN interval [retain_min, retain_max]
             lower_bound_reg = torch.tensor(0.0, device=device)
             upper_bound_reg = torch.tensor(0.0, device=device)
             
@@ -221,13 +214,9 @@ class UnlearnIntervalProtection:
                     weight_diff_pos = torch.relu(weight_diff)
                     weight_diff_neg = torch.relu(-weight_diff)
                     
-                    # Protect lower interval [retain_min, unlearn_min]
-                    lower_bound_reg += weight_diff_pos @ retain_min - weight_diff_neg @ unlearn_min
-                    upper_bound_reg += weight_diff_pos @ unlearn_min - weight_diff_neg @ retain_min
-                    
-                    # Protect upper interval [unlearn_max, retain_max]
-                    lower_bound_reg += weight_diff_pos @ unlearn_max - weight_diff_neg @ retain_max
-                    upper_bound_reg += weight_diff_pos @ retain_max - weight_diff_neg @ unlearn_max
+                    # Penalize changes in output for the retain interval
+                    lower_bound_reg += weight_diff_pos @ retain_min - weight_diff_neg @ retain_max
+                    upper_bound_reg += weight_diff_pos @ retain_max - weight_diff_neg @ retain_min
                 
                 elif "bias" in name:
                     bias_diff = param - prev_param

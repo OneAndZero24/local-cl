@@ -130,21 +130,6 @@ def unlearn_experiment(config: DictConfig):
         generator=torch.Generator(device=fabric.device)
     ))
     
-    
-    # Initialize interval protection if enabled
-    interval_protection = None
-    if use_interval_protection:
-        log.info('Initializing interval protection')
-        interval_protection = UnlearnIntervalProtection(
-            lambda_interval=lambda_interval,
-            compute_intervals_from_data=True
-        )
-        
-        # Setup protection before unlearning
-        interval_protection.setup_protection(
-            model, retain_loader, train_loader, fabric.device
-        )
-    
     # Pretrain if needed
     if should_pretrain:
         pretrain_epochs = config.exp.pretrain_epochs
@@ -173,6 +158,20 @@ def unlearn_experiment(config: DictConfig):
         if 'save_pretrained_path' in config.exp and config.exp.save_pretrained_path:
             log.info(f'Saving pretrained model to {config.exp.save_pretrained_path}')
             torch.save(model.state_dict(), config.exp.save_pretrained_path)
+    
+    # Initialize interval protection if enabled (AFTER pretraining)
+    interval_protection = None
+    if use_interval_protection:
+        log.info('Initializing interval protection')
+        interval_protection = UnlearnIntervalProtection(
+            lambda_interval=lambda_interval,
+            compute_intervals_from_data=True
+        )
+        
+        # Setup protection after model is pretrained
+        interval_protection.setup_protection(
+            model, retain_loader, train_loader, fabric.device
+        )
     
     # Test before unlearning
     log.info('Testing before unlearning')
