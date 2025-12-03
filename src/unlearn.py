@@ -179,9 +179,16 @@ def unlearn_experiment(config: DictConfig):
             model, optimizer, criterion, train_loader, 
             epoch, fabric, interval_protection
         )
+        
+        # Test after each epoch
+        log.info(f'Testing after unlearning epoch {epoch + 1}')
+        per_class_acc_epoch = test_per_class(
+            model, test_loader, all_classes,
+            log_prefix=f'unlearn_epoch_{epoch}'
+        )
     
-    # Test after unlearning
-    log.info('Testing after unlearning')
+    # Final test after all unlearning
+    log.info('Testing after unlearning (final)')
     per_class_acc_after = test_per_class(
         model, test_loader, all_classes,
         log_prefix='after_unlearn'
