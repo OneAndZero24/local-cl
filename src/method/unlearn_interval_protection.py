@@ -193,8 +193,9 @@ class UnlearnIntervalProtection:
                 continue
             
             # Compute output change bounds for the RETAIN interval [retain_min, retain_max]
-            lower_bound_reg = torch.tensor(0.0, device=device)
-            upper_bound_reg = torch.tensor(0.0, device=device)
+            # Initialize as None, will be set on first weight operation
+            lower_bound_reg = None
+            upper_bound_reg = None
             
             for name, param in next_linear.named_parameters():
                 # Find corresponding snapshot parameter
@@ -215,18 +216,27 @@ class UnlearnIntervalProtection:
                     weight_diff_neg = torch.relu(-weight_diff)
                     
                     # Penalize changes in output for the retain interval
-                    lower_bound_reg += weight_diff_pos @ retain_min - weight_diff_neg @ retain_max
-                    upper_bound_reg += weight_diff_pos @ retain_max - weight_diff_neg @ retain_min
+                    lower_contrib = weight_diff_pos @ retain_min - weight_diff_neg @ retain_max
+                    upper_contrib = weight_diff_pos @ retain_max - weight_diff_neg @ retain_min
+                    
+                    if lower_bound_reg is None:
+                        lower_bound_reg = lower_contrib
+                        upper_bound_reg = upper_contrib
+                    else:
+                        lower_bound_reg = lower_bound_reg + lower_contrib
+                        upper_bound_reg = upper_bound_reg + upper_contrib
                 
                 elif "bias" in name:
                     bias_diff = param - prev_param
                     # Bias affects all outputs equally
-                    lower_bound_reg = lower_bound_reg + bias_diff
-                    upper_bound_reg = upper_bound_reg + bias_diff
+                    if lower_bound_reg is not None:
+                        lower_bound_reg = lower_bound_reg + bias_diff
+                        upper_bound_reg = upper_bound_reg + bias_diff
             
-            total_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
+            if lower_bound_reg is not None:
+                total_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
         
-        return total_loss
+        return self.lambda_interval * total_loss
     
     
     def _find_next_linear(self, model: nn.Module, interval_layer_name: str) -> Optional[nn.Module]:

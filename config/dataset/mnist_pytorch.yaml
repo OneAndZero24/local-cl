@@ -1,0 +1,11 @@
+_partial_: True
+_target_: torchvision.datasets.MNIST
+root: ${oc.env:DATA_DIR}/mnist
+download: True
+transform:
+  _target_: torchvision.transforms.Compose
+  transforms:
+    - _target_: torchvision.transforms.ToTensor
+    - _target_: torchvision.transforms.Normalize
+      mean: [0.1307]
+      std: [0.3081]

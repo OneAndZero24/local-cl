@@ -1,11 +1,10 @@
 # @package _global_
-# Interval Protection Unlearning: Negative loss + interval protection
-# Protects the "negative space" where retain classes are active but unlearn classes are not
-# This should preserve knowledge of retain classes better than baseline
+# Interval Protection Unlearning on MNIST with MLP
+# Fast test configuration with smaller model and fewer epochs
 
 defaults:
-  - dataset: cifar10_pytorch
-  - model: resnet18_unlearn
+  - dataset: mnist_pytorch
+  - model: mlp_unlearn
   - _self_
 
 exp:
@@ -23,13 +22,13 @@ exp:
   use_interval_protection: true
   lambda_interval: 100.0  # Weight for interval protection loss
   
-  # Pretraining parameters (if model_path is null)
-  pretrain_epochs: 10
+  # Pretraining parameters
+  pretrain_epochs: 5
   pretrain_lr: 0.001
   
-  # Training parameters
+  # Unlearning parameters
   batch_size: 128
-  epochs: 10
+  epochs: 5
   lr: 0.0001
   criterion: CrossEntropyLoss
   
@@ -42,10 +41,10 @@ fabric:
   _target_: lightning.Fabric
   num_nodes: 1
   devices: 1
-  accelerator: cpu # or gpu
+  accelerator: cpu
 
 wandb:
   entity: ${oc.env:WANDB_ENTITY}
   project: unlearning-experiments
-  name: interval_protection_cifar10_unlearn_0_1
+  name: mnist_mlp_interval_protection
   mode: online
