@@ -23,15 +23,15 @@ exp:
   use_interval_protection: true
   lambda_interval: 1.0  # Weight for interval protection loss
   
+  # Pretraining parameters (if model_path is null)
+  pretrain_epochs: 10
+  pretrain_lr: 0.001
+  
   # Training parameters
   batch_size: 128
   epochs: 1
   lr: 0.0001
   criterion: CrossEntropyLoss
-  
-  # Model paths
-  model_path: null  # Path to pretrained model (or null to train from scratch)
-  save_unlearned_model_path: null  # Path to save unlearned model (optional)
   
   # Logging
   detect_anomaly: False

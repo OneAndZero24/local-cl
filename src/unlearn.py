@@ -59,14 +59,8 @@ def unlearn_experiment(config: DictConfig):
     log.info('Building model')
     model = instantiate(config.model)
     
-    # Load pretrained weights if specified, otherwise pretrain
-    if 'model_path' in config.exp and config.exp.model_path:
-        log.info(f'Loading pretrained model from {config.exp.model_path}')
-        state_dict = torch.load(config.exp.model_path, map_location='cpu')
-        model.load_state_dict(state_dict)
-        should_pretrain = False
-    else:
-        should_pretrain = config.exp.get('pretrain_epochs', 0) > 0
+    # Always pretrain if pretrain_epochs > 0
+    should_pretrain = config.exp.get('pretrain_epochs', 0) > 0
     
     # Setup model with fabric (no task setup, no incremental handling)
     model = fabric.setup(model)
@@ -153,11 +147,6 @@ def unlearn_experiment(config: DictConfig):
         for epoch in range(pretrain_epochs):
             log.info(f'Pretrain epoch {epoch + 1}/{pretrain_epochs}')
             pretrain_epoch(model, pretrain_optimizer, criterion, full_train_loader, epoch, fabric)
-        
-        # Save pretrained model if path specified
-        if 'save_pretrained_path' in config.exp and config.exp.save_pretrained_path:
-            log.info(f'Saving pretrained model to {config.exp.save_pretrained_path}')
-            torch.save(model.state_dict(), config.exp.save_pretrained_path)
     
     # Initialize interval protection if enabled (AFTER pretraining)
     interval_protection = None
@@ -231,11 +220,6 @@ def unlearn_experiment(config: DictConfig):
         'summary/retain_classes_after': retain_acc_after,
         'summary/retain_classes_delta': retain_acc_after - retain_acc_before,
     })
-    
-    # Optionally save the unlearned model
-    if 'save_unlearned_model_path' in config.exp:
-        log.info(f'Saving unlearned model to {config.exp.save_unlearned_model_path}')
-        torch.save(model.state_dict(), config.exp.save_unlearned_model_path)
 
 
 def pretrain_epoch(

@@ -220,8 +220,9 @@ class UnlearnIntervalProtection:
                 
                 elif "bias" in name:
                     bias_diff = param - prev_param
-                    lower_bound_reg += bias_diff
-                    upper_bound_reg += bias_diff
+                    # Bias affects all outputs equally
+                    lower_bound_reg = lower_bound_reg + bias_diff
+                    upper_bound_reg = upper_bound_reg + bias_diff
             
             total_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
         
