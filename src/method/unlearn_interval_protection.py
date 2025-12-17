@@ -23,6 +23,7 @@ class UnlearnIntervalProtection:
     Args:
         lambda_interval (float): Weight for the interval protection loss
         compute_intervals_from_data (bool): If True, computes intervals from data before unlearning
+        infinity_scale (float): Scale factor for "infinity" bounds (default: 10.0)
     """
     
     def __init__(
@@ -30,19 +31,21 @@ class UnlearnIntervalProtection:
         lambda_interval: float = 1.0,
         compute_intervals_from_data: bool = True,
         lower_percentile: float = 0.05,
-        upper_percentile: float = 0.95
+        upper_percentile: float = 0.95,
+        infinity_scale: float = 10.0
     ):
         self.lambda_interval = lambda_interval
         self.compute_intervals_from_data = compute_intervals_from_data
         self.lower_percentile = lower_percentile
         self.upper_percentile = upper_percentile
+        self.infinity_scale = infinity_scale
         
         self.params_snapshot = {}
         self.protected_intervals = []  # List of (min, max) tuples for each interval layer
         self.interval_layers = []
         
         log.info(f"UnlearnIntervalProtection initialized with lambda_interval={lambda_interval}, "
-                 f"percentiles=[{lower_percentile}, {upper_percentile}]")
+                 f"percentiles=[{lower_percentile}, {upper_percentile}], infinity_scale={infinity_scale}")
     
     
     def setup_protection(self, model: nn.Module, retain_dataloader, unlearn_dataloader, device):
@@ -169,7 +172,7 @@ class UnlearnIntervalProtection:
         Compute the interval protection loss.
         
         This loss penalizes weight changes that would cause the output to change
-        within the protected retain intervals.
+        within the protected intervals: [-inf, forget_min] and [forget_max, +inf].
         
         Returns:
             Tensor: Protection loss value
@@ -180,11 +183,11 @@ class UnlearnIntervalProtection:
         
         total_loss = torch.tensor(0.0, device=device)
         
-        # For each interval layer, compute protection loss
+        # For each interval layer, compute protection loss for two intervals
         for idx, interval_info in enumerate(self.protected_intervals):
             layer_name = interval_info['layer_name']
-            retain_min = interval_info['retain_min'].to(device)
-            retain_max = interval_info['retain_max'].to(device)
+            forget_min = interval_info['retain_min'].to(device)
+            forget_max = interval_info['retain_max'].to(device)
             
             # Find the next linear layer after this interval activation
             next_linear = self._find_next_linear(model, layer_name)
@@ -192,10 +195,17 @@ class UnlearnIntervalProtection:
             if next_linear is None:
                 continue
             
-            # Compute output change bounds for the RETAIN interval [retain_min, retain_max]
-            # Initialize as None, will be set on first weight operation
-            lower_bound_reg = None
-            upper_bound_reg = None
+            # Compute "infinity" bounds
+            neg_inf = forget_min - self.infinity_scale * torch.abs(forget_min)
+            pos_inf = forget_max + self.infinity_scale * torch.abs(forget_max)
+            
+            # Apply loss to interval 1: [-inf, forget_min]
+            lower_bound_reg_1 = None
+            upper_bound_reg_1 = None
+            
+            # Apply loss to interval 2: [forget_max, +inf]
+            lower_bound_reg_2 = None
+            upper_bound_reg_2 = None
             
             for name, param in next_linear.named_parameters():
                 # Find corresponding snapshot parameter
@@ -215,26 +225,38 @@ class UnlearnIntervalProtection:
                     weight_diff_pos = torch.relu(weight_diff)
                     weight_diff_neg = torch.relu(-weight_diff)
                     
-                    # Penalize changes in output for the retain interval
-                    lower_contrib = weight_diff_pos @ retain_min - weight_diff_neg @ retain_max
-                    upper_contrib = weight_diff_pos @ retain_max - weight_diff_neg @ retain_min
+                    # Interval 1: [-inf, forget_min]
+                    lower_contrib_1 = weight_diff_pos @ neg_inf - weight_diff_neg @ forget_min
+                    upper_contrib_1 = weight_diff_pos @ forget_min - weight_diff_neg @ neg_inf
                     
-                    if lower_bound_reg is None:
-                        lower_bound_reg = lower_contrib
-                        upper_bound_reg = upper_contrib
+                    # Interval 2: [forget_max, +inf]
+                    lower_contrib_2 = weight_diff_pos @ forget_max - weight_diff_neg @ pos_inf
+                    upper_contrib_2 = weight_diff_pos @ pos_inf - weight_diff_neg @ forget_max
+                    
+                    if lower_bound_reg_1 is None:
+                        lower_bound_reg_1 = lower_contrib_1
+                        upper_bound_reg_1 = upper_contrib_1
+                        lower_bound_reg_2 = lower_contrib_2
+                        upper_bound_reg_2 = upper_contrib_2
                     else:
-                        lower_bound_reg = lower_bound_reg + lower_contrib
-                        upper_bound_reg = upper_bound_reg + upper_contrib
+                        lower_bound_reg_1 = lower_bound_reg_1 + lower_contrib_1
+                        upper_bound_reg_1 = upper_bound_reg_1 + upper_contrib_1
+                        lower_bound_reg_2 = lower_bound_reg_2 + lower_contrib_2
+                        upper_bound_reg_2 = upper_bound_reg_2 + upper_contrib_2
                 
                 elif "bias" in name:
                     bias_diff = param - prev_param
                     # Bias affects all outputs equally
-                    if lower_bound_reg is not None:
-                        lower_bound_reg = lower_bound_reg + bias_diff
-                        upper_bound_reg = upper_bound_reg + bias_diff
+                    if lower_bound_reg_1 is not None:
+                        lower_bound_reg_1 = lower_bound_reg_1 + bias_diff
+                        upper_bound_reg_1 = upper_bound_reg_1 + bias_diff
+                        lower_bound_reg_2 = lower_bound_reg_2 + bias_diff
+                        upper_bound_reg_2 = upper_bound_reg_2 + bias_diff
             
-            if lower_bound_reg is not None:
-                total_loss += lower_bound_reg.sum().pow(2) + upper_bound_reg.sum().pow(2)
+            if lower_bound_reg_1 is not None:
+                # Add loss from both intervals
+                total_loss += lower_bound_reg_1.sum().pow(2) + upper_bound_reg_1.sum().pow(2)
+                total_loss += lower_bound_reg_2.sum().pow(2) + upper_bound_reg_2.sum().pow(2)
         
         return self.lambda_interval * total_loss
     

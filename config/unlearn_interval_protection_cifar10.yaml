@@ -22,6 +22,8 @@ exp:
   # Interval protection ENABLED
   use_interval_protection: true
   lambda_interval: 100.0  # Weight for interval protection loss
+  margin_percentile: 0.2  # Margin to shrink forget interval (0.2 = 20% on each side)
+  infinity_scale: 100.0  # Scale factor for infinity bounds (default: 10.0)
   
   # Pretraining parameters (if model_path is null)
   pretrain_epochs: 10

@@ -44,6 +44,8 @@ def unlearn_experiment(config: DictConfig):
     # Check if using interval protection
     use_interval_protection = config.exp.get('use_interval_protection', False)
     lambda_interval = config.exp.get('lambda_interval', 1.0)
+    margin_percentile = config.exp.get('margin_percentile', 0.2)
+    infinity_scale = config.exp.get('infinity_scale', 10.0)
     
     # Initialize dataset
     log.info('Initializing datasets')
@@ -154,10 +156,13 @@ def unlearn_experiment(config: DictConfig):
         log.info('Initializing interval protection')
         interval_protection = UnlearnIntervalProtection(
             lambda_interval=lambda_interval,
-            compute_intervals_from_data=True
+            compute_intervals_from_data=True,
+            margin_percentile=margin_percentile,
+            infinity_scale=infinity_scale
         )
         
         # Setup protection after model is pretrained
+        # Note: retain_loader not used anymore, only unlearn_dataloader (forget set)
         interval_protection.setup_protection(
             model, retain_loader, train_loader, fabric.device
         )
