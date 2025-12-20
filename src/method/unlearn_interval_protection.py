@@ -31,7 +31,7 @@ class UnlearnIntervalProtection:
         lambda_interval: float = 1.0,
         compute_intervals_from_data: bool = True,
         lower_percentile: float = 0.05,
-        upper_percentile: float = 0.95,
+        upper_percentile: float = 0.8,
         infinity_scale: float = 10.0
     ):
         self.lambda_interval = lambda_interval

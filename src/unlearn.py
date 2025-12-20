@@ -157,7 +157,8 @@ def unlearn_experiment(config: DictConfig):
         interval_protection = UnlearnIntervalProtection(
             lambda_interval=lambda_interval,
             compute_intervals_from_data=True,
-            margin_percentile=margin_percentile,
+            lower_percentile=margin_percentile,
+            upper_percentile=1.0 - margin_percentile,
             infinity_scale=infinity_scale
         )
         
